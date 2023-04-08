@@ -156,7 +156,7 @@ Action RLGL_Detect_Timer(Handle timer) {
 		}
 		
 		int buttons = GetClientButtons(i);
-		if(buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_DUCK | IN_JUMP)) {
+		if(buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_MOVERIGHT | IN_MOVELEFT | IN_DUCK | IN_JUMP)) {
 			SDKHooks_TakeDamage(i, 0, 0, g_cvRLGLDamage.FloatValue);
 			ShowSyncHudText(i, g_hHudMsg, "STOP MOVING ITS A RED LIGHT!!!");
 		}
