@@ -103,8 +103,8 @@ Action RLGL_Timer(Handle timer) {
 
 Action RLGL_Warning_Timer(Handle timer) {
 	static int timePassed;
-	
-	SetHudTextParams(-1.0, 0.1, 2.0, 255, 36, 255, 13);
+	char sMessage[256];
+	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (g_cvRLGLWarningTime.IntValue - timePassed));
 	for(int i = 1; i <= MaxClients; i++) {
 		if(!IsClientInGame(i)) {
 			continue;
@@ -114,7 +114,7 @@ Action RLGL_Warning_Timer(Handle timer) {
 			continue;
 		}
 		
-		ShowSyncHudText(i, g_hHudMsg, "Warning: Red Light is coming in %d seconds, Do not move after that", (g_cvRLGLWarningTime.IntValue - timePassed));
+		SendHudText(i, sMessage, _, 0);
 	}
 	
 	timePassed++;
@@ -139,8 +139,9 @@ Action RLGL_Detect_Timer(Handle timer) {
 	if(!g_bEnableDetecting) {
 		return Plugin_Handled;
 	}
-	
-	SetHudTextParams(-1.0, 0.1, 2.0, 255, 0, 0, 50);
+
+	char sMessage[256];
+	FormatEx(sMessage, sizeof(sMessage), "STOP MOVING ITS A RED LIGHT!!!");
 	for(int i = 1; i <= MaxClients; i++) {
 		if(!IsClientInGame(i)) {
 			continue;
@@ -156,9 +157,9 @@ Action RLGL_Detect_Timer(Handle timer) {
 		}
 		
 		int buttons = GetClientButtons(i);
-		if(buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_MOVERIGHT | IN_MOVELEFT | IN_DUCK | IN_JUMP)) {
+		if(buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_DUCK | IN_JUMP)) {
 			SDKHooks_TakeDamage(i, 0, 0, g_cvRLGLDamage.FloatValue);
-			ShowSyncHudText(i, g_hHudMsg, "STOP MOVING ITS A RED LIGHT!!!");
+			SendHudText(i, sMessage, _, 1);
 		}
 		
 		continue;
@@ -171,7 +172,8 @@ Action RLGL_Detect_Time_Timer(Handle timer) {
 	ApplyFade("Green");
 	g_bEnableDetecting = false;
 	
-	SetHudTextParams(-1.0, 0.1, 2.0, 124, 252, 0, 50);
+	char sMessage[256];
+	FormatEx(sMessage, sizeof(sMessage), "YOU CAN MOVE NOW, ITS A GREEN LIGHT!");
 	for(int i = 1; i <= MaxClients; i++) {
 		if(!IsClientInGame(i)) {
 			continue;
@@ -179,9 +181,9 @@ Action RLGL_Detect_Time_Timer(Handle timer) {
 		
 		if(!IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT) {
 			continue;
-		} 
-		
-		ShowSyncHudText(i, g_hHudMsg, "YOU CAN MOVE NOW, ITS A GREEN LIGHT!");
+		}
+
+		SendHudText(i, sMessage, _, 2);
 	}
 	
 	return Plugin_Continue;

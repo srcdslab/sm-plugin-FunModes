@@ -6,6 +6,10 @@
 #include <sdkhooks>
 #include <multicolors>
 
+#undef REQUIRE_PLUGIN
+#tryinclude <DynamicChannels>
+#define REQUIRE_PLUGIN
+
 #pragma newdecls required
 
 /* COLORS VARIABLES */
@@ -24,6 +28,7 @@ bool g_bIsRLGLEnabled;
 bool g_bRoundEnd;
 bool g_bEnableDetecting;
 bool g_bIsDoubleJumpOn;
+bool g_bPlugin_DynamicChannels = false;
 
 #define HealBeacon_Tag "{gold}[FunModes-HealBeacon]{lightgreen}"
 #define BeaconMode_HealBeacon 0
@@ -126,6 +131,9 @@ char colorsList[][] = {
 	"255 215 0 255 Gold"
 };
 
+/* GLOBAL CONVARS */
+ConVar g_cvHUDChannel;
+
 /* VIP MODE CONVARS */
 ConVar g_cvVIPModeCount;
 ConVar g_cvVIPModeLaser;
@@ -173,7 +181,7 @@ public Plugin myinfo =  {
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.3",
+	version = "1.3.1",
 	url = "https://nide.gg"
 }
 
@@ -192,6 +200,8 @@ public void OnPluginStart()
 	
 	/* HUD HANDLE */
 	g_hHudMsg = CreateHudSynchronizer();
+
+	g_cvHUDChannel = CreateConVar("sm_funmodes_hud_channel", "4", "The channel for the hud if using DynamicChannels", _, true, 0.0, true, 6.0);
 	
 	PluginStart_HealBeacon();
 	PluginStart_VIPMode();
@@ -212,6 +222,20 @@ public void OnPluginStart()
 	for(int i = 0; i < sizeof(commands); i++) {
 		RegAdminCmd(commands[i], Cmd_Cvars, ADMFLAG_CONVARS, "Shows All fun modes cvars");
 	}
+}
+
+public void OnAllPluginsLoaded() {
+	g_bPlugin_DynamicChannels = LibraryExists("DynamicChannels");
+}
+
+public void OnLibraryAdded(const char[] name) {
+	if (strcmp(name, "DynamicChannels", false) == 0)
+		g_bPlugin_DynamicChannels = true;
+}
+
+public void OnLibraryRemoved(const char[] name) {
+	if (strcmp(name, "DynamicChannels", false) == 0)
+		g_bPlugin_DynamicChannels = false;
 }
 
 public void OnMapStart() {
@@ -495,4 +519,47 @@ void GetConVarNameAndDescription(Panel panel, ConVar cvar) {
 	char cvarDescription[128];
 	cvar.GetDescription(cvarDescription, sizeof(cvarDescription));
 	panel.DrawText(cvarDescription);
+}
+
+stock void SendHudText(int client, const char[] sMessage, bool isFar = false, int icolor = -1) {
+	bool bDynamicAvailable = false;
+	int iHUDChannel = -1;
+
+	int iChannel = g_cvHUDChannel.IntValue;
+	if (iChannel < 0 || iChannel > 6) {
+		iChannel = 4;
+	}
+
+	bDynamicAvailable = g_bPlugin_DynamicChannels && CanTestFeatures() && GetFeatureStatus(FeatureType_Native, "GetDynamicChannel") == FeatureStatus_Available;
+
+#if defined _DynamicChannels_included_
+	if (bDynamicAvailable) {
+		iHUDChannel = GetDynamicChannel(iChannel);
+	}
+#endif
+
+	if (isFar) {
+		SetHudTextParams(-0.2, 1.0, 0.7, 255, 13, 55, 255);
+	} else {
+		SetHudTextParams(-0.2, 1.0, 2.0, 255, 36, 255, 13);
+	}
+
+	switch(icolor) {
+		case 0: {
+			SetHudTextParams(-1.0, 0.1, 2.0, 255, 36, 255, 13);
+		}
+		case 1: {
+			SetHudTextParams(-1.0, 0.1, 2.0, 255, 0, 0, 50);
+		}
+		case 2: {
+			SetHudTextParams(-1.0, 0.1, 2.0, 124, 252, 0, 50);
+		}
+	}
+
+	if (bDynamicAvailable) {
+		ShowHudText(client, iHUDChannel, "%s", sMessage);
+	} else {
+		ClearSyncHud(client, g_hHudMsg);
+		ShowSyncHudText(client, g_hHudMsg, "%s", sMessage);
+	}
 }

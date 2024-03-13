@@ -107,15 +107,16 @@ Action RoundStart_CountTimer(Handle timer) {
 		return Plugin_Stop;
 	}
 	
-	SetHudTextParams(-0.2, 1.0, 2.0, 255, 36, 255, 13);
 	
 	/* Lets send the hud message to all clients */
 	for(int i = 1; i <= MaxClients; i++) {
 		if(!IsClientInGame(i)) {
 			continue;
 		}
-		
-		ShowSyncHudText(i, g_hHudMsg, "%T", "HealBeacon_Alert", i, (alertTime - g_iCounter));
+
+		char sMessage[256];
+		FormatEx(sMessage, sizeof(sMessage), "%T", "HealBeacon_Alert", i, (alertTime - g_iCounter));
+		SendHudText(i, sMessage);
 	}
 	
 	g_iCounter++;
@@ -262,8 +263,9 @@ stock void HealBeacon_DealDamage(int client) {
 	/* if player is far then do damage and warn them */
 	if(isFar) {
 		SDKHooks_TakeDamage(client, 0, 0, g_cvHealBeaconDamage.FloatValue);
-		SetHudTextParams(-0.2, 1.0, 0.7, 255, 13, 55, 255);
-		ShowSyncHudText(client, g_hHudMsg, "%T", "HealBeacon_Damage", client);
+		char sMessage[256];
+		FormatEx(sMessage, sizeof(sMessage), "%T", "HealBeacon_Damage", client);
+		SendHudText(client, sMessage, true);
 	}
 }
 
