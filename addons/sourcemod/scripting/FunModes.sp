@@ -184,7 +184,6 @@ int g_iVIPUserid = -1;
 #include "Fun_Modes/RedLightGreenLight.sp"
 #include "Fun_Modes/DoubleJump.sp"
 #include "Fun_Modes/InvertedControls.sp"
-#include "Fun_Modes/Blind.sp"
 
 public Plugin myinfo =
 {
@@ -219,7 +218,6 @@ public void OnPluginStart()
 	PluginStart_RLGL();
 	PluginStart_DoubleJump();
 	PluginStart_IC();
-	PluginStart_Blind();
 	
 	AutoExecConfig();
 	
