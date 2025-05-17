@@ -190,7 +190,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.3.2",
+	version = "1.3.3",
 	url = "https://nide.gg"
 }
 
@@ -210,7 +210,7 @@ public void OnPluginStart()
 	/* HUD HANDLE */
 	g_hHudMsg = CreateHudSynchronizer();
 
-	g_cvHUDChannel = CreateConVar("sm_funmodes_hud_channel", "4", "The channel for the hud if using DynamicChannels", _, true, 0.0, true, 6.0);
+	g_cvHUDChannel = CreateConVar("sm_funmodes_hud_channel", "4", "The channel for the hud if using DynamicChannels", _, true, 0.0, true, 5.0);
 	
 	PluginStart_HealBeacon();
 	PluginStart_VIPMode();
@@ -567,7 +567,7 @@ stock void SendHudText(int client, const char[] sMessage, bool isFar = false, in
 	int iHUDChannel = -1;
 
 	int iChannel = g_cvHUDChannel.IntValue;
-	if (iChannel < 0 || iChannel > 6) {
+	if (iChannel < 0 || iChannel > 5) {
 		iChannel = 4;
 	}
 
