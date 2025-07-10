@@ -3,6 +3,14 @@
 
 #include <sdktools_functions>
 
+ConVarInfo g_cvInfoDoubleJump[4] = 
+{
+	{null, "150.0,260.0,300.0,320.0", "float"},
+	{null, "1,2,3,4,5", "int"},
+	{null, "0,1", "bool"},
+	{null, "0,1", "bool"}
+};
+
 /* CALLED on Plugin Start */
 stock void PluginStart_DoubleJump()
 {
@@ -14,6 +22,20 @@ stock void PluginStart_DoubleJump()
 	g_cvDoubleJumpMaxJumps		= CreateConVar("sm_doublejump_max_jumps", "1", "How many re-jumps the player can do while he is in the air.");
 	g_cvDoubleJumpHumansEnable 	= CreateConVar("sm_doublejump_humans", "1", "Enable/Disable Double jump for humans.");
 	g_cvDoubleJumpZombiesEnable = CreateConVar("sm_doublejump_zombies", "0", "Enable/Disable Double jump for Zombies.");
+	
+	DoubleJump_SetCvarsInfo();
+}
+
+void DoubleJump_SetCvarsInfo() 
+{
+	ConVar cvars[sizeof(g_cvInfoDoubleJump)];
+	cvars[0] = g_cvDoubleJumpBoost;
+	cvars[1] = g_cvDoubleJumpMaxJumps;
+	cvars[2] = g_cvDoubleJumpHumansEnable;
+	cvars[3] = g_cvDoubleJumpZombiesEnable;
+	
+	for (int i = 0; i < sizeof(g_cvInfoDoubleJump); i++)
+		g_cvInfoDoubleJump[i].cvar = cvars[i];
 }
 
 Action Cmd_DoubleJump(int client, int args)
@@ -78,12 +100,4 @@ stock void ApplyNewJump(int client)
 	vel[2] = g_cvDoubleJumpBoost.FloatValue;
 
 	TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vel);
-}
-
-stock void DoubleJump_GetConVars(ConVar cvars[4])
-{
-	cvars[0] = g_cvDoubleJumpBoost;
-	cvars[1] = g_cvDoubleJumpMaxJumps;
-	cvars[2] = g_cvDoubleJumpHumansEnable;
-	cvars[3] = g_cvDoubleJumpZombiesEnable;
 }

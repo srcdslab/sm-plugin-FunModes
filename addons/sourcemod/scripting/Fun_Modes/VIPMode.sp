@@ -1,6 +1,13 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+ConVarInfo g_cvInfoVIP[3] = 
+{
+	{null, "15.0,25.0,40.0,60.0", "float"},
+	{null, "2.0,3.0,5.0,10.0", "float"},
+	{null, "0,1", "bool"}
+};
+
 /* CALLED ON PLUGIN START */
 stock void PluginStart_VIPMode()
 {
@@ -12,6 +19,19 @@ stock void PluginStart_VIPMode()
 	g_cvVIPModeTimer = CreateConVar("sm_vipmode_timer", "15", "After how many seconds from round start to pick VIP");
 	g_cvVIPModeCount = CreateConVar("sm_vipmode_counter", "3", "After how many seconds all the other humans will be slayed after the VIP dies");
 	g_cvVIPModeLaser = CreateConVar("sm_vipmode_laser", "1", "Don't Kill all humans when vip dies to a laser, 1 = Enabled, 0 = Disabled");
+	
+	VIPMode_SetCvarsInfo();
+}
+
+void VIPMode_SetCvarsInfo()
+{
+	ConVar cvars[sizeof(g_cvInfoVIP)];
+	cvars[0] = g_cvVIPModeTimer;
+	cvars[1] = g_cvVIPModeCount;
+	cvars[2] = g_cvVIPModeLaser;
+	
+	for (int i = 0; i < sizeof(g_cvInfoVIP); i++)
+		g_cvInfoVIP[i].cvar = cvars[i];
 }
 
 public void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
@@ -332,11 +352,4 @@ Action Cmd_CheckVIP(int client, int args)
 
 	CReplyToCommand(client, "%s The current VIP is {olive}%N", VIPMode_Tag, vip);
 	return Plugin_Handled;
-}
-
-stock void VIPMode_GetConVars(ConVar cvars[3])
-{
-	cvars[0] = g_cvVIPModeTimer;
-	cvars[1] = g_cvVIPModeCount;
-	cvars[2] = g_cvVIPModeLaser;
 }

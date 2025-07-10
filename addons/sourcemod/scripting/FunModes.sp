@@ -5,6 +5,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <multicolors>
+#include <adt_array>
 
 #undef REQUIRE_PLUGIN
 #tryinclude <DynamicChannels>
@@ -123,6 +124,15 @@ enum struct fogData
 	}
 }
 
+
+/* FOR CONVAR LIST PURPOSE */
+enum struct ConVarInfo
+{
+	ConVar cvar;
+	char values[32];
+	char type[10];
+}
+
 fogData g_FogData;
 
 int g_iFogEntity = -1;
@@ -149,9 +159,12 @@ ConVar g_cvVIPModeTimer;
 /* RLGL CONVARS */
 ConVar g_cvRLGLDetectTimer;
 ConVar g_cvRLGLFinishDetectTime;
-ConVar g_cvRLGLDetectTimerRepeat;
+ConVar g_cvRLGLDetectTimerRepeatMin;
+ConVar g_cvRLGLDetectTimerRepeatMax;
 ConVar g_cvRLGLDamage;
 ConVar g_cvRLGLWarningTime;
+ConVar g_cvCountdownFolder;
+ConVar g_cvRLGLZombiesSpeed;
 
 /* DOUBLE JUMP CONVARS */
 ConVar g_cvDoubleJumpBoost;
@@ -165,7 +178,9 @@ enum ConVarType
 	CONVAR_TYPE_VIPMode = 1,
 	CONVAR_TYPE_RLGL = 2,
 	CONVAR_TYPE_DOUBLEJUMP = 3
-}
+};
+
+ConVarType g_iCurrentConVarType;
 
 /* TIMERS */
 Handle g_hKillAllTimer = null;
@@ -173,6 +188,7 @@ Handle g_hVIPRoundStartTimer = null;
 Handle g_hVIPBeaconTimer[MAXPLAYERS + 1] = { null, ... };
 Handle g_hRLGLTimer = null;
 Handle g_hRLGLDetectTimer;
+Handle g_hRLGLWarningTime;
 
 int g_iVIPUserid = -1;
 
@@ -190,7 +206,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.3.3",
+	version = "1.4.4",
 	url = "https://nide.gg"
 }
 
@@ -271,12 +287,15 @@ public void OnMapStart()
 
 	/* DELETE HEALBEACON ARRAYLIST */
 	delete g_aHBPlayers;
+	
+	MapStart_RLGL();
 }
 
 public void OnMapEnd()
 {
 	g_hRLGLTimer = null;
 	g_hRLGLDetectTimer = null;
+	g_hRLGLWarningTime = null;
 }
 
 public void OnClientPutInServer(int client)
@@ -302,6 +321,7 @@ void RoundStart_Frame()
 	RoundStart_HealBeacon();
 	RoundStart_Fog();
 	RoundStart_VIPMode();
+	RoundStart_RLGL();
 }
 
 void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -448,38 +468,262 @@ int Menu_MainCvars(Menu menu, MenuAction action, int param1, int param2)
 
 void DisplayConVarsListMenu(int client, ConVarType type)
 {
-	Panel panel = new Panel();
+	Menu menu = new Menu(Menu_DisplayConVars);
 
 	char title[64];
 	GetTypeTitle(type, title, sizeof(title));
-	panel.SetTitle(title);
+	menu.SetTitle(title);
 
-	GetTypeConVarsList(panel, type);
+	GetTypeConVarsList(menu, type);
 
-	panel.CurrentKey = 9;
-	panel.DrawItem("Back");
-
-	panel.Send(client, Menu_CvarsList, MENU_TIME_FOREVER);
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
 }
 
-int Menu_CvarsList(Menu menu, MenuAction action, int param1, int param2)
+int Menu_DisplayConVars(Menu menu, MenuAction action, int param1, int param2)
 {
 	switch(action)
 	{
 		case MenuAction_End:
-		{
 			delete menu;
+		
+		case MenuAction_Cancel:
+		{
+			if(param2 == MenuCancel_ExitBack)
+				Cmd_Cvars(param1, 0);
 		}
+		
 		case MenuAction_Select:
 		{
-			if(param2 == 9) {
-				Cmd_Cvars(param1, 0);
-				return 0;
-			}
+			char data[8];
+			menu.GetItem(param2, data, sizeof(data));
+			
+			char dataEx[2][5];
+			ExplodeString(data, "|", dataEx, 2, 5);
+			
+			ConVarType type = view_as<ConVarType>(StringToInt(dataEx[0]));
+			int index = StringToInt(dataEx[1]);
+					
+			int len = GetConVarInfoSize(type);
+			ConVarInfo[] info = new ConVarInfo[len];
+			CopyStructArray(type, info, len);
+			
+			ShowConVarInfo(param1, info[index], type);
 		}
 	}
 
 	return 0;
+}
+
+void ShowConVarInfo(int client, ConVarInfo info, ConVarType type)
+{
+	g_iCurrentConVarType = type;
+	Menu menu = new Menu(Menu_ShowConVarInfo);
+	
+	char convarName[32];
+	info.cvar.GetName(convarName, sizeof(convarName));
+	
+	char convarDescription[98];
+	info.cvar.GetDescription(convarDescription, sizeof(convarDescription));
+	
+	char title[sizeof(convarName) + sizeof(convarDescription) + 2];
+	FormatEx(title, sizeof(title), "%s\n%s", convarName, convarDescription);
+	menu.SetTitle(title);
+	
+	int valsCount;
+	for (int i = 0; i < sizeof(info.values); i++)
+	{
+		if(info.values[i] == ',')
+			valsCount++;
+	}
+	
+	valsCount++;
+	
+	char[][] dataEx = new char[valsCount][8];
+	ExplodeString(info.values, ",", dataEx, valsCount, 8);
+	
+	any currentVal = GetValFromCvar(info.cvar, info.type);
+
+	bool currentValExists = false;
+	for (int i = 0; i < valsCount; i++)
+	{
+		any val = GetValFromCvar(null, info.type, dataEx[i]);
+		if(val == currentVal) {
+			currentValExists = true;
+		}
+		
+		char data[100];
+		FormatEx(data, sizeof(data), "%d|%s|%s|%s", view_as<int>(info.cvar), dataEx[i], info.type, info.values);
+		
+		menu.AddItem(data, dataEx[i], val == currentVal ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+	}
+	
+	if(!currentValExists)
+	{
+		char val[10];
+		info.cvar.GetString(val, sizeof(val));
+		menu.AddItem(NULL_STRING, val, ITEMDRAW_DISABLED);
+	}
+	
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+}
+
+int Menu_ShowConVarInfo(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch(action)
+	{
+		case MenuAction_End:
+			delete menu;
+			
+		case MenuAction_Cancel:
+		{
+			if(param2 == MenuCancel_ExitBack)
+				DisplayConVarsListMenu(param1, g_iCurrentConVarType);
+		}
+		
+		case MenuAction_Select:
+		{
+			char data[100];
+			menu.GetItem(param2, data, sizeof(data));
+			
+			char dataEx[4][22];
+			ExplodeString(data, "|", dataEx, 4, 22);
+			
+			ConVar cvar = view_as<ConVar>(StringToInt(dataEx[0]));
+			SetCvarVal(cvar, dataEx[2], dataEx[1]);
+			
+			char cvarName[32];
+			cvar.GetName(cvarName, sizeof(cvarName));
+			CPrintToChat(param1, "{gold}[FunModes]{lightgreen} You have changed {olive}%s {lightgreen}value to {olive}%s.", cvarName, dataEx[1]);
+			
+			ConVarInfo info;
+			info.cvar = cvar;
+			strcopy(info.values, sizeof(ConVarInfo::values), dataEx[3]);
+			strcopy(info.type, sizeof(ConVarInfo::type), dataEx[2]);
+			
+			ShowConVarInfo(param1, info, g_iCurrentConVarType);
+		}
+	}
+	
+	return 0;
+}
+
+void SetCvarVal(ConVar cvar, const char[] type, const char[] valStr)
+{
+	if(strcmp(type, "int") == 0)
+		cvar.IntValue = StringToInt(valStr);
+	
+	else if(strcmp(type, "float") == 0)
+		cvar.FloatValue = StringToFloat(valStr);
+
+	else if(strcmp(type, "bool") == 0)
+		cvar.BoolValue = view_as<bool>(StringToInt(valStr));
+}
+
+any GetValFromCvar(ConVar cvar = null, const char[] type, const char[] valStr = "") {
+	if(strcmp(type, "int") == 0)
+	{
+		if(cvar != null)
+			return cvar.IntValue;
+		else
+			return StringToInt(valStr);
+	}
+	else if(strcmp(type, "float") == 0)
+	{
+		if(cvar != null)
+			return cvar.FloatValue;
+		else
+			return StringToFloat(valStr);
+	}
+
+	else if(strcmp(type, "bool") == 0)
+	{
+		if(cvar != null)
+			return cvar.BoolValue;
+		else
+			return view_as<bool>(StringToInt(valStr));
+	}	
+	
+	return 0;
+}
+
+int GetConVarInfoSize(ConVarType type) 
+{
+	switch(type)
+	{
+		case CONVAR_TYPE_HEALBEACON:
+			return sizeof(g_cvInfoHealBeacon); 
+		
+		case CONVAR_TYPE_VIPMode:
+			return sizeof(g_cvInfoVIP);
+		
+		case CONVAR_TYPE_RLGL:
+			return sizeof(g_cvInfoRLGL);
+		
+		case CONVAR_TYPE_DOUBLEJUMP:
+			return sizeof(g_cvInfoDoubleJump);
+	}
+	
+	return 1;
+}
+
+void CopyStructArray(ConVarType type, ConVarInfo[] info, int len)
+{
+	switch(type)
+	{
+		case CONVAR_TYPE_HEALBEACON:
+		{
+			for (int i = 0; i < len; i++)
+			{
+				ConVarInfo infoEx;
+				infoEx.cvar = g_cvInfoHealBeacon[i].cvar;
+				strcopy(infoEx.values, sizeof(ConVarInfo::values), g_cvInfoHealBeacon[i].values);
+				strcopy(infoEx.type, sizeof(ConVarInfo::type), g_cvInfoHealBeacon[i].type);
+				
+				info[i] = infoEx;
+			}
+		}
+		
+		case CONVAR_TYPE_VIPMode:
+		{
+			for (int i = 0; i < len; i++)
+			{
+				ConVarInfo infoEx;
+				infoEx.cvar = g_cvInfoVIP[i].cvar;
+				strcopy(infoEx.values, sizeof(ConVarInfo::values), g_cvInfoVIP[i].values);
+				strcopy(infoEx.type, sizeof(ConVarInfo::type), g_cvInfoVIP[i].type);
+				
+				info[i] = infoEx;
+			}
+		}
+		
+		case CONVAR_TYPE_RLGL:
+		{
+			for (int i = 0; i < len; i++)
+			{
+				ConVarInfo infoEx;
+				infoEx.cvar = g_cvInfoRLGL[i].cvar;
+				strcopy(infoEx.values, sizeof(ConVarInfo::values), g_cvInfoRLGL[i].values);
+				strcopy(infoEx.type, sizeof(ConVarInfo::type), g_cvInfoRLGL[i].type);
+				
+				info[i] = infoEx;
+			}
+		}
+		
+		case CONVAR_TYPE_DOUBLEJUMP:
+		{
+			for (int i = 0; i < len; i++)
+			{
+				ConVarInfo infoEx;
+				infoEx.cvar = g_cvInfoDoubleJump[i].cvar;
+				strcopy(infoEx.values, sizeof(ConVarInfo::values), g_cvInfoDoubleJump[i].values);
+				strcopy(infoEx.type, sizeof(ConVarInfo::type), g_cvInfoDoubleJump[i].type);
+				
+				info[i] = infoEx;
+			}
+		}
+	}
 }
 
 void GetTypeTitle(ConVarType type, char[] title, int maxlen)
@@ -507,58 +751,36 @@ void GetTypeTitle(ConVarType type, char[] title, int maxlen)
 	return;
 }
 
-void GetTypeConVarsList(Panel panel, ConVarType type)
+void GetTypeConVarsList(Menu menu, ConVarType type)
 {
 	switch(type)
 	{
 		case CONVAR_TYPE_HEALBEACON:
-		{
-			ConVar cvars[6];
-			HealBeacon_GetConVars(cvars);
-			for(int i = 0; i < sizeof(cvars); i++)
-			{
-				GetConVarNameAndDescription(panel, cvars[i]);
-			}
-		}
+			DisplayThisConVars(menu, g_cvInfoHealBeacon, sizeof(g_cvInfoHealBeacon), type);
+		
 		case CONVAR_TYPE_VIPMode:
-		{
-			ConVar cvars[3];
-			VIPMode_GetConVars(cvars);
-			for(int i = 0; i < sizeof(cvars); i++)
-			{
-				GetConVarNameAndDescription(panel, cvars[i]);
-			}
-		}
+			DisplayThisConVars(menu, g_cvInfoVIP, sizeof(g_cvInfoVIP), type);
+			
 		case CONVAR_TYPE_RLGL:
-		{
-			ConVar cvars[5];
-			RLGL_GetConVars(cvars);
-			for(int i = 0; i < sizeof(cvars); i++)
-			{
-				GetConVarNameAndDescription(panel, cvars[i]);
-			}
-		}
+			DisplayThisConVars(menu, g_cvInfoRLGL, sizeof(g_cvInfoRLGL), type);
+
 		case CONVAR_TYPE_DOUBLEJUMP:
-		{
-			ConVar cvars[4];
-			DoubleJump_GetConVars(cvars);
-			for(int i = 0; i < sizeof(cvars); i++)
-			{
-				GetConVarNameAndDescription(panel, cvars[i]);
-			}
-		}
+			DisplayThisConVars(menu, g_cvInfoDoubleJump, sizeof(g_cvInfoDoubleJump), type);
 	}
 }
 
-void GetConVarNameAndDescription(Panel panel, ConVar cvar)
+void DisplayThisConVars(Menu menu, ConVarInfo[] info, int len, ConVarType type)
 {
-	char cvarName[90];
-	cvar.GetName(cvarName, sizeof(cvarName));
-	panel.DrawItem(cvarName);
+	for (int i = 0; i < len; i++)
+	{
+		char data[8];
+		FormatEx(data, sizeof(data), "%d|%d", view_as<int>(type), i);
 
-	char cvarDescription[128];
-	cvar.GetDescription(cvarDescription, sizeof(cvarDescription));
-	panel.DrawText(cvarDescription);
+		char convarName[32];
+		info[i].cvar.GetName(convarName, sizeof(convarName));
+		
+		menu.AddItem(data, convarName);
+	}
 }
 
 stock void SendHudText(int client, const char[] sMessage, bool isFar = false, int icolor = -1)

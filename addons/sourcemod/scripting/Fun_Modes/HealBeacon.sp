@@ -1,6 +1,16 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+ConVarInfo g_cvInfoHealBeacon[6] = 
+{
+	{null, "20.0,30.0,40.0,60.0", "float"},
+	{null, "5.0,8.0,10.0,15.0", "float"},
+	{null, "2.0,5.0,10.0,15.0", "float"},
+	{null, "1,2,3,4,5", "int"},
+	{null, "1,2,3,4,5", "int"},
+	{null, "100.0,200.0,400.0,500.0", "float"}
+};
+
 /* Called in OnPluginStart */
 stock void PluginStart_HealBeacon()
 {
@@ -20,6 +30,22 @@ stock void PluginStart_HealBeacon()
 	g_cvHealBeaconHeal = CreateConVar("sm_beacon_heal", "1", "How much heal beacon should heal the players in 1 second");
 	g_cvRandoms = CreateConVar("sm_healbeacon_randoms", "2", "How many random players should get the heal beacon");
 	g_cvDefaultDistance = CreateConVar("sm_healbeacon_distance", "400.0", "Default distance of beacon to give");
+	
+	HealBeacon_SetCvarsInfo();
+}
+
+void HealBeacon_SetCvarsInfo()
+{
+	ConVar cvars[sizeof(g_cvInfoHealBeacon)];
+	cvars[0] = g_cvHealBeaconTimer;
+	cvars[1] = g_cvAlertTimer;
+	cvars[2] = g_cvHealBeaconDamage;
+	cvars[3] = g_cvHealBeaconHeal;
+	cvars[4] = g_cvRandoms;
+	cvars[5] = g_cvDefaultDistance;
+
+	for (int i = 0; i < sizeof(g_cvInfoHealBeacon); i++)
+		g_cvInfoHealBeacon[i].cvar = cvars[i];
 }
 
 stock void RoundStart_HealBeacon()
@@ -728,14 +754,4 @@ Action Cmd_HealBeaconCheckDistance(int client, int args)
 	float distance = GetDistanceBetween(client, target);
 	CReplyToCommand(client, "%s Distance between you and %N is: {olive}%.2f.", HealBeacon_Tag, target, distance);
 	return Plugin_Handled;
-}
-
-stock void HealBeacon_GetConVars(ConVar cvars[6])
-{
-	cvars[0] = g_cvHealBeaconTimer;
-	cvars[1] = g_cvAlertTimer;
-	cvars[2] = g_cvHealBeaconDamage;
-	cvars[3] = g_cvHealBeaconHeal;
-	cvars[4] = g_cvRandoms;
-	cvars[5] = g_cvDefaultDistance;
 }
