@@ -206,7 +206,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.4",
+	version = "1.4.5",
 	url = "https://nide.gg"
 }
 
@@ -428,7 +428,7 @@ Action Cmd_Cvars(int client, int args)
 	return Plugin_Handled;
 }
 
-int Menu_MainCvars(Menu menu, MenuAction action, int param1, int param2)
+ Menu_MainCvars(Menu menu, MenuAction action, int param1, int param2)
 {
 	switch(action)
 	{
