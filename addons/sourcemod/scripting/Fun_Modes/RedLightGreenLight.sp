@@ -75,7 +75,8 @@ stock void RoundStart_RLGL() {
 	delete g_hRLGLTimer;
 	delete g_hRLGLDetectTimer;
 	
-	StartRLGLTimer();
+	if(g_bIsRLGLEnabled)
+		StartRLGLTimer();
 }
 
 void ApplyFade(const char[] sColor)
