@@ -428,7 +428,7 @@ Action Cmd_Cvars(int client, int args)
 	return Plugin_Handled;
 }
 
- Menu_MainCvars(Menu menu, MenuAction action, int param1, int param2)
+ int Menu_MainCvars(Menu menu, MenuAction action, int param1, int param2)
 {
 	switch(action)
 	{
