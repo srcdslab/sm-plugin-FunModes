@@ -511,17 +511,6 @@ stock void ReplaceBeacon(int client, int random, int target)
 
 Action Cmd_HealBeacon(int client, int args)
 {
-	/* Check if VIP mode is on first both modes cant be played at the same time*/
-	if(g_bIsVIPModeOn)
-	{
-		if(!client)
-			ReplyToCommand(client, "%s VIP Mode is on, HealBeacon and VIP Mode can't be played together at the same time.", HealBeacon_Tag);
-		else
-			CReplyToCommand(client, "%s %T", HealBeacon_Tag, "HealBeacon_VIPModeOn", client);
-		
-		return Plugin_Handled;
-	}
-	
 	if(g_bIsHealBeaconOn)
 	{
 		g_bIsHealBeaconOn = false;
@@ -539,7 +528,13 @@ Action Cmd_HealBeacon(int client, int args)
 	else
 	{
 		g_bIsHealBeaconOn = true;
-
+	
+		/* Event hooks */
+		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
+		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
+		FunModes_HookEvent(g_bEvent_PlayerTeam, "player_team", Event_PlayerTeam);
+		FunModes_HookEvent(g_bEvent_PlayerDeath, "player_death", Event_PlayerDeath);
+		
 		delete g_aHBPlayers;
 		g_aHBPlayers = new ArrayList(ByteCountToCells(32));
 		if(!client)

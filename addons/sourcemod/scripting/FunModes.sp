@@ -192,6 +192,13 @@ Handle g_hRLGLWarningTime;
 
 int g_iVIPUserid = -1;
 
+/* Event Hooks Booleans */
+bool g_bEvent_RoundStart;
+bool g_bEvent_RoundEnd;
+bool g_bEvent_PlayerDeath;
+bool g_bEvent_PlayerTeam;
+bool g_bEvent_PlayerSpawn;
+
 /* CUSTOM SP INCLUDE FILES */
 #include "Fun_Modes/HealBeacon.sp"
 #include "Fun_Modes/HealBeacon_Menus.sp"
@@ -206,7 +213,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.5",
+	version = "1.4.6",
 	url = "https://nide.gg"
 }
 
@@ -215,13 +222,6 @@ public void OnPluginStart()
 	/* TRANSLATIONS LAODS */
 	LoadTranslations("common.phrases");
 	LoadTranslations("FunModes.phrases");
-	
-	/* EVENTS HOOKS */
-	HookEvent("round_start", Event_RoundStart);
-	HookEvent("player_death", Event_PlayerDeath);
-	HookEvent("player_team", Event_PlayerTeam);
-	HookEvent("player_spawn", Event_PlayerSpawn);
-	HookEvent("round_end", Event_RoundEnd);	
 	
 	/* HUD HANDLE */
 	g_hHudMsg = CreateHudSynchronizer();
@@ -236,7 +236,7 @@ public void OnPluginStart()
 	PluginStart_IC();
 	
 	AutoExecConfig();
-	
+
 	for(int i = 1; i <= MaxClients; i++)
 	{
 		if(IsValidClient(i))
@@ -247,6 +247,14 @@ public void OnPluginStart()
 	for(int i = 0; i < sizeof(commands); i++)
 	{
 		RegAdminCmd(commands[i], Cmd_Cvars, ADMFLAG_CONVARS, "Shows All fun modes cvars");
+	}
+}
+
+/* Events Hooks functions */
+void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback) {
+	if(!modeBool) {
+		modeBool = true;
+		HookEvent(name, callback);
 	}
 }
 

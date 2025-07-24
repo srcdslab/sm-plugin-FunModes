@@ -232,7 +232,6 @@ Action VIP_BeaconTimer(Handle timer, int userid)
 		g_hVIPBeaconTimer[client] = null;
 		return Plugin_Stop;
 	}
-
 	if(!IsPlayerAlive(client) || GetClientTeam(client) != CS_TEAM_CT)
 	{
 		g_hVIPBeaconTimer[client] = null;
@@ -251,17 +250,6 @@ Action VIP_BeaconTimer(Handle timer, int userid)
 
 Action Cmd_VIPModeEnable(int client, int args)
 {
-	/* Check if healbeacon mode is on first both modes cant be played at the same time*/
-	if(g_bIsHealBeaconOn)
-	{
-		if(!client)
-			CReplyToCommand(client, "%s Heal Beacon mode is ON, VIP Mode and HealBeacon Mode can't be played together at the same time.", VIPMode_Tag);
-		else
-			CReplyToCommand(client, "%s %T", VIPMode_Tag, "VIPMode_HealBeaconOn", client);
-		
-		return Plugin_Handled;
-	}
-
 	if(g_bIsVIPModeOn)
 	{
 		g_bIsVIPModeOn = false;
@@ -279,6 +267,13 @@ Action Cmd_VIPModeEnable(int client, int args)
 	else
 	{
 		g_bIsVIPModeOn = true;
+		
+		/* Events Hooks */
+		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
+		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
+		FunModes_HookEvent(g_bEvent_PlayerTeam, "player_team", Event_PlayerTeam);
+		FunModes_HookEvent(g_bEvent_PlayerDeath, "player_death", Event_PlayerDeath);
+		
 		if(!client)
 			CReplyToCommand(client, "%s VIP Mode is now ON!", VIPMode_Tag);
 		else
@@ -286,7 +281,7 @@ Action Cmd_VIPModeEnable(int client, int args)
 		
 		for(int i = 1; i <= MaxClients; i++)
 		{
-			if(!IsClientInGame(i))
+			if(!IsClientInGame(i) || IsFakeClient(i) || !IsClientConnected(i))
 				continue;
 
 			SDKHook(i, SDKHook_OnTakeDamagePost, OnTakeDamagePost);

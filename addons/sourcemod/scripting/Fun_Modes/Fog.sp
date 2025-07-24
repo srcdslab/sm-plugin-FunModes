@@ -1,6 +1,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+
 /* CALLED ON PLUGIN START */
 stock void PluginStart_Fog()
 {
@@ -286,6 +287,8 @@ Action Cmd_FogEnable(int client, int args)
 	else
 	{
 		g_FogData.fogEnable = true;
+		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
+		FunModes_HookEvent(g_bEvent_PlayerSpawn, "player_spawn", Event_PlayerSpawn);
 		CReplyToCommand(client, "%s FOG Mode is now {olive}ON!", Fog_Tag);
 		CreateFogEntity();
 		return Plugin_Handled;

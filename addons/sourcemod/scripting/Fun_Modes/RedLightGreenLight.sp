@@ -52,6 +52,7 @@ void RLGL_SetCvarsInfo()
 	for (int i = 0; i < sizeof(g_cvInfoRLGL); i++)
 		g_cvInfoRLGL[i].cvar = cvars[i];
 }
+
 stock void MapStart_RLGL() {
 	g_cvCountdownFolder.GetString(countDownPath, sizeof(countDownPath));
 	
@@ -146,7 +147,10 @@ Action Cmd_RLGL(int client, int args)
 	delete g_hRLGLDetectTimer;
 
 	if(g_bIsRLGLEnabled)
+	{
+		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		StartRLGLTimer();
+	}
 
 	return Plugin_Handled;
 }
