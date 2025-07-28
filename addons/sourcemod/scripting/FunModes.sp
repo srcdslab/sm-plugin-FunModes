@@ -155,6 +155,7 @@ ConVar g_cvHUDChannel;
 ConVar g_cvVIPModeCount;
 ConVar g_cvVIPModeLaser;
 ConVar g_cvVIPModeTimer;
+ConVar g_cvVIPMax;
 
 /* RLGL CONVARS */
 ConVar g_cvRLGLDetectTimer;
@@ -190,7 +191,7 @@ Handle g_hRLGLTimer = null;
 Handle g_hRLGLDetectTimer;
 Handle g_hRLGLWarningTime;
 
-int g_iVIPUserid = -1;
+bool g_bIsVIP[MAXPLAYERS + 1];
 
 /* Event Hooks Booleans */
 bool g_bEvent_RoundStart;
@@ -213,7 +214,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.6",
+	version = "1.4.7",
 	url = "https://nide.gg"
 }
 

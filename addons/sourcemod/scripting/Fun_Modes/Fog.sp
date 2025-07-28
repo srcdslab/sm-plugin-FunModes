@@ -178,6 +178,7 @@ public int FogSettings_Handler(Menu menu, MenuAction action, int param1, int par
 					}
 
 					AcceptFogInput(FOGInput_Toggle);
+					Fog_DisplaySettingsMenu(param1);
 				}
 			}
 		}
@@ -269,6 +270,7 @@ public int FogColorsMenu_Handler(Menu menu, MenuAction action, int param1, int p
 
 			CPrintToChat(param1, "%s %T", Fog_Tag, "Fog_ColorChange", param1, buffers[4], buffers[4]);
 			LogAction(param1, -1, "[FunModes-FOG] \"%L\" changed FOG color to \"%s\"", param1, buffers[4]);
+			Fog_DisplayColorsMenu(param1);
 		}
 	}
 
