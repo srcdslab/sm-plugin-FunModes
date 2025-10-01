@@ -71,6 +71,8 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v5
+        with:
+          path: package
 
       - name: Versioning
         run: |
