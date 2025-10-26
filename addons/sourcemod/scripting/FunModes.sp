@@ -302,9 +302,28 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
+	/* RLGL Timers */
 	g_hRLGLTimer = null;
 	g_hRLGLDetectTimer = null;
 	g_hRLGLWarningTime = null;
+
+	/* VIPMode Timers */	
+	g_hKillAllTimer = null;
+	g_hVIPRoundStartTimer = null;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		// VIP Beacon Timer
+		g_hVIPBeaconTimer[i] = null;
+
+		// Healbeacon beacon timer
+		g_hBeaconTimer[i] = null;
+	}
+
+	/* Healbeacon Timers */
+	g_hRoundStart_Timer[0] = null;
+	g_hRoundStart_Timer[1] = null;
+ 	g_hDamageTimer = null;
+	g_hHealTimer = null;
 }
 
 public void OnClientPutInServer(int client)
