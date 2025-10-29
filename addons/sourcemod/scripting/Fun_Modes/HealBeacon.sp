@@ -66,7 +66,7 @@ stock void RoundStart_HealBeacon()
 	g_iCounter = 0;
 
 	/* LETS CREATE THE FIRST ROUND START TIMER */
-	g_hRoundStart_Timer[0] = CreateTimer(g_cvHealBeaconTimer.FloatValue, RoundStart_Timer);
+	g_hRoundStart_Timer[0] = CreateTimer(g_cvHealBeaconTimer.FloatValue, RoundStart_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 stock void PlayerDeath_HealBeacon(int userid)
@@ -117,7 +117,7 @@ Action RoundStart_Timer(Handle timer)
 
 	/* Delete the previous timer handler if found so we dont assign a new CreateTimer over the old one */
 	delete g_hRoundStart_Timer[1];
-	g_hRoundStart_Timer[1] = CreateTimer(1.0, RoundStart_CountTimer, _, TIMER_REPEAT);
+	g_hRoundStart_Timer[1] = CreateTimer(1.0, RoundStart_CountTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Stop;
 }
 
@@ -185,7 +185,7 @@ stock void SetHealBeaconToClient(int client)
 
 	/* BEACON THE PLAYER */
 	delete g_hBeaconTimer[client];
-	g_hBeaconTimer[client] = CreateTimer(0.1, HealBeacon_BeaconTimer, GetClientUserId(client), TIMER_REPEAT);
+	g_hBeaconTimer[client] = CreateTimer(0.1, HealBeacon_BeaconTimer, GetClientUserId(client), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 
 	/* Lets now push client indexes to the arraylist */
 	g_aHBPlayers.Push(client);
@@ -195,11 +195,11 @@ stock void HealBeacon_Setup()
 {
 	/* Lets create the damage timer and delete the handle first so we dont get problems */
 	delete g_hDamageTimer;
-	g_hDamageTimer = CreateTimer(0.7, HealBeacon_DamageTimer, _, TIMER_REPEAT);
+	g_hDamageTimer = CreateTimer(0.7, HealBeacon_DamageTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 
 	/* Lets create the heal timer and delete the handle first so we dont get problems */
 	delete g_hHealTimer;
-	g_hHealTimer = CreateTimer(1.0, HealBeacon_HealTimer, _, TIMER_REPEAT);
+	g_hHealTimer = CreateTimer(1.0, HealBeacon_HealTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action HealBeacon_BeaconTimer(Handle timer, int userid)

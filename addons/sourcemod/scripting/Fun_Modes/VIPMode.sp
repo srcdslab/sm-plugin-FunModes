@@ -130,6 +130,8 @@ stock void PlayerTeam_VIPMode(int userid, int team)
 
 stock void ClientDisconnect_VIPMode(int client)
 {
+	delete g_hVIPBeaconTimer[client];
+	
 	if(!g_bIsVIPModeOn) {
 		return;
 	}
@@ -141,7 +143,7 @@ stock void ClientDisconnect_VIPMode(int client)
 	RemoveClientVIP(client, true, "VIPMode_VIPDeathDisconnect");
 
 	delete g_hKillAllTimer;
-	g_hKillAllTimer = CreateTimer(g_cvVIPModeCount.FloatValue, VIPMode_KillAllTimer);
+	g_hKillAllTimer = CreateTimer(g_cvVIPModeCount.FloatValue, VIPMode_KillAllTimer, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action VIPMode_KillAllTimer(Handle timer)
@@ -183,7 +185,7 @@ stock void RoundStart_VIPMode()
 	}
 
 	delete g_hVIPRoundStartTimer;
-	g_hVIPRoundStartTimer = CreateTimer(g_cvVIPModeTimer.FloatValue, VIPRoundStart_Timer);
+	g_hVIPRoundStartTimer = CreateTimer(g_cvVIPModeTimer.FloatValue, VIPRoundStart_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action VIPRoundStart_Timer(Handle timer)
@@ -307,7 +309,7 @@ Action Cmd_SetVIP(int client, int args)
 	CPrintToChatAll("%s {olive}%N {lightgreen}is a VIP!", VIPMode_Tag, target);
 
 	delete g_hVIPBeaconTimer[target];
-	g_hVIPBeaconTimer[target] = CreateTimer(1.0, VIP_BeaconTimer, GetClientUserId(target), TIMER_REPEAT);
+	g_hVIPBeaconTimer[target] = CreateTimer(1.0, VIP_BeaconTimer, GetClientUserId(target), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	return Plugin_Handled;
 }
 
@@ -364,7 +366,7 @@ stock void RemoveClientVIP(int client, bool kill, const char[] translation = "")
 		CPrintToChatAll("%s %t", VIPMode_Tag, "VIPMode_KillAll", g_cvVIPModeCount.IntValue);
 
 		delete g_hKillAllTimer;
-		g_hKillAllTimer = CreateTimer(g_cvVIPModeCount.FloatValue, VIPMode_KillAllTimer);
+		g_hKillAllTimer = CreateTimer(g_cvVIPModeCount.FloatValue, VIPMode_KillAllTimer, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
 
@@ -393,5 +395,5 @@ stock void VIP_PickRandom()
 	CPrintToChatAll("%s {olive}%N {lightgreen}is a VIP!", VIPMode_Tag, random);
 
 	delete g_hVIPBeaconTimer[random];
-	g_hVIPBeaconTimer[random] = CreateTimer(1.0, VIP_BeaconTimer, GetClientUserId(random), TIMER_REPEAT);
+	g_hVIPBeaconTimer[random] = CreateTimer(1.0, VIP_BeaconTimer, GetClientUserId(random), TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
