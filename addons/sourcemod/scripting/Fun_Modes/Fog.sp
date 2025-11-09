@@ -13,7 +13,7 @@ stock void PluginStart_Fog()
 
 stock void PlayerSpawn_Fog(int userid)
 {
-	CreateTimer(1.0, PlayerSpawn_Timer, userid);
+	CreateTimer(1.0, PlayerSpawn_Timer, userid, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action PlayerSpawn_Timer(Handle timer, int userid)
