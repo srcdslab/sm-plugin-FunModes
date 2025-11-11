@@ -9,7 +9,16 @@
 
 char countDownPath[PLATFORM_MAX_PATH];
 
-ConVarInfo g_cvInfoRLGL[7] = {
+// %1: client, %2: speed value (float)
+#define ChangeSpeed(%1,%2) \ 
+	SetEntPropFloat(%1,Prop_Data,"m_flLaggedMovementValue",%2); \
+	CPrintToChat(%1,RLGL_Tag..." Your speed has been changed to {olive}%.2f",%2); \
+	CPrintToChat(%1,RLGL_Tag..." This is a part of {olive}Red Light Green Light.{white} An admin decided to have this kicker.")
+
+float g_fOriginalSpeed[MAXPLAYERS + 1];
+
+ConVarInfo g_cvInfoRLGL[7] = 
+{
     {null, "0.1,0.3,0.5,0.8", "float"},
     {null, "2.0,5.0,10.0,15.0", "float"},
     {null, "20.0,30.0,40.0,60.0", "float"},
@@ -83,7 +92,7 @@ stock void RoundStart_RLGL() {
 void ApplyFade(const char[] sColor)
 {
 	int color[4];
-	if(StrEqual(sColor, "Red", false))
+	if(strcmp(sColor, "Red", false) == 0)
 	{
 		color[0] = 255;
 		color[1] = 0;
@@ -278,10 +287,21 @@ stock void SetZombiesSpeed(float val) {
 	{
 		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_T) 
 			continue;
-			
-		SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", val);
+		
+		if (val == 1.0)
+		{
+			ChangeSpeed(i,g_fOriginalSpeed[i]);
+			continue;
+		}
+		else
+		{
+			g_fOriginalSpeed[i] = GetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue");
+		}
+		
+		ChangeSpeed(i,val);
 	}
 }
+
 
 stock void StartRLGLTimer()
 {
