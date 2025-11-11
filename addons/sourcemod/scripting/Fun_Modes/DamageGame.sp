@@ -77,8 +77,6 @@ Action Timer_DamageGame(Handle timer)
 	if (!g_bMotherZombie || g_bRoundEnd)
 		return Plugin_Handled;
 		
-	PrintToChatAll("Timer Called");
-
 	int lowestDamage = 999999, count, clients[MAXPLAYERS + 1];
 	
 	for (int i = 1; i <= MaxClients; i++)
@@ -113,8 +111,7 @@ Action Timer_DamageGame(Handle timer)
 			count++;
 		}
 	}
-	
-	PrintToChatAll("Lowest damage: %d", lowestDamage);
+
 	// We got the players who dealt the lowest damage, Lets damage THEM!
 	for (int i = 0; i < count; i++)
 	{
@@ -123,13 +120,7 @@ Action Timer_DamageGame(Handle timer)
 		CPrintToChat(client, "%s You have been damaged for being a bad defender", DamageGame_Tag);
 		CPrintToChatAll("%s %N {olive}got damaged for being a bad defender!", DamageGame_Tag, client);
 	}
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (g_iDealtDamage[i] >= 0)
-			PrintToChatAll("%N - %d", i, g_iDealtDamage[i]);
-	}
-	
+
 	return Plugin_Continue;
 }
 
