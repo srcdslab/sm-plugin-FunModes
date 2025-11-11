@@ -288,7 +288,7 @@ stock void SetZombiesSpeed(float val) {
 		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_T) 
 			continue;
 		
-		if (val == 1.0)
+		if (val == 1.0 && g_fOriginalSpeed[i] > 0.0)
 		{
 			ChangeSpeed(i,g_fOriginalSpeed[i]);
 			continue;
