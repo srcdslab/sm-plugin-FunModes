@@ -37,14 +37,13 @@ void VIPMode_SetCvarsInfo()
 		g_cvInfoVIP[i].cvar = cvars[i];
 }
 
-public void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
+stock void VIPMode_OnTakeDamagePost(int victim, int attacker)
 {
-	if(!g_bIsVIPModeOn || !g_cvVIPModeLaser.BoolValue)
+	if(!g_cvVIPModeLaser.BoolValue)
 		return;
 	
-	if(!g_bIsVIP[victim]) {
+	if(!g_bIsVIP[victim])
 		return;
-	}
 
 	if(!IsValidEntity(attacker))
 		return;
@@ -85,9 +84,9 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 	return;
 }
 
-public void ZR_OnClientInfected(int client, int attacker, bool motherInfect, bool respawnOverride, bool respawn)
+stock void VIPMode_OnClientInfected(int client)
 {
-	if(!g_bIsVIPModeOn || !g_cvVIPModeLaser.BoolValue)
+	if(!g_cvVIPModeLaser.BoolValue)
 		return;
 	
 	if(!g_bIsVIP[client])
