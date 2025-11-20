@@ -116,7 +116,13 @@ Action Timer_DamageGame(Handle timer)
 	for (int i = 0; i < count; i++)
 	{
 		int client = clients[i];
-		SDKHooks_TakeDamage(client, 0, 0, g_cvDamageGameDamage.FloatValue);
+		int health = GetClientHealth(client);
+		int newHealth = health - g_cvDamageGameDamage.IntValue;
+		if (newHealth <= 0)
+			ForcePlayerSuicide(client);
+		else 
+			SetEntityHealth(client, newHealth);
+			
 		CPrintToChat(client, "%s You have been damaged for being a bad defender", DamageGame_Tag);
 		CPrintToChatAll("%s %N {olive}got damaged for being a bad defender!", DamageGame_Tag, client);
 	}
