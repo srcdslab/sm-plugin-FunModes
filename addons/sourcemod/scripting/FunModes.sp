@@ -345,9 +345,12 @@ public void OnMapEnd()
 
 public void OnClientPutInServer(int client)
 {
-	if ((!g_bIsDamageGameOn && !g_bIsVIPModeOn)) //|| IsFakeClient(client) || IsClientSourceTV(client))
+	if (!g_bIsDamageGameOn && !g_bIsVIPModeOn)
 		return;
 
+	if (IsFakeClient(client))
+		return;
+		
 	SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 } 
 

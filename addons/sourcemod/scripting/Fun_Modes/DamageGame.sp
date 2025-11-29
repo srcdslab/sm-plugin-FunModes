@@ -39,7 +39,7 @@ Action Cmd_DamageGame(int client, int args)
 	g_bIsDamageGameOn = !g_bIsDamageGameOn;
 	CPrintToChatAll("%s Damage Game is now {olive}%s.", DamageGame_Tag, (g_bIsDamageGameOn) ? "Enabled" : "Disabled");
 
-	if(g_bIsDamageGameOn)
+	if (g_bIsDamageGameOn)
 	{
 		/* Events Hooks */
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
