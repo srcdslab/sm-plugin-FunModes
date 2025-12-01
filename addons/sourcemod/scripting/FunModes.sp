@@ -421,6 +421,7 @@ public void OnClientDisconnect(int client)
 	ClientDisconnect_HealBeacon(client);
 	ClientDisconnect_VIPMode(client);
 	ClientDisconnect_DamageGame(client);
+	ClientDisconnect_RLGL(client);
 }
 
 float GetDistanceBetween(int origin, int target)
@@ -899,12 +900,15 @@ stock void SendHudText(int client, const char[] sMessage, bool isFar = false, in
 
 public void ZR_OnClientInfected(int client, int attacker, bool motherInfect)
 {
+	if (g_bIsVIPModeOn)
+		VIPMode_OnClientInfected(client);
+
+	if (g_bIsRLGLEnabled && g_bEnableDetecting)
+		RLGL_OnClientInfected(client);
+			
 	if (g_bMotherZombie)
 		return;
 	
 	if (motherInfect)
 		g_bMotherZombie = true;
-		
-	if (g_bIsVIPModeOn)
-		VIPMode_OnClientInfected(client);
 }
