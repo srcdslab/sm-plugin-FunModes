@@ -90,7 +90,7 @@ stock void RLGL_OnClientInfected(int client)
 	if (speed <= 0.0)
 		return;
 
-	g_fOriginalSpeed[client] = GetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue");
+	g_fOriginalSpeed[client] = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
 	SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", speed);
 }
 
