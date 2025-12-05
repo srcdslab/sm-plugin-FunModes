@@ -5,7 +5,7 @@
 #include <sdktools>
 #include <sdkhooks>
 #include <multicolors>
-#include <adt_array>
+#include <zombiereloaded>
 
 #undef REQUIRE_PLUGIN
 #tryinclude <DynamicChannels>
@@ -29,7 +29,9 @@ bool g_bIsRLGLEnabled;
 bool g_bRoundEnd;
 bool g_bEnableDetecting;
 bool g_bIsDoubleJumpOn;
+bool g_bIsDamageGameOn;
 bool g_bPlugin_DynamicChannels = false;
+bool g_bMotherZombie = false;
 
 #define HealBeacon_Tag "{gold}[FunModes-HealBeacon]{lightgreen}"
 #define BeaconMode_HealBeacon 0
@@ -50,6 +52,8 @@ bool g_bPlugin_DynamicChannels = false;
 #define IC_TAG "{gold}[FunModes-InvertedControls]{lightgreen}"
 
 #define Beacon_Sound        "buttons/blip1.wav"
+
+#define DamageGame_Tag "{gold}[FunModes-DamageGame]{lightgreen}"
 
 /* Arraylist to save client indexes of the heal beaconed players */
 ArrayList g_aHBPlayers;
@@ -173,12 +177,17 @@ ConVar g_cvDoubleJumpMaxJumps;
 ConVar g_cvDoubleJumpHumansEnable;
 ConVar g_cvDoubleJumpZombiesEnable;
 
+/* DamageGame CONVARS */
+ConVar g_cvDamageGameTimer;
+ConVar g_cvDamageGameDamage;
+
 enum ConVarType
 {
 	CONVAR_TYPE_HEALBEACON = 0,
 	CONVAR_TYPE_VIPMode = 1,
 	CONVAR_TYPE_RLGL = 2,
-	CONVAR_TYPE_DOUBLEJUMP = 3
+	CONVAR_TYPE_DOUBLEJUMP = 3,
+	CONVAR_TYPE_DAMAGEGAME = 4
 };
 
 ConVarType g_iCurrentConVarType;
@@ -190,6 +199,7 @@ Handle g_hVIPBeaconTimer[MAXPLAYERS + 1] = { null, ... };
 Handle g_hRLGLTimer = null;
 Handle g_hRLGLDetectTimer;
 Handle g_hRLGLWarningTime;
+Handle g_hDamageGameTimer;
 
 bool g_bIsVIP[MAXPLAYERS + 1];
 
@@ -208,13 +218,14 @@ bool g_bEvent_PlayerSpawn;
 #include "Fun_Modes/RedLightGreenLight.sp"
 #include "Fun_Modes/DoubleJump.sp"
 #include "Fun_Modes/InvertedControls.sp"
+#include "Fun_Modes/DamageGame.sp"
 
 public Plugin myinfo =
 {
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.8",
+	version = "1.4.9",
 	url = "https://nide.gg"
 }
 
@@ -235,12 +246,13 @@ public void OnPluginStart()
 	PluginStart_RLGL();
 	PluginStart_DoubleJump();
 	PluginStart_IC();
+	PluginStart_DamageGame();
 	
 	AutoExecConfig();
 
 	for(int i = 1; i <= MaxClients; i++)
 	{
-		if(IsValidClient(i))
+		if (IsValidClient(i))
 			OnClientPutInServer(i);
 	}
 	
@@ -252,8 +264,10 @@ public void OnPluginStart()
 }
 
 /* Events Hooks functions */
-void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback) {
-	if(!modeBool) {
+void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback)
+{
+	if (!modeBool)
+	{
 		modeBool = true;
 		HookEvent(name, callback);
 	}
@@ -324,16 +338,30 @@ public void OnMapEnd()
 	g_hRoundStart_Timer[1] = null;
  	g_hDamageTimer = null;
 	g_hHealTimer = null;
+	
+	/* DamageGame Timers */
+	g_hDamageGameTimer = null;
 }
 
 public void OnClientPutInServer(int client)
 {
-	if(!g_bIsVIPModeOn || IsFakeClient(client) || IsClientSourceTV(client))
+	if (!g_bIsDamageGameOn && !g_bIsVIPModeOn)
 		return;
 
+	if (IsFakeClient(client))
+		return;
+		
 	SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 } 
 
+void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
+{
+	if (g_bIsVIPModeOn)
+		VIPMode_OnTakeDamagePost(victim, attacker);
+		
+	if (g_bIsDamageGameOn)
+		DamageGame_OnTakeDamagePost(victim, attacker, damage);
+}
 /*
 *** EVENTS HOOKS CALLBACKS ***
 */
@@ -341,6 +369,7 @@ public void OnClientPutInServer(int client)
 void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundEnd = false;
+	g_bMotherZombie = false;
 	RequestFrame(RoundStart_Frame);
 }
 
@@ -350,6 +379,7 @@ void RoundStart_Frame()
 	RoundStart_Fog();
 	RoundStart_VIPMode();
 	RoundStart_RLGL();
+	RoundStart_DamageGame();
 }
 
 void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
@@ -358,6 +388,7 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
 	PlayerDeath_HealBeacon(userid);
 	PlayerDeath_VIPMode(userid);
+	PlayerDeath_DamageGame(userid);
 }
 
 void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
@@ -371,7 +402,7 @@ void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 
 void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
-	if(!g_FogData.fogEnable)
+	if (!g_FogData.fogEnable)
 		return;
 
 	int userid = event.GetInt("userid");
@@ -382,12 +413,15 @@ void Event_PlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundEnd = true;
+	g_bMotherZombie = false;
 }
 
 public void OnClientDisconnect(int client)
 {
 	ClientDisconnect_HealBeacon(client);
 	ClientDisconnect_VIPMode(client);
+	ClientDisconnect_DamageGame(client);
+	ClientDisconnect_RLGL(client);
 }
 
 float GetDistanceBetween(int origin, int target)
@@ -411,12 +445,12 @@ stock void BeaconPlayer(int client, int mode)
 	GetClientAbsOrigin(client, fvec);
 	fvec[2] += 10;
 
-	if(mode == BeaconMode_HealBeacon)
+	if (mode == BeaconMode_HealBeacon)
 	{
 		TE_SetupBeamRingPoint(fvec, (g_BeaconPlayersData[client].distance - 10.0), g_BeaconPlayersData[client].distance, g_LaserSprite, g_HaloSprite, 0, 15, 0.1, 10.0, 0.0, g_BeaconPlayersData[client].color, 10, 0);
 		TE_SendToAll();
 	}
-	else if(mode == BeaconMode_VIP)
+	else if (mode == BeaconMode_VIP)
 	{
 		TE_SetupBeamRingPoint(fvec, 10.0, 375.0, g_LaserSprite, g_HaloSprite, 0, 15, 0.5, 5.0, 0.0, g_ColorCyan, 10, 0);
 		TE_SendToAll();
@@ -440,7 +474,7 @@ stock void BeaconPlayer(int client, int mode)
 
 Action Cmd_Cvars(int client, int args)
 {
-	if(!client)
+	if (!client)
 		return Plugin_Handled;
 
 	Menu menu = new Menu(Menu_MainCvars);
@@ -450,6 +484,7 @@ Action Cmd_Cvars(int client, int args)
 	menu.AddItem("1", "- VIP Mode Cvars");
 	menu.AddItem("2", "- RedLightGreenLight Cvars");
 	menu.AddItem("3", "- DoubleJump Cvars");
+	menu.AddItem("4", "- DamageGame Cvars");
 
 	menu.ExitButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -466,27 +501,7 @@ Action Cmd_Cvars(int client, int args)
 		}
 		case MenuAction_Select:
 		{
-			ConVarType type;
-			switch(param2)
-			{
-				case 0:
-				{
-					type = CONVAR_TYPE_HEALBEACON;
-				}
-				case 1:
-				{
-					type = CONVAR_TYPE_VIPMode;
-				}
-				case 2:
-				{
-					type = CONVAR_TYPE_RLGL;
-				}
-				case 3:
-				{
-					type = CONVAR_TYPE_DOUBLEJUMP;
-				}
-			}
-			
+			ConVarType type = view_as<ConVarType>(param2);
 			DisplayConVarsListMenu(param1, type);
 		}
 	}
@@ -517,7 +532,7 @@ int Menu_DisplayConVars(Menu menu, MenuAction action, int param1, int param2)
 		
 		case MenuAction_Cancel:
 		{
-			if(param2 == MenuCancel_ExitBack)
+			if (param2 == MenuCancel_ExitBack)
 				Cmd_Cvars(param1, 0);
 		}
 		
@@ -561,7 +576,7 @@ void ShowConVarInfo(int client, ConVarInfo info, ConVarType type)
 	int valsCount;
 	for (int i = 0; i < sizeof(info.values); i++)
 	{
-		if(info.values[i] == ',')
+		if (info.values[i] == ',')
 			valsCount++;
 	}
 	
@@ -576,7 +591,7 @@ void ShowConVarInfo(int client, ConVarInfo info, ConVarType type)
 	for (int i = 0; i < valsCount; i++)
 	{
 		any val = GetValFromCvar(null, info.type, dataEx[i]);
-		if(val == currentVal) {
+		if (val == currentVal) {
 			currentValExists = true;
 		}
 		
@@ -586,7 +601,7 @@ void ShowConVarInfo(int client, ConVarInfo info, ConVarType type)
 		menu.AddItem(data, dataEx[i], val == currentVal ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 	}
 	
-	if(!currentValExists)
+	if (!currentValExists)
 	{
 		char val[10];
 		info.cvar.GetString(val, sizeof(val));
@@ -606,7 +621,7 @@ int Menu_ShowConVarInfo(Menu menu, MenuAction action, int param1, int param2)
 			
 		case MenuAction_Cancel:
 		{
-			if(param2 == MenuCancel_ExitBack)
+			if (param2 == MenuCancel_ExitBack)
 				DisplayConVarsListMenu(param1, g_iCurrentConVarType);
 		}
 		
@@ -639,35 +654,35 @@ int Menu_ShowConVarInfo(Menu menu, MenuAction action, int param1, int param2)
 
 void SetCvarVal(ConVar cvar, const char[] type, const char[] valStr)
 {
-	if(strcmp(type, "int") == 0)
+	if (strcmp(type, "int") == 0)
 		cvar.IntValue = StringToInt(valStr);
 	
-	else if(strcmp(type, "float") == 0)
+	else if (strcmp(type, "float") == 0)
 		cvar.FloatValue = StringToFloat(valStr);
 
-	else if(strcmp(type, "bool") == 0)
+	else if (strcmp(type, "bool") == 0)
 		cvar.BoolValue = view_as<bool>(StringToInt(valStr));
 }
 
 any GetValFromCvar(ConVar cvar = null, const char[] type, const char[] valStr = "") {
-	if(strcmp(type, "int") == 0)
+	if (strcmp(type, "int") == 0)
 	{
-		if(cvar != null)
+		if (cvar != null)
 			return cvar.IntValue;
 		else
 			return StringToInt(valStr);
 	}
-	else if(strcmp(type, "float") == 0)
+	else if (strcmp(type, "float") == 0)
 	{
-		if(cvar != null)
+		if (cvar != null)
 			return cvar.FloatValue;
 		else
 			return StringToFloat(valStr);
 	}
 
-	else if(strcmp(type, "bool") == 0)
+	else if (strcmp(type, "bool") == 0)
 	{
-		if(cvar != null)
+		if (cvar != null)
 			return cvar.BoolValue;
 		else
 			return view_as<bool>(StringToInt(valStr));
@@ -691,6 +706,9 @@ int GetConVarInfoSize(ConVarType type)
 		
 		case CONVAR_TYPE_DOUBLEJUMP:
 			return sizeof(g_cvInfoDoubleJump);
+			
+		case CONVAR_TYPE_DAMAGEGAME:
+			return sizeof(g_cvInfoDamageGame);
 	}
 	
 	return 1;
@@ -751,6 +769,19 @@ void CopyStructArray(ConVarType type, ConVarInfo[] info, int len)
 				info[i] = infoEx;
 			}
 		}
+		
+		case CONVAR_TYPE_DAMAGEGAME:
+		{
+			for (int i = 0; i < len; i++)
+			{
+				ConVarInfo infoEx;
+				infoEx.cvar = g_cvInfoDamageGame[i].cvar;
+				strcopy(infoEx.values, sizeof(ConVarInfo::values), g_cvInfoDamageGame[i].values);
+				strcopy(infoEx.type, sizeof(ConVarInfo::type), g_cvInfoDamageGame[i].type);
+				
+				info[i] = infoEx;
+			}
+		}
 	}
 }
 
@@ -774,6 +805,10 @@ void GetTypeTitle(ConVarType type, char[] title, int maxlen)
 		{
 			FormatEx(title, maxlen, "DoubleJump Cvars List");
 		}
+		case CONVAR_TYPE_DAMAGEGAME:
+		{
+			FormatEx(title, maxlen, "DamageGame Cvars List");
+		}
 	}
 	
 	return;
@@ -794,6 +829,9 @@ void GetTypeConVarsList(Menu menu, ConVarType type)
 
 		case CONVAR_TYPE_DOUBLEJUMP:
 			DisplayThisConVars(menu, g_cvInfoDoubleJump, sizeof(g_cvInfoDoubleJump), type);
+			
+		case CONVAR_TYPE_DAMAGEGAME:
+			DisplayThisConVars(menu, g_cvInfoDamageGame, sizeof(g_cvInfoDamageGame), type);
 	}
 }
 
@@ -858,4 +896,19 @@ stock void SendHudText(int client, const char[] sMessage, bool isFar = false, in
 		ClearSyncHud(client, g_hHudMsg);
 		ShowSyncHudText(client, g_hHudMsg, "%s", sMessage);
 	}
+}
+
+public void ZR_OnClientInfected(int client, int attacker, bool motherInfect)
+{
+	if (g_bIsVIPModeOn)
+		VIPMode_OnClientInfected(client);
+
+	if (g_bIsRLGLEnabled && g_bEnableDetecting)
+		RLGL_OnClientInfected(client);
+			
+	if (g_bMotherZombie)
+		return;
+	
+	if (motherInfect)
+		g_bMotherZombie = true;
 }

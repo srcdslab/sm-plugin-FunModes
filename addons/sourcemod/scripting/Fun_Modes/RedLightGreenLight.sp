@@ -9,7 +9,10 @@
 
 char countDownPath[PLATFORM_MAX_PATH];
 
-ConVarInfo g_cvInfoRLGL[7] = {
+float g_fOriginalSpeed[MAXPLAYERS + 1];
+
+ConVarInfo g_cvInfoRLGL[7] = 
+{
     {null, "0.1,0.3,0.5,0.8", "float"},
     {null, "2.0,5.0,10.0,15.0", "float"},
     {null, "20.0,30.0,40.0,60.0", "float"},
@@ -71,19 +74,35 @@ stock void MapStart_RLGL() {
 	}
 }
 
-stock void RoundStart_RLGL() {
+stock void RoundStart_RLGL()
+{
 	delete g_hRLGLWarningTime;
 	delete g_hRLGLTimer;
 	delete g_hRLGLDetectTimer;
 	
-	if(g_bIsRLGLEnabled)
+	if (g_bIsRLGLEnabled)
 		StartRLGLTimer();
+}
+
+stock void RLGL_OnClientInfected(int client)
+{
+	float speed = g_cvRLGLZombiesSpeed.FloatValue;
+	if (speed <= 0.0)
+		return;
+
+	g_fOriginalSpeed[client] = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
+	SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", speed);
+}
+
+stock void ClientDisconnect_RLGL(int client)
+{
+	g_fOriginalSpeed[client] = 0.0;
 }
 
 void ApplyFade(const char[] sColor)
 {
 	int color[4];
-	if(StrEqual(sColor, "Red", false))
+	if (strcmp(sColor, "Red", false) == 0)
 	{
 		color[0] = 255;
 		color[1] = 0;
@@ -100,22 +119,22 @@ void ApplyFade(const char[] sColor)
 	int count = 0;
 	int allHumans[MAXPLAYERS + 1];
 
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i) || IsFakeClient(i))
+		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
 		allHumans[count] = i;
 		count++;
 	}
 
-	if(count == 0)
+	if (count == 0)
 		return;
 
 	int flags = (FFADE_OUT);
 
 	Handle message = StartMessage("Fade", allHumans, count, 1);
-	if(GetUserMessageType() == UM_Protobuf)
+	if (GetUserMessageType() == UM_Protobuf)
 	{
 		Protobuf pb = UserMessageToProtobuf(message);
 		pb.SetInt("duration", 500);
@@ -146,7 +165,7 @@ Action Cmd_RLGL(int client, int args)
 	delete g_hRLGLTimer;
 	delete g_hRLGLDetectTimer;
 
-	if(g_bIsRLGLEnabled)
+	if (g_bIsRLGLEnabled)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		StartRLGLTimer();
@@ -157,7 +176,7 @@ Action Cmd_RLGL(int client, int args)
 
 Action RLGL_Timer(Handle timer)
 {
-	if(!g_bIsRLGLEnabled)
+	if (!g_bIsRLGLEnabled)
 		return Plugin_Stop;
 
 	g_hRLGLWarningTime = CreateTimer(1.0, RLGL_Warning_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
@@ -185,25 +204,25 @@ Action RLGL_Warning_Timer(Handle timer)
 	bool playSnd = FileExists(sndPath2);
 	sndPath2[0] = '\0';
 	
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i))
+		if (!IsClientInGame(i))
 			continue;
 
 		SendHudText(i, sMessage, _, 0);
-		if(playSnd) {
+		if (playSnd) {
 			EmitSoundToClient(i, sndPath);
 		}
 	}
 
 	timePassed++;
 
-	if(timePassed > g_cvRLGLWarningTime.IntValue)
+	if (timePassed > g_cvRLGLWarningTime.IntValue)
 	{
 		ApplyFade("Red");
 		g_bEnableDetecting = true;
 		float speed = g_cvRLGLZombiesSpeed.FloatValue;
-		if(speed > 0.0) {
+		if (speed > 0.0) {
 			SetZombiesSpeed(speed);
 		}
 		
@@ -222,7 +241,7 @@ Action RLGL_Warning_Timer(Handle timer)
 
 Action RLGL_Detect_Timer(Handle timer)
 {
-	if(!g_bIsRLGLEnabled || !g_bEnableDetecting)
+	if (!g_bIsRLGLEnabled || !g_bEnableDetecting)
 	{
 		g_hRLGLDetectTimer = null;
 		return Plugin_Stop;
@@ -230,17 +249,17 @@ Action RLGL_Detect_Timer(Handle timer)
 
 	char sMessage[256];
 	FormatEx(sMessage, sizeof(sMessage), "STOP MOVING ITS A RED LIGHT!!!");
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
 			continue;
 
 		MoveType moveType = GetEntityMoveType(i);
-		if(moveType == MOVETYPE_NOCLIP || moveType == MOVETYPE_NONE)
+		if (moveType == MOVETYPE_NOCLIP || moveType == MOVETYPE_NONE)
 			continue;
 
 		int buttons = GetClientButtons(i);
-		if(buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_JUMP))
+		if (buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_JUMP))
 		{
 			SDKHooks_TakeDamage(i, 0, 0, g_cvRLGLDamage.FloatValue);
 			SendHudText(i, sMessage, _, 1);
@@ -262,9 +281,9 @@ Action RLGL_Detect_Time_Timer(Handle timer)
 	
 	char sMessage[256];
 	FormatEx(sMessage, sizeof(sMessage), "YOU CAN MOVE NOW, ITS A GREEN LIGHT!");
-	for(int i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
 			continue;
 
 		SendHudText(i, sMessage, _, 2);
@@ -276,10 +295,18 @@ Action RLGL_Detect_Time_Timer(Handle timer)
 stock void SetZombiesSpeed(float val) {
 	for (int i = 1; i <= MaxClients; i++) 
 	{
-		if(!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_T) 
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_T) 
 			continue;
-			
-		SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", val);
+		
+		g_fOriginalSpeed[i] = (val == 1.0) ? 0.0 : GetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue");
+		float thisVal = (val == 1.0) ? g_fOriginalSpeed[i] : val;
+
+		if (thisVal == 0.0)
+			thisVal = 1.0;
+
+		SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", thisVal); 
+		CPrintToChat(i, RLGL_Tag ... " Your speed has been changed to {olive}%.2f", thisVal); 
+		CPrintToChat(i, RLGL_Tag ... " This is a part of {olive}Red Light Green Light.{white} An admin decided to have this kicker.");
 	}
 }
 
@@ -288,7 +315,7 @@ stock void StartRLGLTimer()
 	float time = 10.0;
 	float timeMax = g_cvRLGLDetectTimerRepeatMax.FloatValue;
 	float timeMin = g_cvRLGLDetectTimerRepeatMin.FloatValue;
-	if(timeMax <= 0.0) 
+	if (timeMax <= 0.0) 
 		time = timeMin;
 	else
 		time = GetRandomFloat(timeMin, timeMax);
