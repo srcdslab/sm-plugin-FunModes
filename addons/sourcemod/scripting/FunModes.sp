@@ -307,6 +307,7 @@ public void OnMapStart()
 	g_bIsDoubleJumpOn 		= false;
 	g_bIsBetterDamageModeOn = false;
 	g_bEnableDetecting 		= false;
+	g_bIsDamageGameOn		= false;
 
 	/* DELETE HEALBEACON ARRAYLIST */
 	delete g_aHBPlayers;
