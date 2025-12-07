@@ -225,7 +225,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.9",
+	version = "1.4.10",
 	url = "https://nide.gg"
 }
 
