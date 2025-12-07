@@ -225,7 +225,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.9",
+	version = "1.4.10",
 	url = "https://nide.gg"
 }
 
@@ -307,6 +307,7 @@ public void OnMapStart()
 	g_bIsDoubleJumpOn 		= false;
 	g_bIsBetterDamageModeOn = false;
 	g_bEnableDetecting 		= false;
+	g_bIsDamageGameOn		= false;
 
 	/* DELETE HEALBEACON ARRAYLIST */
 	delete g_aHBPlayers;
