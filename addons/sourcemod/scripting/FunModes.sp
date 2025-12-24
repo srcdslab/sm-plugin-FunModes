@@ -225,7 +225,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "1.4.10",
+	version = "1.4.11",
 	url = "https://nide.gg"
 }
 
@@ -352,17 +352,26 @@ public void OnClientPutInServer(int client)
 	if (IsFakeClient(client))
 		return;
 		
-	SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+	if (g_bIsVIPModeOn)
+		SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
+	else
+		SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 } 
 
 void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
-{
-	if (g_bIsVIPModeOn)
-		VIPMode_OnTakeDamagePost(victim, attacker);
-		
+{		
 	if (g_bIsDamageGameOn)
 		DamageGame_OnTakeDamagePost(victim, attacker, damage);
 }
+
+public Action OnTakeDamage(int victim, int& attacker, int& inflictor, float& damage, int& damagetype)
+{
+	if (!g_bIsVIPModeOn)
+		return Plugin_Continue;
+		
+	return VIPMode_OnTakeDamage(victim, attacker, damage);
+}
+
 /*
 *** EVENTS HOOKS CALLBACKS ***
 */
@@ -901,9 +910,6 @@ stock void SendHudText(int client, const char[] sMessage, bool isFar = false, in
 
 public void ZR_OnClientInfected(int client, int attacker, bool motherInfect)
 {
-	if (g_bIsVIPModeOn)
-		VIPMode_OnClientInfected(client);
-
 	if (g_bIsRLGLEnabled && g_bEnableDetecting)
 		RLGL_OnClientInfected(client);
 			

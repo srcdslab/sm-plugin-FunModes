@@ -1,6 +1,8 @@
 #pragma semicolon 1
 #pragma newdecls required
 
+bool g_bDiedFromLaser[MAXPLAYERS + 1];
+
 ConVarInfo g_cvInfoVIP[4] = 
 {
 	{null, "15.0,25.0,40.0,60.0", "float"},
@@ -37,67 +39,51 @@ void VIPMode_SetCvarsInfo()
 		g_cvInfoVIP[i].cvar = cvars[i];
 }
 
-stock void VIPMode_OnTakeDamagePost(int victim, int attacker)
+stock Action VIPMode_OnTakeDamage(int victim, int attacker, float damage)
 {
-	if(!g_cvVIPModeLaser.BoolValue)
-		return;
+	if (!g_cvVIPModeLaser.BoolValue)
+		return Plugin_Continue;
 	
-	if(!g_bIsVIP[victim])
-		return;
+	if (!g_bIsVIP[victim])
+		return Plugin_Continue;
 
-	if(!IsValidEntity(attacker))
-		return;
+	if (!IsValidEntity(attacker))
+		return Plugin_Continue;
 
 	char classname[64];
-	if(!GetEntityClassname(attacker, classname, sizeof(classname)))
-		return;
+	if (!GetEntityClassname(attacker, classname, sizeof(classname)))
+		return Plugin_Continue;
 
 	/* if attacker entity is not trigger_hurt */
-	if(!StrEqual(classname, "trigger_hurt"))
-	{
-		RemoveClientVIP(victim, true, "VIPMode_VIPDeath");
-		return;
-	}
+	if (strcmp(classname, "trigger_hurt") != 0)
+		return Plugin_Continue;
 
 	/* we should now check if trigger_hurt is from a laser */
-	int parent = GetEntPropEnt(attacker, Prop_Data, "m_hParent");
-	if(!IsValidEntity(parent))
-		return;
+	int parent = GetEntPropEnt(attacker, Prop_Data, "m_hParent");	
+	if (!IsValidEntity(parent))
+		return Plugin_Continue;
 
 	bool isFromLaser = false;
 	char parentClassName[64];
-	if(!GetEntityClassname(parent, parentClassName, sizeof(parentClassName))) {
-		return;
-	}
+	if(!GetEntityClassname(parent, parentClassName, sizeof(parentClassName)))
+		return Plugin_Continue;
 
-	if(StrEqual(parentClassName, "func_movelinear") || StrEqual(parentClassName, "func_door"))
+	if (strcmp(parentClassName, "func_movelinear") == 0 || strcmp(parentClassName, "func_door") == 0)
 		isFromLaser = true;
-
-	if(!isFromLaser)
-	{
-		RemoveClientVIP(victim, true, "VIPMode_VIPDeathLaser");
-		return;
-	}
-
-	CPrintToChatAll("%s %T", VIPMode_Tag, "VIPMode_VIPDeathLaser", victim, victim);
-	RemoveClientVIP(victim, false);
-	return;
-}
-
-stock void VIPMode_OnClientInfected(int client)
-{
-	if(!g_cvVIPModeLaser.BoolValue)
-		return;
-	
-	if(!g_bIsVIP[client])
-		return;
 		
-	RemoveClientVIP(client, true, "VIPMode_VIPDeath");
+	if (!isFromLaser)
+		return Plugin_Continue;
+		
+	g_bDiedFromLaser[victim] = false;
+	if (damage >= GetClientHealth(victim))
+		g_bDiedFromLaser[victim] = true;
+	
+	return Plugin_Continue;
 }
 
 stock void PlayerDeath_VIPMode(int userid)
 {
-	if(!g_bIsVIPModeOn || g_cvVIPModeLaser.BoolValue)
+	if(!g_bIsVIPModeOn)
 		return;
 
 	int client = GetClientOfUserId(userid);
@@ -107,6 +93,14 @@ stock void PlayerDeath_VIPMode(int userid)
 	if(!g_bIsVIP[client])
 		return;
 
+	if (g_bDiedFromLaser[client])
+	{
+		CPrintToChatAll("%s %T", VIPMode_Tag, "VIPMode_VIPDeathLaser", client, client);
+		RemoveClientVIP(client, false);
+		g_bDiedFromLaser[client] = false;
+		return;
+	}
+	
 	RemoveClientVIP(client, true, "VIPMode_VIPDeath");
 }
 
@@ -176,10 +170,8 @@ stock void RoundStart_VIPMode()
 	/* DELETE VIP BEACON TIMER */
 	for(int i = 1; i <= MaxClients; i++)
 	{
-		if(!IsValidClient(i))
-			continue;
-
 		g_bIsVIP[i] = false;
+		g_bDiedFromLaser[i] = false;
 		delete g_hVIPBeaconTimer[i];
 	}
 
@@ -267,7 +259,7 @@ Action Cmd_VIPModeEnable(int client, int args)
 			if(!IsClientInGame(i) || IsFakeClient(i) || !IsClientConnected(i))
 				continue;
 
-			SDKHook(i, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+			SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 		}
 
 		return Plugin_Handled;
