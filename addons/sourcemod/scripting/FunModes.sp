@@ -358,7 +358,7 @@ public void OnClientPutInServer(int client)
 		SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 } 
 
-void OnTakeDamage(int victim, int attacker, int inflictor, float damage, int damagetype)
+void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
 {		
 	if (g_bIsDamageGameOn)
 		DamageGame_OnTakeDamagePost(victim, attacker, damage);
