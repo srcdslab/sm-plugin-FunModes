@@ -352,17 +352,26 @@ public void OnClientPutInServer(int client)
 	if (IsFakeClient(client))
 		return;
 		
-	SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+	if (g_bIsVIPModeOn)
+		SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
+	else
+		SDKHook(client, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
 } 
 
-void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
-{
-	if (g_bIsVIPModeOn)
-		VIPMode_OnTakeDamagePost(victim, attacker, damage);
-		
+void OnTakeDamage(int victim, int attacker, int inflictor, float damage, int damagetype)
+{		
 	if (g_bIsDamageGameOn)
 		DamageGame_OnTakeDamagePost(victim, attacker, damage);
 }
+
+public Action OnTakeDamage(int victim, int& attacker, int& inflictor, float& damage, int& damagetype)
+{
+	if (!g_bIsVIPModeOn)
+		return Plugin_Continue;
+		
+	return VIPMode_OnTakeDamage(victim, attacker, damage);
+}
+
 /*
 *** EVENTS HOOKS CALLBACKS ***
 */

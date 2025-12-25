@@ -39,44 +39,46 @@ void VIPMode_SetCvarsInfo()
 		g_cvInfoVIP[i].cvar = cvars[i];
 }
 
-stock void VIPMode_OnTakeDamagePost(int victim, int attacker, float damage)
+stock Action VIPMode_OnTakeDamage(int victim, int attacker, float damage)
 {
 	if (!g_cvVIPModeLaser.BoolValue)
-		return;
+		return Plugin_Continue;
 	
 	if (!g_bIsVIP[victim])
-		return;
+		return Plugin_Continue;
 
 	if (!IsValidEntity(attacker))
-		return;
+		return Plugin_Continue;
 
 	char classname[64];
 	if (!GetEntityClassname(attacker, classname, sizeof(classname)))
-		return;
+		return Plugin_Continue;
 
 	/* if attacker entity is not trigger_hurt */
 	if (strcmp(classname, "trigger_hurt") != 0)
-		return;
+		return Plugin_Continue;
 
 	/* we should now check if trigger_hurt is from a laser */
-	int parent = GetEntPropEnt(attacker, Prop_Data, "m_hParent");
+	int parent = GetEntPropEnt(attacker, Prop_Data, "m_hParent");	
 	if (!IsValidEntity(parent))
-		return;
+		return Plugin_Continue;
 
 	bool isFromLaser = false;
 	char parentClassName[64];
 	if(!GetEntityClassname(parent, parentClassName, sizeof(parentClassName)))
-		return;
+		return Plugin_Continue;
 
 	if (strcmp(parentClassName, "func_movelinear") == 0 || strcmp(parentClassName, "func_door") == 0)
 		isFromLaser = true;
-	
+		
 	if (!isFromLaser)
-		return;
-	
+		return Plugin_Continue;
+		
 	g_bDiedFromLaser[victim] = false;
-	if (damage > GetClientHealth(victim))
+	if (damage >= GetClientHealth(victim))
 		g_bDiedFromLaser[victim] = true;
+	
+	return Plugin_Continue;
 }
 
 stock void PlayerDeath_VIPMode(int userid)
@@ -257,7 +259,7 @@ Action Cmd_VIPModeEnable(int client, int args)
 			if(!IsClientInGame(i) || IsFakeClient(i) || !IsClientConnected(i))
 				continue;
 
-			SDKHook(i, SDKHook_OnTakeDamagePost, OnTakeDamagePost);
+			SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
 		}
 
 		return Plugin_Handled;
