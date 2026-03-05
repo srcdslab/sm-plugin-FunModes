@@ -154,7 +154,7 @@ stock void OnTakeDamagePost_DamageGame(int victim, int attacker, float damage)
 	g_iDealtDamage[attacker] += RoundToNearest(damage);
 }
 
-stock void OnWeaponEquip_DamageGame(int client, int weapon, Action &result)
+stock void OnWeaponCanUse_DamageGame(int client, int weapon, Action &result)
 {
 	#pragma unused client
 	#pragma unused weapon
@@ -190,7 +190,7 @@ public Action Cmd_DamageGameToggle(int client, int args)
 			OnClientPutInServer_DamageGame(i);
 		}
 		
-		CS_TerminateRound(3.0, CSRoundEnd_Draw);
+		FunModes_RestartRound();
 	}
 	else
 	{

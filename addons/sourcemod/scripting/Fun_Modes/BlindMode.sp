@@ -214,7 +214,7 @@ void ApplyBlind(int client)
 	int color[4];
 	color[3] = 255;
 
-	int flags = FFADE_OUT;
+	int flags = FFADE_IN;
 	
 	int clients[1];
 	clients[0] = client;
@@ -273,17 +273,18 @@ Action Timer_BlindMode(Handle timer)
 	float percentage = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_PERCENTAGE].cvar.FloatValue;
 	int neededZombies = RoundToCeil(zombiesCount * (percentage / 100));
 	
-	int enough = 0;
+	int enough = 1;
 	do 
 	{
 		int zombie = zombies[GetRandomInt(0, zombiesCount - 1)];
 		if (g_bHasFlash[zombie])
 			zombie = zombies[GetRandomInt(0, zombiesCount - 1)];
-			
+
 		g_bHasFlash[zombie] = true;
+		
 		int entity = GivePlayerItem(zombie, "weapon_flashbang");
 		EquipPlayerWeapon(zombie, entity);
-		SetEntData(zombie, FindSendPropInfo("CBasePlayer", "m_iAmmo") + (view_as<int>(GrenadeType_Flashbang) * 4), 1, _, true);
+
 		CPrintToChat(zombie, "%s You have been granted a FlashBang!!!\nBlind some humans.", THIS_MODE_INFO.tag);
 		enough++;
 	} while (enough <= neededZombies);
@@ -315,6 +316,7 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 	GetEntPropVector(entity, Prop_Send, "m_vecOrigin", origin);
 
 	float maxDistance = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_MAX_DISTANCE].cvar.FloatValue;
+	maxDistance *= maxDistance;
 	
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -324,7 +326,7 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 		float plOrigin[3];
 		GetClientAbsOrigin(i, plOrigin);
 		
-		float distance = GetVectorDistance(origin, plOrigin);
+		float distance = GetVectorDistance(origin, plOrigin, true);
 		if (distance > maxDistance)
 			continue;
 		

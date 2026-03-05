@@ -181,7 +181,7 @@ public Action Cmd_PullGameToggle(int client, int args)
 		
 		CPrintToChatAll("%s {olive}%d Random Humans {lightgreen}and {olive}%d Random Zombies {lightgreen}will be selected for the pullgame every %d seconds", THIS_MODE_INFO.tag, humansCount, zombiesCount, interval);
 		
-		CS_TerminateRound(3.0, CSRoundEnd_Draw);
+		FunModes_RestartRound();
 	}
 	else
 		PullGame_ToggleTimer(false);

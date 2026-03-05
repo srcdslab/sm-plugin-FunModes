@@ -695,6 +695,8 @@ public Action Cmd_HealBeaconToggle(int client, int args)
 			ReplyToCommand(client, "%s HealBeacon Mode is now ON!", THIS_MODE_INFO.tag);
 		else
 			CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_Enabled", client);
+			
+		FunModes_RestartRound();
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);

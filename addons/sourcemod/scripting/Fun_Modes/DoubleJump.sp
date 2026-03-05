@@ -27,7 +27,8 @@ stock void OnPluginStart_DoubleJump()
 
 	/* ADMIN COMMANDS */
 	RegAdminCmd("sm_fm_doublejump", Cmd_DoubleJumpToggle, ADMFLAG_CONVARS, "Enable/Disable Double Jump mode.");
-
+	RegAdminCmd("sm_doublejump_settings", Cmd_DoubleJumpSettings, ADMFLAG_CONFIG, "Open DoubleJump Settings Menu");
+	
 	/* CONVARS */
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, DOUBLEJUMP_CONVAR_BOOST,

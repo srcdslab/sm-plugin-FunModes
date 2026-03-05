@@ -13,10 +13,12 @@ ModeInfo g_FogInfo;
 #undef THIS_MODE_INFO
 #define THIS_MODE_INFO g_FogInfo
 
-#define FOGInput_Color 0
-#define FOGInput_Start 1
-#define FOGInput_End 2
+#define FOGInput_Color 	0
+#define FOGInput_Start 	1
+#define FOGInput_End 	2
 #define FOGInput_Toggle 3
+
+#define FOG_NAME		"fog_mode_aaa34124n"
 
 enum struct fogData
 {
@@ -110,7 +112,7 @@ stock void Event_RoundStart_Fog()
 			if (!IsClientInGame(i))
 				continue;
 
-			SetVariantString("fog_mode_aaa34124n");
+			SetVariantString(FOG_NAME);
 			AcceptEntityInput(i, "SetFogController");
 		}
 
@@ -123,6 +125,9 @@ stock void Event_RoundStart_Fog()
 stock void Event_RoundEnd_Fog() {}
 stock void Event_PlayerSpawn_Fog(int client)
 {
+	if (!THIS_MODE_INFO.isOn)
+		return;
+		
 	CreateTimer(1.0, PlayerSpawn_Timer, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
 }
 
@@ -138,11 +143,14 @@ stock void Event_PlayerDeath_Fog(int client)
 
 Action PlayerSpawn_Timer(Handle timer, int userid)
 {
+	if (!THIS_MODE_INFO.isOn)
+		return Plugin_Stop;
+		
 	int client = GetClientOfUserId(userid);
-	if (client < 1 || !THIS_MODE_INFO.isOn)
+	if (client < 1)
 		return Plugin_Stop;
 
-	SetVariantString("fog_mode_aaa34124n");
+	SetVariantString(FOG_NAME);
 	AcceptEntityInput(client, "SetFogController");
 	return Plugin_Continue;
 }
@@ -151,7 +159,7 @@ stock void CreateFogEntity()
 {
 	/* CHECK FOR ANY FOG MAP HAS */
 	int entity = -1;
-	while((entity = FindEntityByClassname(entity, "env_fog_controller")) != -1)
+	while ((entity = FindEntityByClassname(entity, "env_fog_controller")) != -1)
 	{
 		if (entity == g_iFogEntity)
 			continue;
@@ -169,7 +177,7 @@ stock void CreateFogEntity()
 	if (!IsValidEntity(g_iFogEntity))
 		return;
 	
-	DispatchKeyValue(g_iFogEntity, "targetname", "fog_mode_aaa34124n");
+	DispatchKeyValue(g_iFogEntity, "targetname", FOG_NAME);
 	DispatchKeyValue(g_iFogEntity, "fogenable", "1");
 	DispatchKeyValue(g_iFogEntity, "fogblend", "1");
 	DispatchKeyValueFloat(g_iFogEntity, "fogstart", g_FogData.fogStart);
@@ -186,7 +194,7 @@ stock void CreateFogEntity()
 		if (!IsClientInGame(i))
 			continue;
 
-		SetVariantString("fog_mode_aaa34124n");
+		SetVariantString(FOG_NAME);
 		AcceptEntityInput(i, "SetFogController");
 	}
 }
@@ -200,8 +208,8 @@ stock void AcceptFogInput(int mode)
 	{
 		case FOGInput_Color:
 		{
-			char sColor[64];
-			Format(sColor, sizeof(sColor), "%i %i %i %i", g_FogData.fogColor[0], g_FogData.fogColor[1], g_FogData.fogColor[2], g_FogData.fogColor[3]);
+			char sColor[20];
+			FormatEx(sColor, sizeof(sColor), "%i %i %i %i", g_FogData.fogColor[0], g_FogData.fogColor[1], g_FogData.fogColor[2], g_FogData.fogColor[3]);
 
 			SetVariantString(sColor);
 			AcceptEntityInput(g_iFogEntity, "SetColor");
@@ -403,6 +411,7 @@ public Action Cmd_FogToggle(int client, int args)
 		FunModes_HookEvent(g_bEvent_PlayerSpawn, "player_spawn", Event_PlayerSpawn);
 		CReplyToCommand(client, "%s FOG Mode is now {olive}ON!", THIS_MODE_INFO.tag);
 		CreateFogEntity();
+		AcceptFogInput(FOGInput_Toggle);
 		return Plugin_Handled;
 	}
 }

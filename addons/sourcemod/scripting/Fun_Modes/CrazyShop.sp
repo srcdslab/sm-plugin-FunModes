@@ -400,7 +400,7 @@ stock void OnTakeDamagePost_CrazyShop(int victim, int attacker, float damage)
 	}
 }
 
-stock void OnWeaponEquip_CrazyShop(int client, int weapon, Action &result)
+stock void OnWeaponCanUse_CrazyShop(int client, int weapon, Action &result)
 {
 	#pragma unused client
 	#pragma unused weapon
@@ -421,7 +421,7 @@ stock void OnTakeDamage_CrazyShop(int victim, int &attacker, float &damage, Acti
 	// victim is for sure gonna be a real player, so no need to check
 	
 	// check if victim is a human and has laser protect
-	if (PLAYER_TEMP_VAR(victim, laserProtect) && !isVictimAlive && !isVictimZombie)
+	if (PLAYER_TEMP_VAR(victim, laserProtect) && isVictimAlive && !isVictimZombie)
 	{
 		if (!IsValidEntity(attacker))
 			return;
@@ -463,7 +463,7 @@ stock void OnTakeDamage_CrazyShop(int victim, int &attacker, float &damage, Acti
 		
 		if (PLAYER_TEMP_VAR(victim, kbProtect))
 		{
-			damage -= damage * 0.9;
+			damage -= damage * g_CrazyShopItems[8].amount;
 			result = Plugin_Changed;
 			return;
 		}
@@ -531,7 +531,7 @@ stock void OnPlayerRunCmdPost_CrazyShop(int client, int buttons, int impulse)
 	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
 	if (impulse == 100)
 	{	
-		PLAYER_TEMP_VAR(client, lastUse) = currentTime + 2;
+		PLAYER_TEMP_VAR(client, lastUse) = currentTime + 2.0;
 		CrazyShop_OpenAvailableItems(client);	
 	}
 }
@@ -806,7 +806,7 @@ public Action Cmd_CrazyShopToggle(int client, int args)
 		}
 		
 		// Restart the round
-		CS_TerminateRound(2.0, CSRoundEnd_Draw);
+		FunModes_RestartRound();
 	}
 	else
 		delete THIS_MODE_DB;
@@ -1462,27 +1462,9 @@ int Menu_AvailableItems(Menu menu, MenuAction action, int param1, int param2)
 
 void CrazyShop_Activate(int client, int itemNum)
 {
-	if (!IsPlayerAlive(client))
-	{
-		CPrintToChat(client, "%s You are not alive to activate this item.", THIS_MODE_INFO.tag);
-		return;
-	}
-	
 	CrazyShop_Item item;
 	item = g_CrazyShopItems[itemNum];
-		
-	if (item.team == 1 && !ZR_IsClientHuman(client))
-	{
-		CPrintToChat(client, "%s This is a human item, you cannot use it right now!", THIS_MODE_INFO.tag);
-		return;
-	}
-	
-	if (item.team == 0 && !ZR_IsClientZombie(client))
-	{
-		CPrintToChat(client, "%s This is a zombie item, you cannot use it right now!", THIS_MODE_INFO.tag);
-		return;
-	}
-	
+
 	if (PLAYER_ITEM_ACTIVE(client, itemNum))
 	{
 		CPrintToChat(client, "%s You cannot activate the same item again unless the old ones' effect ended", THIS_MODE_INFO.tag);
@@ -1597,7 +1579,7 @@ void CrazyShop_Activate(int client, int itemNum)
 		// Buy a smokegrenade
 		case 5:
 		{
-			GiveGrenadesToClient(client, GrenadeType_Smokegrenade, 1);
+			SET_GRENADES_COUNT(client, SMOKEGRENADE, GET_GRENADES_COUNT(client, SMOKEGRENADE) + 1);
 			
 			int wp = GivePlayerItem(client, "weapon_smokegrenade");
 			EquipPlayerWeapon(client, wp);

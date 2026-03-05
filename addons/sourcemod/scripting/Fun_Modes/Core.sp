@@ -17,7 +17,7 @@ bool g_bEvent_WeaponFire;
 
 /* Client SDKHook Boolens */
 bool g_bSDKHook_OnTakeDamagePost[MAXPLAYERS + 1] = { false, ... };
-bool g_bSDKHook_WeaponEquip[MAXPLAYERS + 1] =  { false, ... };
+bool g_bSDKHook_WeaponCanUse[MAXPLAYERS + 1] =  { false, ... };
 bool g_bSDKHook_OnTakeDamage[MAXPLAYERS + 1] =  { false, ... };
 
 /* Round Checking Booleans */
@@ -45,6 +45,7 @@ int g_iCounter = 0;
 /* GLOBAL CONVARS */
 ConVar g_cvHUDChannel;
 int g_iPreviousModeIndex[MAXPLAYERS+1];
+int g_iNetPropAmmoIndex = -1;
 
 /* SDKCall Handles */
 Handle g_hSwitchSDKCall;
@@ -105,6 +106,13 @@ enum WeaponAmmoGrenadeType
 	GrenadeType_Smokegrenade        = 13,   /** CSS - Smokegrenade slot. */
 };
 
+#define HEGRENADE			11
+#define FLASHBANG			12
+#define SMOKEGRENADE		13
+
+#define GET_GRENADES_COUNT(%1,%2)		GetEntData(%1, g_iNetPropAmmoIndex + (%2 * 4))
+#define SET_GRENADES_COUNT(%1,%2,%3)	SetEntData(%1, g_iNetPropAmmoIndex + (%2 * 4), %3, _, true)			
+		
 /* 
 - New FunModes Update
 	* The plugin will now use macros to define the main functions and forwards
@@ -135,7 +143,6 @@ enum WeaponAmmoGrenadeType
 		CALL_MODE_FUNC(%1, RealityShift); \
 		CALL_MODE_FUNC(%1, PullGame)
 
-#define CALL_MODE_FUNC_PARAM(%1,%2,%3) %1_%2(%3)
 #define DECLARE_FM_FORWARD_PARAM(%1,%2) \
 		CALL_MODE_FUNC_PARAM(%1, HealBeacon, %2); \ 
 		CALL_MODE_FUNC_PARAM(%1, VIPMode, %2); \
@@ -149,6 +156,7 @@ enum WeaponAmmoGrenadeType
 		CALL_MODE_FUNC_PARAM(%1, CrazyShop, %2); \
 		CALL_MODE_FUNC_PARAM(%1, RealityShift, %2); \
 		CALL_MODE_FUNC_PARAM(%1, PullGame, %2)
+#define CALL_MODE_FUNC_PARAM(%1,%2,%3) %1_%2(%3)
 
 /*
 these commented macros are not used for now
@@ -180,7 +188,8 @@ these commented macros are not used for now
 #define DECLARE_ONPLAYERRUNCMD_POST(%1,%2,%3,%4) \
 		CALL_MODE_FUNC_PARAM3(%1, DoubleJump, %2, %3, %4); \
 		CALL_MODE_FUNC_PARAM3(%1, CrazyShop, %2, %3, %4); \
-		CALL_MODE_FUNC_PARAM3(%1, PullGame, %2, %3, %4)
+		CALL_MODE_FUNC_PARAM3(%1, PullGame, %2, %3, %4); \
+		CALL_MODE_FUNC_PARAM3(%1, ChaosWeapons, %2, %3, %4)
 		
 /* %0: ConVarInfo[], %1: index, %2: name, %3: default value, %4: description 
 	%5: cvar values, %6: cvar value type
@@ -194,6 +203,8 @@ these commented macros are not used for now
 #define CHANGE_MODE_INFO(%1,%2,%3,%4) \ 
 		%1.%2 = %3; \
 		g_ModesInfo[%4] = %1
+
+#define FUNMODE_CONVAR(%1,%2) %1.cvarInfo[%2].cvar
 
 #define THIS_MODE_INFO
 

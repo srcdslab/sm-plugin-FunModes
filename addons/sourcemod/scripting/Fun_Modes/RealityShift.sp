@@ -162,7 +162,7 @@ public Action Cmd_RealityShiftToggle(int client, int args)
 		int interval = THIS_MODE_INFO.cvarInfo[REALITYSHIFT_CONVAR_TIMER_INTERVAL].cvar.IntValue;
 		CPrintToChatAll("%s Positions will be swapped every {olive}%d seconds!", THIS_MODE_INFO.tag, interval);
 		
-		CS_TerminateRound(3.0, CSRoundEnd_Draw);
+		FunModes_RestartRound();
 	}
 	else
 		delete g_hRealityShiftTimer;

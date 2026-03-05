@@ -25,16 +25,18 @@ ModeInfo g_ChaosWeaponsInfo;
 
 #define CHAOSWEAPONS_CONVAR_TIMER_INTERVAL	0
 #define CHAOSWEAPONS_CONVAR_KNOCKBACK		1
-#define CHAOSWEAPONS_CONVAR_TOGGLE 			2
+#define CHAOSWEAPONS_CONVAR_COUNTDOWN		2
+#define CHAOSWEAPONS_CONVAR_TOGGLE 			3
 
 Handle g_hChaosWeaponsTimer;
 
+char g_sChaosWeaponCurrent[32];
+
 char g_ChaosWeaponsList[][] = 
 {
-	"ELITE", "DEAGLE", /* Pistols */
-	"MAC10", "TMP", "MP5NAVY", "UMP45", "P90", /* SMGs */
-	"GALIL", "FAMAS", "AK47", "M4A1", "AUG", "SG552", /* Rifles */
-	"M3", "XM1014" /* Shotguns */
+	"mac10", "tmp", "mp5navy", "ump45", "p90", /* SMGs */
+	"galil", "famas", "ak47", "m4a1", "aug", "sg552", /* Rifles */
+	"m3", "xm1014" /* Shotguns */
 };
 
 float g_fOriginalWeaponsKB[sizeof(g_ChaosWeaponsList)];
@@ -60,6 +62,12 @@ stock void OnPluginStart_ChaosWeapons()
 		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_KNOCKBACK,
 		"sm_chaosweapons_knockback", "0.1", "Knockback to set of other weapons",
 		("0.1,0.2,0.5,1.0"), "float"
+	);
+	
+	DECLARE_FM_CVAR(
+		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_COUNTDOWN,
+		"sm_chaosweapons_countdown", "10", "How many seconds for the countdown",
+		("5,10,15,20"), "int"
 	);
 	
 	DECLARE_FM_CVAR(
@@ -203,7 +211,43 @@ Action Timer_ChaosWeapons(Handle timer)
 		return Plugin_Handled;
 	}
 	
-	PickRandomWeapon();
+	CreateTimer(1.0, Timer_ChaosWeaponsRepeat, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+	return Plugin_Continue;
+}
+
+Action Timer_ChaosWeaponsRepeat(Handle timer)
+{
+	static int counter;
+	if (!THIS_MODE_INFO.isOn || g_bRoundEnd || !g_bMotherZombie)
+	{
+		counter = 0;
+		return Plugin_Stop;
+	}
+	
+	int max = THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_COUNTDOWN].cvar.IntValue;
+	
+	if (++counter >= max)
+	{
+		counter = 0;
+		PickRandomWeapon();
+		return Plugin_Stop;
+	}
+	
+	char msg[128];
+	FormatEx
+	(
+		msg, sizeof(msg), "[ChaosWeapons] The weapon that pushes zombies will change in %d seconds!", 
+		max - counter
+	);
+	
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i))
+			continue;
+			
+		SendHudText(i, msg, _, 1);
+	}
+	
 	return Plugin_Continue;
 }
 
@@ -211,10 +255,11 @@ void PickRandomWeapon()
 {
 	int index = GetRandomInt(0, sizeof(g_ChaosWeaponsList) - 1);
 	
+	FormatEx(g_sChaosWeaponCurrent, sizeof(g_sChaosWeaponCurrent), "weapon_%s", g_ChaosWeaponsList[index]);
 	SetAllWeaponsKnockback(THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_KNOCKBACK].cvar.FloatValue, index);
 	
 	char msg[255];
-	FormatEx(msg, sizeof(msg), "Only the [%s] will push the zombies for the next %d seconds!", g_ChaosWeaponsList[index], THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_TIMER_INTERVAL].cvar.IntValue);
+	FormatEx(msg, sizeof(msg), "Only the [%s] will push the zombies for the next %d seconds\nPress F to buy it!", StrToUpper(g_ChaosWeaponsList[index]), THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_TIMER_INTERVAL].cvar.IntValue);
 	
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -226,31 +271,90 @@ void PickRandomWeapon()
 	}
 }
 
+stock char[] StrToUpper(const char[] buffer)
+{
+	int len = strlen(buffer);
+	char myChar[32];
+	
+	for (int i = 0; i < len; i++)
+	{
+		char c = buffer[i];
+		if (c >= 'a' && c <= 'z')
+			c &= ~0x20;
+			
+		myChar[i] = c;
+	}
+	
+	return myChar;
+}
+
 void SetAllWeaponsKnockback(float kb = 0.0, int index = -1, bool firstTime = false, bool turnOff = false)
 {
 	for (int i = 0; i < sizeof(g_ChaosWeaponsList); i++)
 	{	
-		int len = strlen(g_ChaosWeaponsList[i]);
-		char[] lower = new char[len + 1];
-		
-		for (int j = 0; j < len; j++)
-		{
-			char c = g_ChaosWeaponsList[i][j];
-			if (c >= 'A' && c <= 'Z')
-				c |= 0x20;
-			
-			lower[j] = c;
-		}
-		
 		if (turnOff || (index >= 0 && i == index))
 		{
-			ZR_SetWeaponKnockback(lower, g_fOriginalWeaponsKB[i]);
+			ZR_SetWeaponKnockback(g_ChaosWeaponsList[i], g_fOriginalWeaponsKB[i]);
 			continue;
 		}
 		
 		if (firstTime)
-			g_fOriginalWeaponsKB[i] = ZR_GetWeaponKnockback(lower);
+			g_fOriginalWeaponsKB[i] = ZR_GetWeaponKnockback(g_ChaosWeaponsList[i]);
 		
-		ZR_SetWeaponKnockback(lower, kb);
+		ZR_SetWeaponKnockback(g_ChaosWeaponsList[i], kb);
+	}
+}
+
+stock void OnPlayerRunCmdPost_ChaosWeapons(int client, int buttons, int impulse)
+{
+	#pragma unused buttons
+	
+	if (!THIS_MODE_INFO.isOn)
+		return;
+	
+	if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
+		return;
+		
+	static float playersTime[MAXPLAYERS + 1];
+	
+	float currentTime = GetGameTime();
+	if (currentTime <= playersTime[client])
+		return;
+		
+	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
+	if (impulse == 100)
+	{	
+		playersTime[client] = currentTime + 2.0;
+		
+		char curWeapon[sizeof(g_sChaosWeaponCurrent)];
+		strcopy(curWeapon, sizeof(curWeapon), g_sChaosWeaponCurrent);
+		
+		int weapon = 0; 
+		
+		ReplaceString(curWeapon, sizeof(curWeapon), "weapon_", "");
+		int price = ZR_GetWeaponZMarketPrice(curWeapon);
+		
+		int cash = GetEntProp(client, Prop_Send, "m_iAccount");
+		if (cash < price)
+		{
+			CPrintToChat(client, "%s Insufficent fund", THIS_MODE_INFO.tag);
+			return;
+		}
+		
+		weapon = GetPlayerWeaponSlot(client, CS_SLOT_PRIMARY);
+		if (IsValidEntity(weapon))
+		{
+			SDKHooks_DropWeapon(client, weapon);
+			RemoveEntity(weapon);
+		}
+		
+		weapon = GivePlayerItem(client, g_sChaosWeaponCurrent);
+		if (!IsValidEntity(weapon))
+			return;
+			
+		if (g_hSwitchSDKCall != null)
+			SDKCall(g_hSwitchSDKCall, client, weapon, 0);
+		
+		SetEntProp(client, Prop_Send, "m_iAccount", cash - price);
 	}
 }

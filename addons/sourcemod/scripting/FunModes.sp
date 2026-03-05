@@ -26,7 +26,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "2.0.0",
+	version = "2.1.0",
 	url = "https://nide.gg"
 }
 
@@ -57,6 +57,10 @@ public void OnPluginStart()
 		RegAdminCmd(commands[i], Cmd_FunModes, ADMFLAG_CONVARS, "Show all available funmodes");
 	}
 	
+	g_iNetPropAmmoIndex = FindSendPropInfo("CBasePlayer", "m_iAmmo");
+	if (g_iNetPropAmmoIndex == -1)
+		SetFailState("[FunModes] Could not find offset `CBasePlayer::m_iAmmo`");
+		
 	GameData gd = new GameData("sdkhooks.games/engine.ep2v");
 	if (gd == null)
 		LogError("[FunModes] Could not find \"sdkhooks.games/engine.ep2v.txt\" file.");
@@ -108,13 +112,6 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		g_bSDKHook_OnTakeDamagePost[i] = false;
-		g_bSDKHook_WeaponEquip[i] = false;
-		g_bSDKHook_OnTakeDamage[i] = false;
-	}
-
 	DECLARE_FM_FORWARD(OnMapEnd);
 }
 
@@ -126,8 +123,8 @@ public void OnClientPutInServer(int client)
 public void OnClientDisconnect(int client)
 {
 	g_bSDKHook_OnTakeDamagePost[client] = false;
-	g_bSDKHook_WeaponEquip[client] = false;
 	g_bSDKHook_OnTakeDamage[client] = false;
+	g_bSDKHook_WeaponCanUse[client] = false;
 	DECLARE_FM_FORWARD_PARAM(OnClientDisconnect, client);
 }
 
@@ -148,6 +145,7 @@ void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundEnd = true;
+	g_bMotherZombie = false;
 	DECLARE_FM_FORWARD(Event_RoundEnd);
 }
 
@@ -173,20 +171,20 @@ void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int
 	DECLARE_FM_FORWARD_PARAM3(OnTakeDamagePost, victim, attacker, damage);
 }
 
-Action OnWeaponEquip(int client, int weapon)
-{
-	Action result = Plugin_Continue;
-	
-	DECLARE_FM_FORWARD_PARAM3(OnWeaponEquip, client, weapon, result);
-	
-	return result;
-}
-
 Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
 	Action result = Plugin_Continue;
 	
 	DECLARE_FM_FORWARD_PARAM4(OnTakeDamage, victim, attacker, damage, result);
+	
+	return result;
+}
+
+Action OnWeaponCanUse(int client, int weapon)
+{
+	Action result = Plugin_Continue;
+	
+	DECLARE_FM_FORWARD_PARAM3(OnWeaponCanUse, client, weapon, result);
 	
 	return result;
 }
@@ -199,6 +197,20 @@ void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback)
 		modeBool = true;
 		HookEvent(name, callback);
 	}
+}
+
+void FunModes_RestartRound()
+{
+	// slay all players before terminating the round
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+		
+		ForcePlayerSuicide(i);
+	}
+	
+	CS_TerminateRound(3.0, CSRoundEnd_Draw);
 }
 
 public void OnAllPluginsLoaded()
@@ -261,16 +273,6 @@ stock void BeaconPlayer(int client, int mode, float distance = 0.0, int color[4]
 
 		TE_SendToAll();
 		EmitAmbientSound(Beacon_Sound, fvec, client, SNDLEVEL_RAIDSIREN);
-	}
-}
-
-void GiveGrenadesToClient(int client, WeaponAmmoGrenadeType type, int amount)
-{
-	int ammo = FindSendPropInfo("CBasePlayer", "m_iAmmo");
-	if (ammo != -1)
-	{
-		int grenadesCount = GetEntData(client, ammo + (view_as<int>(type) * 4));
-		SetEntData(client, ammo + (view_as<int>(type) * 4), grenadesCount + amount, _, true);
 	}
 }
 

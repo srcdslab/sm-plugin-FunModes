@@ -232,7 +232,7 @@ stock void OnTakeDamage_VIPMode(int victim, int attacker, float damage, Action &
 		g_bDiedFromLaser[victim] = true;
 }
 
-stock void OnWeaponEquip_VIPMode(int client, int weapon, Action &result)
+stock void OnWeaponCanUse_VIPMode(int client, int weapon, Action &result)
 {
 	#pragma unused client
 	#pragma unused weapon

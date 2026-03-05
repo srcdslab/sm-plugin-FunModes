@@ -35,7 +35,8 @@ stock void OnPluginStart_RLGL()
 
 	/* ADMIN COMMANDS */
 	RegAdminCmd("sm_fm_rlgl", Cmd_RLGLToggle, ADMFLAG_CONVARS, "Enable/Disable RedLightGreenLight mode.");
-
+	RegAdminCmd("sm_rlgl_settings", Cmd_RLGLSettings, ADMFLAG_CONVARS, "Open RLGL Settings Menu");
+	
 	/* CONVARS */
 	DECLARE_FM_CVAR(
 		THIS_MODE_INFO.cvarInfo, RLGL_CONVAR_TIME_BETWEEN_DAMAGE, 
