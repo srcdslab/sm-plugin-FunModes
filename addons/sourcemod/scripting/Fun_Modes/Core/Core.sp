@@ -373,5 +373,5 @@ enum WeaponAmmoGrenadeType
 		THIS_MODE_INFO.index = g_iLastModeIndex++; \
 		g_ModesInfo[THIS_MODE_INFO.index] = THIS_MODE_INFO
 
-#include "Fun_Modes/Core/ModesInclude.sp"
-#include "Fun_Modes/Core/ModesDefinition.sp"
+#include "ModesInclude.sp"
+#include "ModesDefinition.sp"
