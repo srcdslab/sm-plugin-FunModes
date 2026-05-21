@@ -2,11 +2,10 @@
     (). FunModes V2:
         
     @file           ChaosWeapons.sp
-    @Usage         	Funcitons for the ChaosWeapons mode.
-    				
+    @Usage          Funcitons for the ChaosWeapons mode.
 */
 
-/*
+ /*
 	Chaos Weapons: A mode where every 30 seconds or 1 minute, 
 	a global message says what weapon will be used like "Only the AK47 will push the zombies for the next 30 seconds!" 
 	and only the named weapon will have normal knockback, any other weapon will have 0.1 knockback (It wont push zombies) 
@@ -18,10 +17,13 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-ModeInfo g_ChaosWeaponsInfo;
+static int g_iChaosWeaponsIndex = -1;
+
+#undef THIS_MODE_INDEX
+#define THIS_MODE_INDEX g_iChaosWeaponsIndex
 
 #undef THIS_MODE_INFO
-#define THIS_MODE_INFO g_ChaosWeaponsInfo
+#define THIS_MODE_INFO g_ModesInfo[THIS_MODE_INDEX]
 
 #define CHAOSWEAPONS_CONVAR_TIMER_INTERVAL	0
 #define CHAOSWEAPONS_CONVAR_KNOCKBACK		1
@@ -41,8 +43,19 @@ char g_ChaosWeaponsList[][] =
 
 float g_fOriginalWeaponsKB[sizeof(g_ChaosWeaponsList)];
 
+/* ConVars Values variables */
+float g_fChaosWeapons_TimerInterval;
+float g_fChaosWeapons_Knockback;
+
+int g_iChaosWeapons_Countdown;
+
+bool g_bChaosWeapons_Enabled;
+
 stock void OnPluginStart_ChaosWeapons()
 {
+	// Important, this must be first before filling any other mode info!
+	FUNMODES_REGISTER_MODE();
+
 	THIS_MODE_INFO.name = "ChaosWeapons";
 	THIS_MODE_INFO.tag = "{gold}[FunModes-ChaosWeapons]{lightgreen}";
 	
@@ -53,48 +66,87 @@ stock void OnPluginStart_ChaosWeapons()
 	
 	/* CONVARS */
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_TIMER_INTERVAL,
-		"sm_chaosweapons_timer_interval", "30.0", "Every how many seconds to keep picking a random weapon?",
-		("10.0,15.0,20.0,30.0"), "float"
+		CHAOSWEAPONS_CONVAR_TIMER_INTERVAL, "sm_chaosweapons_timer_interval",
+		"30.0", "Every how many seconds to keep picking a random weapon?",
+		("10.0,15.0,20.0,30.0"), CONVAR_FLOAT
 	);
-	
+
+	THIS_MODE_INFO.cvars[CHAOSWEAPONS_CONVAR_TIMER_INTERVAL].HookChange(ChaosWeapons_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_KNOCKBACK,
-		"sm_chaosweapons_knockback", "0.1", "Knockback to set of other weapons",
-		("0.1,0.2,0.5,1.0"), "float"
+		CHAOSWEAPONS_CONVAR_KNOCKBACK, "sm_chaosweapons_knockback",
+		"0.1", "Knockback to set of other weapons",
+		("0.1,0.2,0.5,1.0"), CONVAR_FLOAT
 	);
-	
+
+	THIS_MODE_INFO.cvars[CHAOSWEAPONS_CONVAR_KNOCKBACK].HookChange(ChaosWeapons_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_COUNTDOWN,
-		"sm_chaosweapons_countdown", "10", "How many seconds for the countdown",
-		("5,10,15,20"), "int"
+		CHAOSWEAPONS_CONVAR_COUNTDOWN, "sm_chaosweapons_countdown",
+		"10", "How many seconds for the countdown",
+		("5,10,15,20"), CONVAR_INT
 	);
-	
+
+	THIS_MODE_INFO.cvars[CHAOSWEAPONS_CONVAR_COUNTDOWN].HookChange(ChaosWeapons_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, CHAOSWEAPONS_CONVAR_TOGGLE,
-		"sm_chaosweapons_enable", "1", "Enable/Disable ChaosWeapons Mode (This differs from turning it on/off)",
-		("0,1"), "bool"
+		CHAOSWEAPONS_CONVAR_TOGGLE, "sm_chaosweapons_enable",
+		"1", "Enable/Disable ChaosWeapons Mode (This differs from turning it on/off)",
+		("0,1"), CONVAR_BOOL
 	);
-	
+
+	THIS_MODE_INFO.cvars[CHAOSWEAPONS_CONVAR_TOGGLE].HookChange(ChaosWeapons_OnConVarChange);
+
 	THIS_MODE_INFO.enableIndex = CHAOSWEAPONS_CONVAR_TOGGLE;
-	
-	THIS_MODE_INFO.index = g_iLastModeIndex++;
-	g_ModesInfo[THIS_MODE_INFO.index] = THIS_MODE_INFO;
-	
-	THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_TOGGLE].cvar.AddChangeHook(OnChaosWeaponsModeToggle);
 }
 
-void OnChaosWeaponsModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
+void InitCvarsValues_ChaosWeapons()
 {
-	if (THIS_MODE_INFO.isOn)
-		CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, cvar.BoolValue, THIS_MODE_INFO.index);
+	int modeIndex = THIS_MODE_INFO.index;
+
+	g_fChaosWeapons_TimerInterval = _FUNMODES_CVAR_GET_VALUE(modeIndex, CHAOSWEAPONS_CONVAR_TIMER_INTERVAL, Float);
+	g_fChaosWeapons_Knockback = _FUNMODES_CVAR_GET_VALUE(modeIndex, CHAOSWEAPONS_CONVAR_KNOCKBACK, Float);
+
+	g_iChaosWeapons_Countdown = _FUNMODES_CVAR_GET_VALUE(modeIndex, CHAOSWEAPONS_CONVAR_COUNTDOWN, Int);
+
+	g_bChaosWeapons_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, CHAOSWEAPONS_CONVAR_TOGGLE, Bool);
+}
+
+void ChaosWeapons_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
+{
+	switch (cvarIndex)
+	{
+		case CHAOSWEAPONS_CONVAR_TIMER_INTERVAL:
+		{
+			g_fChaosWeapons_TimerInterval = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+		}
+
+		case CHAOSWEAPONS_CONVAR_KNOCKBACK:
+		{
+			g_fChaosWeapons_Knockback = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+		}
+
+		case CHAOSWEAPONS_CONVAR_COUNTDOWN:
+		{
+			g_iChaosWeapons_Countdown = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
+		}
+
+		case CHAOSWEAPONS_CONVAR_TOGGLE:
+		{
+			bool val = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+			if (THIS_MODE_INFO.isOn)
+				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, val, THIS_MODE_INFO.index);
+
+			g_bChaosWeapons_Enabled = val;
+		}
+	}
 }
 
 stock void OnMapStart_ChaosWeapons() {}
 stock void OnMapEnd_ChaosWeapons()
 {
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
-	
+
 	g_hChaosWeaponsTimer = null;
 }
 
@@ -132,26 +184,24 @@ stock void Event_PlayerDeath_ChaosWeapons(int client)
 
 public Action Cmd_ChaosWeaponsToggle(int client, int args)
 {
-	if (!THIS_MODE_INFO.cvarInfo[THIS_MODE_INFO.enableIndex].cvar.BoolValue)
+	if (!g_bChaosWeapons_Enabled)
 	{
 		CReplyToCommand(client, "%s ChaosWeapons Mode is currently Disabled", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
 	}
 
-	/* You can change whatever you want here */
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
-	
+
 	CPrintToChatAll("%s ChaosWeapons Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
-	
+
 	if (THIS_MODE_INFO.isOn)
 	{
-		float interval = THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_TIMER_INTERVAL].cvar.FloatValue;
-		g_hChaosWeaponsTimer = CreateTimer(interval, Timer_ChaosWeapons, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+		g_hChaosWeaponsTimer = CreateTimer(g_fChaosWeapons_TimerInterval, Timer_ChaosWeapons, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 		
-		CPrintToChatAll("%s a Random weapon will get normal knockback and the others will get their knockback nerfed every %.2f seconds!", THIS_MODE_INFO.tag, interval);
-		
-		SetAllWeaponsKnockback(THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_KNOCKBACK].cvar.FloatValue, _, true);
-		
+		CPrintToChatAll("%s a Random weapon will get normal knockback and the others will get their knockback nerfed every %.2f seconds!", THIS_MODE_INFO.tag, g_fChaosWeapons_TimerInterval);
+
+		SetAllWeaponsKnockback(g_fChaosWeapons_Knockback, _, true);
+
 		PickRandomWeapon();
 	}
 	else
@@ -159,7 +209,7 @@ public Action Cmd_ChaosWeaponsToggle(int client, int args)
 		delete g_hChaosWeaponsTimer;
 		SetAllWeaponsKnockback(_, _, _, true);
 	}
-	
+
 	return Plugin_Handled;
 }
 
@@ -168,7 +218,7 @@ public Action Cmd_ChaosWeaponsSettings(int client, int args)
 {
 	if (!client)
 		return Plugin_Handled;
-		
+
 	Menu menu = new Menu(Menu_ChaosWeaponsSettings);
 
 	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
@@ -177,7 +227,7 @@ public Action Cmd_ChaosWeaponsSettings(int client, int args)
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
-	
+
 	return Plugin_Handled;
 }
 
@@ -187,7 +237,7 @@ int Menu_ChaosWeaponsSettings(Menu menu, MenuAction action, int param1, int para
 	{
 		case MenuAction_End:
 			delete menu;
-		
+
 		case MenuAction_Cancel:
 		{
 			if (param2 == MenuCancel_ExitBack)
@@ -210,7 +260,7 @@ Action Timer_ChaosWeapons(Handle timer)
 		g_hChaosWeaponsTimer = null;
 		return Plugin_Handled;
 	}
-	
+
 	CreateTimer(1.0, Timer_ChaosWeaponsRepeat, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 	return Plugin_Continue;
 }
@@ -223,49 +273,52 @@ Action Timer_ChaosWeaponsRepeat(Handle timer)
 		counter = 0;
 		return Plugin_Stop;
 	}
-	
-	int max = THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_COUNTDOWN].cvar.IntValue;
-	
-	if (++counter >= max)
+
+	if (++counter >= g_iChaosWeapons_Countdown)
 	{
 		counter = 0;
 		PickRandomWeapon();
 		return Plugin_Stop;
 	}
-	
+
 	char msg[128];
 	FormatEx
 	(
 		msg, sizeof(msg), "[ChaosWeapons] The weapon that pushes zombies will change in %d seconds!", 
-		max - counter
+		g_iChaosWeapons_Countdown - counter
 	);
-	
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i))
 			continue;
-			
+	
 		SendHudText(i, msg, _, 1);
 	}
-	
+
 	return Plugin_Continue;
 }
 
 void PickRandomWeapon()
 {
 	int index = GetRandomInt(0, sizeof(g_ChaosWeaponsList) - 1);
-	
+
 	FormatEx(g_sChaosWeaponCurrent, sizeof(g_sChaosWeaponCurrent), "weapon_%s", g_ChaosWeaponsList[index]);
-	SetAllWeaponsKnockback(THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_KNOCKBACK].cvar.FloatValue, index);
-	
+	SetAllWeaponsKnockback(g_fChaosWeapons_Knockback, index);
+
 	char msg[255];
-	FormatEx(msg, sizeof(msg), "Only the [%s] will push the zombies for the next %d seconds\nPress F to buy it!", StrToUpper(g_ChaosWeaponsList[index]), THIS_MODE_INFO.cvarInfo[CHAOSWEAPONS_CONVAR_TIMER_INTERVAL].cvar.IntValue);
-	
+	FormatEx(
+		msg, sizeof(msg),
+		"Only the [%s] will push the zombies for the next %.0f seconds\nPress F to buy it!",
+		StrToUpper(g_ChaosWeaponsList[index]),
+		g_fChaosWeapons_TimerInterval
+	);
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i))
 			continue;
-			
+	
 		SendHudText(i, msg, _, 1);
 		CPrintToChat(i, "%s %s", THIS_MODE_INFO.tag, msg);
 	}
@@ -275,16 +328,16 @@ stock char[] StrToUpper(const char[] buffer)
 {
 	int len = strlen(buffer);
 	char myChar[32];
-	
+
 	for (int i = 0; i < len; i++)
 	{
 		char c = buffer[i];
 		if (c >= 'a' && c <= 'z')
 			c &= ~0x20;
-			
+
 		myChar[i] = c;
 	}
-	
+
 	return myChar;
 }
 
@@ -297,10 +350,10 @@ void SetAllWeaponsKnockback(float kb = 0.0, int index = -1, bool firstTime = fal
 			ZR_SetWeaponKnockback(g_ChaosWeaponsList[i], g_fOriginalWeaponsKB[i]);
 			continue;
 		}
-		
+
 		if (firstTime)
 			g_fOriginalWeaponsKB[i] = ZR_GetWeaponKnockback(g_ChaosWeaponsList[i]);
-		
+
 		ZR_SetWeaponKnockback(g_ChaosWeaponsList[i], kb);
 	}
 }
@@ -308,53 +361,53 @@ void SetAllWeaponsKnockback(float kb = 0.0, int index = -1, bool firstTime = fal
 stock void OnPlayerRunCmdPost_ChaosWeapons(int client, int buttons, int impulse)
 {
 	#pragma unused buttons
-	
+
 	if (!THIS_MODE_INFO.isOn)
 		return;
-	
+
 	if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
 		return;
-		
+
 	static float playersTime[MAXPLAYERS + 1];
-	
+
 	float currentTime = GetGameTime();
 	if (currentTime <= playersTime[client])
 		return;
-		
+
 	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
 	if (impulse == 100)
 	{	
 		playersTime[client] = currentTime + 2.0;
-		
+
 		char curWeapon[sizeof(g_sChaosWeaponCurrent)];
 		strcopy(curWeapon, sizeof(curWeapon), g_sChaosWeaponCurrent);
-		
+
 		int weapon = 0; 
-		
+
 		ReplaceString(curWeapon, sizeof(curWeapon), "weapon_", "");
 		int price = ZR_GetWeaponZMarketPrice(curWeapon);
-		
+
 		int cash = GetEntProp(client, Prop_Send, "m_iAccount");
 		if (cash < price)
 		{
 			CPrintToChat(client, "%s Insufficent fund", THIS_MODE_INFO.tag);
 			return;
 		}
-		
+
 		weapon = GetPlayerWeaponSlot(client, CS_SLOT_PRIMARY);
 		if (IsValidEntity(weapon))
 		{
 			SDKHooks_DropWeapon(client, weapon);
 			RemoveEntity(weapon);
 		}
-		
+
 		weapon = GivePlayerItem(client, g_sChaosWeaponCurrent);
 		if (!IsValidEntity(weapon))
 			return;
-			
+
 		if (g_hSwitchSDKCall != null)
 			SDKCall(g_hSwitchSDKCall, client, weapon, 0);
-		
+
 		SetEntProp(client, Prop_Send, "m_iAccount", cash - price);
 	}
 }

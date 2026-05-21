@@ -1,31 +1,30 @@
-/*
-    (). FunModes V2:
-        
-    @file           Fog.sp
-    @Usage          Functions for the Fog mode.
-*/
 
 #pragma semicolon 1
 #pragma newdecls required
 
-ModeInfo g_FogInfo;
+static int g_iFogIndex = -1;
+
+#undef THIS_MODE_INDEX
+#define THIS_MODE_INDEX g_iFogIndex
 
 #undef THIS_MODE_INFO
-#define THIS_MODE_INFO g_FogInfo
+#define THIS_MODE_INFO g_ModesInfo[THIS_MODE_INDEX]
 
-#define FOGInput_Color 	0
-#define FOGInput_Start 	1
-#define FOGInput_End 	2
+#define FOGInput_Color  0
+#define FOGInput_Start  1
+#define FOGInput_End    2
 #define FOGInput_Toggle 3
 
-#define FOG_NAME		"fog_mode_aaa34124n"
+#define FOG_NAME "fog_mode_aaa34124n"
+
+#define FOG_CONVAR_TOGGLE 0
 
 enum struct fogData
 {
 	float fogStart;
 	float fogEnd;
 	int fogColor[4];
-	
+
 	void SetColor(int setColor[4])
 	{
 		this.fogColor[0] = setColor[0];
@@ -39,37 +38,55 @@ fogData g_FogData;
 
 int g_iFogEntity = -1;
 
-#define FOG_CONVAR_TOGGLE 0
+bool g_bFog_Enabled;
 
-/* CALLED ON PLUGIN START */
 stock void OnPluginStart_Fog()
 {
+	// Important, this must be first before filling any other mode info!
+	FUNMODES_REGISTER_MODE();
+
 	THIS_MODE_INFO.name = "Fog";
 	THIS_MODE_INFO.tag = "{gold}[FunModes-FOG]{lightgreen}";
 
-	RegAdminCmd("sm_fm_fog", Cmd_FogToggle, ADMFLAG_CONVARS, "Toggle fog on/off");
-	RegAdminCmd("sm_fogmode", Cmd_FogSettings, ADMFLAG_CONVARS, "Fog Settings");
-	RegAdminCmd("sm_fog_start", Cmd_FogStart, ADMFLAG_CONVARS, "Fog Start");
-	RegAdminCmd("sm_fog_end", Cmd_FogEnd, ADMFLAG_CONVARS, "Fog End");
+	RegAdminCmd("sm_fm_fog", Cmd_FogToggle, ADMFLAG_CONVARS);
+	RegAdminCmd("sm_fogmode", Cmd_FogSettings, ADMFLAG_CONVARS);
+	RegAdminCmd("sm_fog_start", Cmd_FogStart, ADMFLAG_CONVARS);
+	RegAdminCmd("sm_fog_end", Cmd_FogEnd, ADMFLAG_CONVARS);
 
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, FOG_CONVAR_TOGGLE,
-		"sm_fog_enable", "1", "Enable/Disable Fog Mode (This differs from turning it on/off)",
-		("0,1"), "bool"
+		FOG_CONVAR_TOGGLE, "sm_fog_enable",
+		"1", "Enable Fog mode",
+		("0,1"), CONVAR_BOOL
 	);
 
-	THIS_MODE_INFO.enableIndex = FOG_CONVAR_TOGGLE;
-	
-	THIS_MODE_INFO.index = g_iLastModeIndex++;
-	g_ModesInfo[THIS_MODE_INFO.index] = THIS_MODE_INFO;
+	THIS_MODE_INFO.cvars[FOG_CONVAR_TOGGLE].HookChange(Fog_OnConVarChange);
 
-	THIS_MODE_INFO.cvarInfo[FOG_CONVAR_TOGGLE].cvar.AddChangeHook(OnFogModeToggle);	
+	THIS_MODE_INFO.enableIndex = FOG_CONVAR_TOGGLE;
 }
 
-void OnFogModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
+void InitCvarsValues_Fog()
 {
-	if (THIS_MODE_INFO.isOn)
-		CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, cvar.BoolValue, THIS_MODE_INFO.index);
+	int modeIndex = THIS_MODE_INFO.index;
+
+	g_bFog_Enabled =
+		_FUNMODES_CVAR_GET_VALUE(modeIndex, FOG_CONVAR_TOGGLE, Bool);
+}
+
+void Fog_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
+{
+	switch (cvarIndex)
+	{
+		case FOG_CONVAR_TOGGLE:
+		{
+			bool val =
+				_FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+
+			if (THIS_MODE_INFO.isOn)
+				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, val, THIS_MODE_INFO.index);
+
+			g_bFog_Enabled = val;
+		}
+	}
 }
 
 stock void OnMapStart_Fog()
@@ -271,20 +288,7 @@ public int FogSettings_Handler(Menu menu, MenuAction action, int param1, int par
 				}
 				case 1:
 				{
-					bool isOn = THIS_MODE_INFO.isOn;
-					if (isOn)
-					{
-						CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "Fog_Disabled", param1);
-						CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
-					}
-					else
-					{
-						CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "Fog_Enabled", param1);
-						CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, true, THIS_MODE_INFO.index);
-					}
-
-					AcceptFogInput(FOGInput_Toggle);
-					Fog_DisplaySettingsMenu(param1);
+					Cmd_FogToggle(param1, 0);
 				}
 			}
 		}
@@ -391,7 +395,7 @@ public int FogColorsMenu_Handler(Menu menu, MenuAction action, int param1, int p
 
 public Action Cmd_FogToggle(int client, int args)
 {
-	if (!THIS_MODE_INFO.cvarInfo[THIS_MODE_INFO.enableIndex].cvar.BoolValue)
+	if (!g_bFog_Enabled)
 	{
 		CReplyToCommand(client, "%s Fog mode is currently disabled!", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
@@ -416,7 +420,7 @@ public Action Cmd_FogToggle(int client, int args)
 	}
 }
 
-Action Cmd_FogSettings(int client, int args)
+public Action Cmd_FogSettings(int client, int args)
 {
 	if (!client)
 		return Plugin_Handled;

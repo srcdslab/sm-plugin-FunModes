@@ -16,10 +16,13 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-ModeInfo g_BlindModeInfo;
+static int g_iBlindModeIndex = -1;
+
+#undef THIS_MODE_INDEX
+#define THIS_MODE_INDEX g_iBlindModeIndex
 
 #undef THIS_MODE_INFO
-#define THIS_MODE_INFO g_BlindModeInfo
+#define THIS_MODE_INFO g_ModesInfo[THIS_MODE_INDEX]
 
 #define BLINDMODE_CONVAR_TIMER_INTERVAL	0
 #define BLINDMODE_CONVAR_PERCENTAGE		1
@@ -30,8 +33,20 @@ ModeInfo g_BlindModeInfo;
 Handle g_hBlindModeTimer;
 bool g_bHasFlash[MAXPLAYERS + 1];
 
+/* ConVars Values variables */
+float g_fBlindMode_TimerInterval;
+float g_fBlindMode_Percentage;
+float g_fBlindMode_MaxDistance;
+
+int g_iBlindMode_BlindTime;
+
+bool g_bBlindMode_Enabled;
+
 stock void OnPluginStart_BlindMode()
 {
+	// Important, this must be first before filling any other mode info!
+	FUNMODES_REGISTER_MODE();
+
 	THIS_MODE_INFO.name = "BlindMode";
 	THIS_MODE_INFO.tag = "{gold}[FunModes-BlindMode]{lightgreen}";
 	
@@ -39,53 +54,97 @@ stock void OnPluginStart_BlindMode()
 	/* THESE ARE THE STANDARD COMMANDS THAT ALL MODES SHOULD HAVE */
 	RegAdminCmd("sm_fm_blindmode", Cmd_BlindModeToggle, ADMFLAG_CONVARS, "Turn BlindMode Mode On/Off");
 	RegAdminCmd("sm_blindmode_settings", Cmd_BlindModeSettings, ADMFLAG_CONVARS, "Open BlindMode Sttings Menu");
-	
+
 	/* CONVARS */
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, BLINDMODE_CONVAR_TIMER_INTERVAL,
-		"sm_blindmode_time_interval", "20.0", "Every how many seconds to keep giving the zombies flashbang?",
-		("15.0,20.0,30.0,40.0,60.0"), "float"
+		BLINDMODE_CONVAR_TIMER_INTERVAL, "sm_blindmode_time_interval",
+		"20.0", "Every how many seconds to keep giving the zombies flashbang?",
+		("15.0,20.0,30.0,40.0,60.0"), CONVAR_FLOAT
 	);
-	
+
+	THIS_MODE_INFO.cvars[BLINDMODE_CONVAR_TIMER_INTERVAL].HookChange(BlindMode_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, BLINDMODE_CONVAR_PERCENTAGE,
-		"sm_blindmode_percentage", "33.0", "Percentage value of zombies to give flashbang to",
-		("10.0,20.0,50.0,70.0,100.0"), "float"
+		BLINDMODE_CONVAR_PERCENTAGE, "sm_blindmode_percentage",
+		"33.0", "Percentage value of zombies to give flashbang to",
+		("10.0,20.0,50.0,70.0,100.0"), CONVAR_FLOAT
 	);
-	
-	THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_PERCENTAGE].cvar.SetBounds(ConVarBound_Lower, false, 0.0);
-	THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_PERCENTAGE].cvar.SetBounds(ConVarBound_Upper, false, 100.0);
-	
+
+	THIS_MODE_INFO.cvars[BLINDMODE_CONVAR_PERCENTAGE].HookChange(BlindMode_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, BLINDMODE_CONVAR_MAX_DISTANCE,
-		"sm_blindmode_max_distance", "300.0", "Max distance between humans and flashbang to apply blind in units",
-		("200.0,300.0,500.0,700.0,1000.0"), "float"
+		BLINDMODE_CONVAR_MAX_DISTANCE, "sm_blindmode_max_distance",
+		"300.0", "Max distance between humans and flashbang to apply blind in units",
+		("200.0,300.0,500.0,700.0,1000.0"), CONVAR_FLOAT
 	);
-	
+
+	THIS_MODE_INFO.cvars[BLINDMODE_CONVAR_MAX_DISTANCE].HookChange(BlindMode_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, BLINDMODE_CONVAR_BLIND_TIME,
-		"sm_blindmode_blind_time", "5", "How many seconds should the humans be blind for?",
-		("2,3,5,7,10"), "int"
+		BLINDMODE_CONVAR_BLIND_TIME,"sm_blindmode_blind_time",
+		"5", "How many seconds should the humans be blind for?",
+		("2,3,5,7,10"), CONVAR_INT
 	);
-	
+
+	THIS_MODE_INFO.cvars[BLINDMODE_CONVAR_BLIND_TIME].HookChange(BlindMode_OnConVarChange);
+
 	DECLARE_FM_CVAR(
-		THIS_MODE_INFO.cvarInfo, BLINDMODE_CONVAR_TOGGLE,
-		"sm_blindmode_enable", "1", "Enable/Disable BlindMode Mode (This differs from turning it on/off)",
-		("0,1"), "bool"
+		BLINDMODE_CONVAR_TOGGLE, "sm_blindmode_enable",
+		"1", "Enable/Disable BlindMode Mode (This differs from turning it on/off)",
+		("0,1"), CONVAR_BOOL
 	);
-	
+
+	THIS_MODE_INFO.cvars[BLINDMODE_CONVAR_TOGGLE].HookChange(BlindMode_OnConVarChange);
+
 	THIS_MODE_INFO.enableIndex = BLINDMODE_CONVAR_TOGGLE;
-	
-	THIS_MODE_INFO.index = g_iLastModeIndex++;
-	g_ModesInfo[THIS_MODE_INFO.index] = THIS_MODE_INFO;
-	
-	THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_TOGGLE].cvar.AddChangeHook(OnBlindModeModeToggle);
 }
 
-void OnBlindModeModeToggle(ConVar cvar, const char[] newValue, const char[] oldValue)
+void InitCvarsValues_BlindMode()
 {
-	if (THIS_MODE_INFO.isOn)
-		CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, cvar.BoolValue, THIS_MODE_INFO.index);
+	int modeIndex = THIS_MODE_INFO.index;
+
+	g_fBlindMode_TimerInterval = _FUNMODES_CVAR_GET_VALUE(modeIndex, BLINDMODE_CONVAR_TIMER_INTERVAL, Float);
+	g_fBlindMode_Percentage = _FUNMODES_CVAR_GET_VALUE(modeIndex, BLINDMODE_CONVAR_PERCENTAGE, Float);
+	g_fBlindMode_MaxDistance = _FUNMODES_CVAR_GET_VALUE(modeIndex, BLINDMODE_CONVAR_MAX_DISTANCE, Float);
+
+	g_iBlindMode_BlindTime = _FUNMODES_CVAR_GET_VALUE(modeIndex, BLINDMODE_CONVAR_BLIND_TIME, Int);
+
+	g_bBlindMode_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, BLINDMODE_CONVAR_TOGGLE, Bool);
+}
+
+void BlindMode_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
+{
+	switch (cvarIndex)
+	{
+		case BLINDMODE_CONVAR_TIMER_INTERVAL:
+		{
+			g_fBlindMode_TimerInterval = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+		}
+
+		case BLINDMODE_CONVAR_PERCENTAGE:
+		{
+			g_fBlindMode_Percentage = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+		}
+
+		case BLINDMODE_CONVAR_MAX_DISTANCE:
+		{
+			g_fBlindMode_MaxDistance = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+		}
+
+		case BLINDMODE_CONVAR_BLIND_TIME:
+		{
+			g_iBlindMode_BlindTime = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
+		}
+
+		case BLINDMODE_CONVAR_TOGGLE:
+		{
+			bool val = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+			if (THIS_MODE_INFO.isOn)
+				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, val, THIS_MODE_INFO.index);
+
+			g_bBlindMode_Enabled = val;
+		}
+	}
 }
 
 stock void OnMapStart_BlindMode() {}
@@ -135,7 +194,7 @@ stock void Event_PlayerDeath_BlindMode(int client)
 
 public Action Cmd_BlindModeToggle(int client, int args)
 {
-	if (!THIS_MODE_INFO.cvarInfo[THIS_MODE_INFO.enableIndex].cvar.BoolValue)
+	if (!g_bBlindMode_Enabled)
 	{
 		CReplyToCommand(client, "%s BlindMode Mode is currently Disabled", THIS_MODE_INFO.tag);
 		return Plugin_Handled;
@@ -143,29 +202,27 @@ public Action Cmd_BlindModeToggle(int client, int args)
 
 	/* You can change whatever you want here */
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
-	
+
 	CPrintToChatAll("%s BlindMode Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
-	
+
 	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
-		
-		float interval = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_TIMER_INTERVAL].cvar.FloatValue;
-		
+
 		CPrintToChatAll("%s Zombies will get a {olive}flashbang {lightgreen}that can blind humans.", THIS_MODE_INFO.tag);
-		CPrintToChatAll("%s %d%% of the zombies team will get the {olive}flashbang {lightgreen}every %.2f seconds", THIS_MODE_INFO.tag,
-																	THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_PERCENTAGE].cvar.IntValue,
-																	interval
+		CPrintToChatAll("%s %.0f%% of the zombies team will get the {olive}flashbang {lightgreen}every %.2f seconds", THIS_MODE_INFO.tag,
+																	g_fBlindMode_Percentage,
+																	g_fBlindMode_TimerInterval
 		);
-		
-		g_hBlindModeTimer = CreateTimer(interval, Timer_BlindMode, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
+
+		g_hBlindModeTimer = CreateTimer(g_fBlindMode_TimerInterval, Timer_BlindMode, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 	}
 	else
 	{
 		delete g_hBlindModeTimer;
 	}
-	
+
 	return Plugin_Handled;
 }
 
@@ -174,7 +231,7 @@ public Action Cmd_BlindModeSettings(int client, int args)
 {
 	if (!client)
 		return Plugin_Handled;
-		
+
 	Menu menu = new Menu(Menu_BlindModeSettings);
 
 	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
@@ -183,7 +240,7 @@ public Action Cmd_BlindModeSettings(int client, int args)
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
-	
+
 	return Plugin_Handled;
 }
 
@@ -193,7 +250,7 @@ int Menu_BlindModeSettings(Menu menu, MenuAction action, int param1, int param2)
 	{
 		case MenuAction_End:
 			delete menu;
-		
+
 		case MenuAction_Cancel:
 		{
 			if (param2 == MenuCancel_ExitBack)
@@ -218,23 +275,21 @@ void ApplyBlind(int client)
 	
 	int clients[1];
 	clients[0] = client;
-	
-	int time = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_BLIND_TIME].cvar.IntValue;
-	
+
 	Handle message = StartMessage("Fade", clients, 1, 1);
 	if (GetUserMessageType() == UM_Protobuf)
 	{
 		Protobuf pb = UserMessageToProtobuf(message);
-		pb.SetInt("duration", time * 1000);
-		pb.SetInt("hold_time", time * 1000);
+		pb.SetInt("duration", g_iBlindMode_BlindTime * 1000);
+		pb.SetInt("hold_time", g_iBlindMode_BlindTime * 1000);
 		pb.SetInt("flags", flags);
 		pb.SetColor("clr", color);
 	}
 	else
 	{
 		BfWrite bf = UserMessageToBfWrite(message);
-		bf.WriteShort(time * 1000);
-		bf.WriteShort(time * 1000);
+		bf.WriteShort(g_iBlindMode_BlindTime * 1000);
+		bf.WriteShort(g_iBlindMode_BlindTime * 1000);
 		bf.WriteShort(flags);		
 		bf.WriteByte(color[0]);
 		bf.WriteByte(color[1]);
@@ -269,9 +324,8 @@ Action Timer_BlindMode(Handle timer)
 	
 	if (zombiesCount == 0)
 		return Plugin_Handled;
-		
-	float percentage = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_PERCENTAGE].cvar.FloatValue;
-	int neededZombies = RoundToCeil(zombiesCount * (percentage / 100));
+
+	int neededZombies = RoundToCeil(zombiesCount * (g_fBlindMode_Percentage / 100));
 	
 	int enough = 1;
 	do 
@@ -281,9 +335,16 @@ Action Timer_BlindMode(Handle timer)
 			zombie = zombies[GetRandomInt(0, zombiesCount - 1)];
 
 		g_bHasFlash[zombie] = true;
-		
-		int entity = GivePlayerItem(zombie, "weapon_flashbang");
-		EquipPlayerWeapon(zombie, entity);
+
+		if (!HasPlayerItem(zombie, "weapon_flashbang"))
+		{
+			int entity = GivePlayerItem(zombie, "weapon_flashbang");
+			EquipPlayerWeapon(zombie, entity);
+		}
+		else
+		{
+			SET_GRENADES_COUNT(zombie, FLASHBANG, GET_GRENADES_COUNT(zombie, FLASHBANG) + 1);
+		}
 
 		CPrintToChat(zombie, "%s You have been granted a FlashBang!!!\nBlind some humans.", THIS_MODE_INFO.tag);
 		enough++;
@@ -315,7 +376,7 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 	float origin[3];
 	GetEntPropVector(entity, Prop_Send, "m_vecOrigin", origin);
 
-	float maxDistance = THIS_MODE_INFO.cvarInfo[BLINDMODE_CONVAR_MAX_DISTANCE].cvar.FloatValue;
+	float maxDistance = g_fBlindMode_MaxDistance;
 	maxDistance *= maxDistance;
 	
 	for (int i = 1; i <= MaxClients; i++)
