@@ -901,4 +901,4 @@ Action Cmd_HealBeaconCheckDistance(int client, int args)
     return Plugin_Handled;
 }
 
-#include "Fun_Modes/HealBeacon_Menus.sp"
+#include "HealBeacon_Menus.sp"
