@@ -11,9 +11,9 @@ A bunch of funmodes especially made for Zombie Escape
 - sm_funmodes_hud_channel - "The channel for the hud if using DynamicChannels"
 
 # Plugin Structure
-- Each funmode will need to be included in Fun_Modes/Core/ModesInclude.sp file, The order matters.
-- Each funmode will also need to be included in FunModes/Core/ModesDefinition for forwards.
-- You can remove any funmode you want from the Fun_Modes/ folder
+- Each funmode will need to be included in `Fun_Modes/Core/ModesInclude.sp` file, The order matters.
+- Each funmode will also need to be included in `FunModes/Core/ModesInclude.sp` in Forwards_OnPluginStart function.
+- You can remove any funmode you want by removing or commenting the line that includes the mode file in `FunModes/Core/ModesInclude.sp`
 
 # Current FunModes Available
 
