@@ -41,6 +41,8 @@ static int g_iGunGameIndex = -1;
 #define GUNGAME_CONVAR_REWARD_SPEED         6
 #define GUNGAME_CONVAR_TOGGLE               7
 
+#define GUNGAME_PICKUP_COOLDOWN             60.0 // In seconds
+
 static const char g_GunGameWeaponsList[][][] =
 {
     { "weapon_glock", "weapon_usp", "weapon_p228", "weapon_deagle", "weapon_elite", "weapon_fiveseven" },
@@ -70,10 +72,13 @@ enum struct GunGame_Data
     GunGame_Reward reward;
     Handle rewardTimer;
 
+    float pickupCooldown;
+
     void ResetLevel()
     {
         this.level[0] = 0;
         this.level[1] = 0;
+        this.pickupCooldown = 0;
     }
 }
 
@@ -508,6 +513,16 @@ Action Cmd_GunGame(int client, int args)
         CReplyToCommand(client, "%s You have to be an alive human to use this command!", THIS_MODE_INFO.tag);
         return Plugin_Handled;
     }
+
+    float currentTime = GetGameTime();
+    if (currentTime < g_GunGameData[client].pickupCooldown)
+    {
+        CReplyToCommand(client, "%s Please wait %.0f seconds until you can use this command again.", THIS_MODE_INFO.tag,
+                        g_GunGameData[client].pickupCooldown - currentTime);
+        return Plugin_Handled;
+    }
+
+    g_GunGameData[client].pickupCooldown = currentTime + GUNGAME_PICKUP_COOLDOWN;
 
     if (EntWatch_HasSpecialItem(client))
     {
