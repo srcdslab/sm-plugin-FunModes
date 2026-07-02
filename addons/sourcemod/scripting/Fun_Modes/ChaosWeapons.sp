@@ -45,10 +45,11 @@ char g_ChaosWeaponsList[][] =
 	"galil", "famas", "ak47", "m4a1", "aug", "sg552", /* Rifles */
 	"m3", "xm1014", /* Shotguns */
 	"m249", /* Machine Gun */
-	"usp", "glock", "p228", "deagle", "fiveseven", "elite"
+	"usp", "glock", "p228", "deagle", "fiveseven", "elite", /* Pistols */
+	"awp", "scout", "sg550", "g3sg1" /* Snipers */
 };
 
-#define CHAOSWEAPONS_INCLUDED_WEAPONS_COUNT (sizeof(g_ChaosWeaponsList) - 6)
+#define CHAOSWEAPONS_INCLUDED_WEAPONS_COUNT (sizeof(g_ChaosWeaponsList) - 10)
 
 float g_fOriginalWeaponsKB[sizeof(g_ChaosWeaponsList)];
 
