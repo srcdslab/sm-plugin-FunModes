@@ -43,8 +43,13 @@ char g_ChaosWeaponsList[][] =
 {
 	"mac10", "tmp", "mp5navy", "ump45", "p90", /* SMGs */
 	"galil", "famas", "ak47", "m4a1", "aug", "sg552", /* Rifles */
-	"m3", "xm1014" /* Shotguns */
+	"m3", "xm1014", /* Shotguns */
+	"m249", /* Machine Gun */
+	"usp", "glock", "p228", "deagle", "fiveseven", "elite", /* Pistols */
+	"awp", "scout", "sg550", "g3sg1" /* Snipers */
 };
+
+#define CHAOSWEAPONS_INCLUDED_WEAPONS_COUNT (sizeof(g_ChaosWeaponsList) - 10)
 
 float g_fOriginalWeaponsKB[sizeof(g_ChaosWeaponsList)];
 
@@ -273,7 +278,7 @@ Action Timer_ChaosWeaponsRepeat(Handle timer)
 
 void PickRandomWeapon()
 {
-	int index = GetRandomInt(0, sizeof(g_ChaosWeaponsList) - 1);
+	int index = GetRandomInt(0, CHAOSWEAPONS_INCLUDED_WEAPONS_COUNT - 1);
 
 	FormatEx(g_sChaosWeaponCurrent, sizeof(g_sChaosWeaponCurrent), "weapon_%s", g_ChaosWeaponsList[index]);
 	SetAllWeaponsKnockback(g_fChaosWeapons_Knockback, index);
