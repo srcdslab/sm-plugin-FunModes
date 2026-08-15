@@ -62,7 +62,6 @@ Handle g_hSwitchSDKCall;
 #define MAX_MODES_NUM 32
 #define MAX_CVARS_NUM 10
 
-ModeInfo g_ModesInfo[MAX_MODES_NUM];
 int g_iLastModeIndex;
 
 /* ConVars Section */
@@ -290,6 +289,8 @@ enum struct ModeInfo
 		return count;
 	}
 }
+
+ModeInfo g_ModesInfo[MAX_MODES_NUM];
 
 /*
 * Declares a FunModes cvar related to the current mode the compiler is reading.

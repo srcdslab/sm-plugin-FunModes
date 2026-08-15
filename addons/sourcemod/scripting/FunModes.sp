@@ -26,7 +26,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly",
 	description = "bunch of fun modes for ze mode",
-	version = "2.8.1",
+	version = "2.8.2",
 	url = "https://nide.gg"
 }
 
