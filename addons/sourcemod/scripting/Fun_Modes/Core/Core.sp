@@ -64,6 +64,35 @@ Handle g_hSwitchSDKCall;
 
 int g_iLastModeIndex;
 
+/* Modes Section */
+enum struct ModeInfo 
+{
+	int index;
+	char name[32];
+	char tag[64];
+	FM_ConVar cvars[MAX_CVARS_NUM];
+	bool isOn;
+	int enableIndex;
+
+	FM_Forwards forwards;
+
+	int GetCvarsCount()
+	{
+		int count;
+		for (int i = 0; i < sizeof(ModeInfo::cvars); i++)
+		{
+			if (this.cvars[i].name[0] == '\0')
+				continue;
+
+			count++;
+		}
+
+		return count;
+	}
+}
+
+ModeInfo g_ModesInfo[MAX_MODES_NUM];
+
 /* ConVars Section */
 KeyValues g_hKV;
 
@@ -263,34 +292,6 @@ enum WeaponAmmoGrenadeType
 
 /* Modes Forwards Include */
 #include "Forwards.sp"
-
-enum struct ModeInfo 
-{
-	int index;
-	char name[32];
-	char tag[64];
-	FM_ConVar cvars[MAX_CVARS_NUM];
-	bool isOn;
-	int enableIndex;
-
-	FM_Forwards forwards;
-
-	int GetCvarsCount()
-	{
-		int count;
-		for (int i = 0; i < sizeof(ModeInfo::cvars); i++)
-		{
-			if (this.cvars[i].name[0] == '\0')
-				continue;
-
-			count++;
-		}
-
-		return count;
-	}
-}
-
-ModeInfo g_ModesInfo[MAX_MODES_NUM];
 
 /*
 * Declares a FunModes cvar related to the current mode the compiler is reading.
