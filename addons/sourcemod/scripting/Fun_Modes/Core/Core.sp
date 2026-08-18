@@ -62,7 +62,6 @@ Handle g_hSwitchSDKCall;
 #define MAX_MODES_NUM 32
 #define MAX_CVARS_NUM 10
 
-ModeInfo g_ModesInfo[MAX_MODES_NUM];
 int g_iLastModeIndex;
 
 /* ConVars Section */
@@ -157,10 +156,7 @@ enum struct FM_ConVar
 
 	int GetPos()
 	{
-		int pos = 0;
-		for (int i = this.modeIndex - 1; i >= 0; i--)
-			pos += g_ModesInfo[i].GetCvarsCount();
-
+		int pos = FunModes_GetCvarsCountBeforeMode(this.modeIndex);
 		pos += this.cvarIndex;
 		return pos;
 	}
@@ -265,7 +261,8 @@ enum WeaponAmmoGrenadeType
 /* Modes Forwards Include */
 #include "Forwards.sp"
 
-enum struct ModeInfo 
+/* Modes Section */
+enum struct ModeInfo
 {
 	int index;
 	char name[32];
@@ -289,6 +286,17 @@ enum struct ModeInfo
 
 		return count;
 	}
+}
+
+ModeInfo g_ModesInfo[MAX_MODES_NUM];
+
+int FunModes_GetCvarsCountBeforeMode(int modeIndex)
+{
+	int count;
+	for (int i = modeIndex - 1; i >= 0; i--)
+		count += g_ModesInfo[i].GetCvarsCount();
+
+	return count;
 }
 
 /*
