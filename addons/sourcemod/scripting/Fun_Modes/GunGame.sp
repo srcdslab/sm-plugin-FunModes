@@ -78,7 +78,7 @@ enum struct GunGame_Data
     {
         this.level[0] = 0;
         this.level[1] = 0;
-        this.pickupCooldown = 0;
+        this.pickupCooldown = 0.0;
     }
 }
 
