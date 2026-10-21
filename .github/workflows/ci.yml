@@ -46,6 +46,7 @@ jobs:
           set -euo pipefail
           mkdir -p ../plugins
           spcomp -i include -o ../plugins/FunModes.smx FunModes.sp
+          spcomp -i include -o ../plugins/eventmodes.smx eventmodes.sp
 
       - name: Create package
         run: |

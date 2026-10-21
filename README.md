@@ -245,3 +245,49 @@ Random zombies will be chosen to have the pull item that can pull a human based 
 - sm_pullgame_timer_interval - "After how many seconds to keep giving pull access to a random zm?"
 - sm_pullgame_speed - "Pulling Speed Value"
 - sm_pullgame_pull_time - "Pulling Time"
+
+# Event Modes
+
+`eventmodes.smx` is a second, standalone plugin built from `eventmodes.sp`. It gathers 44 event modes for Zombie Escape, Dynamic Fog included, in a single admin menu. It doesn't need FunModes and can be loaded alongside it or on its own.
+
+- Survival rules: VIP Mode, Heal Beacon, Hot Potato, Buddy System, Hero, Last Stand
+- Weapons: Random Weapons, Gun Game, Jammed Guns, Butterfingers
+- Hazards & disasters: Lightning Strikes, Earthquake, Floor is Lava, Zombie Drop, Meteor Shower, Airstrike, Shockwave, Nuke Countdown, Toxic Gas, Radiation
+- Weather & nature: Fog, Acid Rain, Freezing Cold, Sudden Darkness, Gravity Waves, Ice Floor, Wind Gusts, Tornado, Quicksand
+- Chaos & tricks: Teleport Shuffle, Inverted Controls, Blackout / Flashbang, Magnet Pull, Hallucinations, Leech, Double Jump
+- Mini-games: Math Quiz, Trivia, Hot Seat, Red Light Green Light, Simon Says
+- Zombies: Boss Zombie, Ghost Zombies, Zombie Frenzy
+- Event Roulette: turns on random modes from an admin-chosen pool each round and turns them off at round end
+- Dynamic Fog: overrides every `env_fog_controller` and the 3D skybox fog, with presets (`configs/eventmodes/dynamicfog.cfg`) and blending
+
+Zombie Reloaded, EntWatch and DynamicChannels are optional: they are used when they are loaded.
+
+## Plugin Structure
+- The code lives in `em_modules/`, one file per mode. `eventmodes.sp` includes them and dispatches the SourceMod forwards.
+- `em_modules/settings.sp` is generated: after adding a setting to a mode's menu, run `python em_modules/gen_settings.py .` from `addons/sourcemod/scripting`.
+- Configs in `configs/eventmodes/`: `dynamicfog.cfg` (fog presets), `trivia.cfg` (questions), `hotseat.cfg` (questions). The plugin writes `settings.cfg` (every menu setting) and `gungame.cfg` (damage per gun) itself.
+
+## Access
+Anyone who has access to `sm_eventload` (CheckCommandAccess). Change who that is with an override in `configs/admin_overrides.cfg`, e.g. `"sm_eventload" "z"`.
+
+## Admin Commands
+- sm_em / sm_eventmode - "Event modes admin menu: Event Roulette, 7 categories of modes, admin tools"
+- sm_em <mode> [on|off] - "Switch a mode from chat, console or rcon (sm_em list for the names)"
+- sm_em roulette [on|off], sm_em stop, sm_em save, sm_em load
+- sm_fog - "Fog control in chat: on/off, distances, colours, presets (sm_fog help)"
+
+## Player Commands
+- sm_emvip - "Who the VIPs / heal beacon carriers are right now"
+- sm_emgun - "Get your Gun Game gun / Random Weapons set back (15 s cooldown)"
+
+## Cvars
+- sm_eventmodes_beacon_radius - "Heal beacon radius at map start"
+- sm_eventmodes_beacon_heal - "HP per second healed inside the heal beacon at map start"
+- sm_eventmodes_beacon_damage - "HP per second lost outside the heal beacons at map start"
+- sm_eventmodes_beacon_count - "Number of heal beacons at map start"
+- sm_eventmodes_beacon_sound - "Heal beacons beep every second (at map start)"
+- sm_eventmodes_hud_dynamic - "Use DynamicChannels for on-screen texts when it's loaded"
+- sm_dynamicfog_fade - "Default seconds a fog change blends in"
+- sm_dynamicfog_skybox - "Also override the 3D skybox fog"
+- sm_dynamicfog_announce - "Tell everyone in chat when an admin changes the fog"
+- sm_dynamicfog_interval - "Seconds between re-applying the override (applies next map)"
