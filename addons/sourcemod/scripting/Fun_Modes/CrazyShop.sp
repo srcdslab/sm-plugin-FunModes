@@ -609,7 +609,7 @@ void CrazyShop_DB_CreateTables()
 		return;
 	}
 
-	Transaction tr = SQL_CreateTransaction();
+	Transaction tr = new Transaction();
 
 	char query[1024];
 	THIS_MODE_DB.Format(query, sizeof(query),
