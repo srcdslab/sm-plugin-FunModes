@@ -25,6 +25,9 @@ static int g_iRealityShiftIndex = -1;
 #define REALITYSHIFT_CONVAR_TIMER_INTERVAL 0
 #define REALITYSHIFT_CONVAR_MODE 1
 #define REALITYSHIFT_CONVAR_TOGGLE 2
+#define REALITYSHIFT_CONVAR_PAIRS 3
+#define REALITYSHIFT_CONVAR_MIXED 4
+#define REALITYSHIFT_CONVAR_WARN 5
 
 Handle g_hRealityShiftTimer;
 
@@ -34,6 +37,12 @@ bool g_bRealityShiftSwapped[MAXPLAYERS + 1];
 float g_fRealityShift_TimerInterval;
 int g_iRealityShift_Mode;
 bool g_bRealityShift_Enabled;
+int g_iRealityShift_Pairs;
+bool g_bRealityShift_Mixed;
+int g_iRealityShift_Warn;
+
+Handle g_hRealityShiftCountdown;
+int g_iRealityShiftCountdown;
 
 public void OnPluginStart_RealityShift()
 {
@@ -42,6 +51,7 @@ public void OnPluginStart_RealityShift()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_CHAOS;
 
     RegAdminCmd("sm_fm_rs", Cmd_RealityShiftToggle, ADMFLAG_CONVARS, "Turn RealityShift Mode On/Off");
     RegAdminCmd("sm_realityshift_settings", Cmd_RealityShiftSettings, ADMFLAG_CONVARS, "Open RealityShift Sttings Menu");
@@ -67,6 +77,30 @@ public void OnPluginStart_RealityShift()
     );
     THIS_MODE_INFO.cvars[REALITYSHIFT_CONVAR_TOGGLE].HookChange(RealityShift_OnConVarChange);
 
+    DECLARE_FM_CVAR(
+        REALITYSHIFT_CONVAR_PAIRS, "sm_realityshift_pairs",
+        "0", "Random swaps: how many pairs swap each time (0 = everyone)",
+        ("0,1,2,3,5"), CONVAR_INT
+    );
+
+    THIS_MODE_INFO.cvars[REALITYSHIFT_CONVAR_PAIRS].HookChange(RealityShift_OnConVarChange);
+
+    DECLARE_FM_CVAR(
+        REALITYSHIFT_CONVAR_MIXED, "sm_realityshift_mixed",
+        "0", "Zombies are swapped too (humans and zombies can swap with each other)",
+        ("0,1"), CONVAR_BOOL
+    );
+
+    THIS_MODE_INFO.cvars[REALITYSHIFT_CONVAR_MIXED].HookChange(RealityShift_OnConVarChange);
+
+    DECLARE_FM_CVAR(
+        REALITYSHIFT_CONVAR_WARN, "sm_realityshift_warn",
+        "3", "Seconds of countdown with beeps before each swap (0 = none)",
+        ("0,3,5"), CONVAR_INT
+    );
+
+    THIS_MODE_INFO.cvars[REALITYSHIFT_CONVAR_WARN].HookChange(RealityShift_OnConVarChange);
+
     THIS_MODE_INFO.enableIndex = REALITYSHIFT_CONVAR_TOGGLE;
 }
 
@@ -82,6 +116,15 @@ public void InitCvarsValues_RealityShift()
 
     g_bRealityShift_Enabled =
         _FUNMODES_CVAR_GET_VALUE(modeIndex, REALITYSHIFT_CONVAR_TOGGLE, Bool);
+
+    g_iRealityShift_Pairs =
+        _FUNMODES_CVAR_GET_VALUE(modeIndex, REALITYSHIFT_CONVAR_PAIRS, Int);
+
+    g_bRealityShift_Mixed =
+        _FUNMODES_CVAR_GET_VALUE(modeIndex, REALITYSHIFT_CONVAR_MIXED, Bool);
+
+    g_iRealityShift_Warn =
+        _FUNMODES_CVAR_GET_VALUE(modeIndex, REALITYSHIFT_CONVAR_WARN, Int);
 }
 
 void RealityShift_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -116,6 +159,18 @@ void RealityShift_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldV
 
             g_bRealityShift_Enabled = val;
         }
+
+        case REALITYSHIFT_CONVAR_PAIRS:
+            g_iRealityShift_Pairs =
+                _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
+
+        case REALITYSHIFT_CONVAR_MIXED:
+            g_bRealityShift_Mixed =
+                _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+
+        case REALITYSHIFT_CONVAR_WARN:
+            g_iRealityShift_Warn =
+                _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
     }
 }
 
@@ -123,6 +178,7 @@ public void OnMapEnd_RealityShift()
 {
     CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
     g_hRealityShiftTimer = null;
+    g_hRealityShiftCountdown = null;
 }
 
 public void OnClientPutInServer_RealityShift(int client)
@@ -167,6 +223,8 @@ public Action Cmd_RealityShiftToggle(int client, int args)
         !THIS_MODE_INFO.isOn,
         THIS_MODE_INFO.index
     );
+
+    THIS_MODE_INFO.byRoulette = false;
 
     CPrintToChatAll(
         "%s RealityShift Mode is now %s!",
@@ -214,6 +272,7 @@ public Action Cmd_RealityShiftToggle(int client, int args)
     else
     {
         delete g_hRealityShiftTimer;
+        delete g_hRealityShiftCountdown;
     }
 
     return Plugin_Handled;
@@ -228,7 +287,8 @@ public Action Cmd_RealityShiftSettings(int client, int args)
 
     menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
 
-    menu.AddItem(NULL_STRING, "Show Cvars\n");
+    menu.AddItem("now", "Swap positions now", (THIS_MODE_INFO.isOn && !g_bRoundEnd && g_hRealityShiftCountdown == null) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+    menu.AddItem("cvars", "Show Cvars\n");
 
     menu.ExitBackButton = true;
 
@@ -252,7 +312,16 @@ int Menu_RealityShiftSettings(Menu menu, MenuAction action, int param1, int para
 
         case MenuAction_Select:
         {
-            ShowCvarsInfo(param1, THIS_MODE_INFO);
+            char info[16];
+            menu.GetItem(param2, info, sizeof(info));
+
+            if (strcmp(info, "now") == 0)
+            {
+                RealityShift_Shift();
+                Cmd_RealityShiftSettings(param1, 0);
+            }
+            else
+                ShowCvarsInfo(param1, THIS_MODE_INFO);
         }
     }
 
@@ -283,9 +352,69 @@ Action RealityShift_Timer(Handle timer)
         return Plugin_Stop;
     }
 
-    RealityShift_AssignPlayers(_, g_iRealityShift_Mode == 0);
-
+    RealityShift_Shift();
     return Plugin_Continue;
+}
+
+/* Swaps now, or after a countdown with beeps */
+void RealityShift_Shift()
+{
+    if (g_iRealityShift_Warn <= 0)
+    {
+        RealityShift_AssignPlayers(_, g_iRealityShift_Mode == 0);
+        return;
+    }
+
+    if (g_hRealityShiftCountdown != null)
+        return;
+
+    g_iRealityShiftCountdown = g_iRealityShift_Warn;
+    RealityShift_CountdownTick();
+    g_hRealityShiftCountdown =
+        CreateTimer(
+            1.0,
+            RealityShift_CountdownTimer,
+            _,
+            TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT
+        );
+}
+
+Action RealityShift_CountdownTimer(Handle timer)
+{
+    if (!THIS_MODE_INFO.isOn || g_bRoundEnd)
+    {
+        g_hRealityShiftCountdown = null;
+        return Plugin_Stop;
+    }
+
+    if (g_iRealityShiftCountdown <= 0)
+    {
+        g_hRealityShiftCountdown = null;
+        RealityShift_AssignPlayers(_, g_iRealityShift_Mode == 0);
+        return Plugin_Stop;
+    }
+
+    RealityShift_CountdownTick();
+    return Plugin_Continue;
+}
+
+void RealityShift_CountdownTick()
+{
+    PrintCenterTextAll("Positions swap in %d...", g_iRealityShiftCountdown);
+    EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 100 + 20 * (g_iRealityShift_Warn - g_iRealityShiftCountdown));
+    g_iRealityShiftCountdown--;
+}
+
+/* Alive, on a team that swaps and not carrying a map item */
+bool RealityShift_CanSwap(int client)
+{
+    if (!IsClientInGame(client) || !IsPlayerAlive(client))
+        return false;
+
+    if (!ZR_IsClientHuman(client) && !(g_bRealityShift_Mixed && ZR_IsClientZombie(client)))
+        return false;
+
+    return !EW_ClientHasItem(client);
 }
 
 int GetRandomClientFromArray(int[] arr, int len, int &client)
@@ -323,9 +452,7 @@ void RealityShift_AssignPlayers(bool saveOnly = false, bool random = true)
 
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (!IsClientInGame(i)
-        || !IsPlayerAlive(i)
-        || !ZR_IsClientHuman(i))
+        if (!RealityShift_CanSwap(i))
             continue;
 
         g_bRealityShiftSwapped[i] = false;
@@ -338,9 +465,7 @@ void RealityShift_AssignPlayers(bool saveOnly = false, bool random = true)
                 GetClientOfUserId(g_iRealityShiftAssigned[i]);
 
             if (!assignedTo
-            || !IsClientInGame(assignedTo)
-            || !IsPlayerAlive(assignedTo)
-            || !ZR_IsClientHuman(assignedTo))
+            || !RealityShift_CanSwap(assignedTo))
             {
                 g_bRealityShiftSwapped[i] = false;
 
@@ -358,7 +483,11 @@ void RealityShift_AssignPlayers(bool saveOnly = false, bool random = true)
 
     int assignmentsCount = count / 2;
 
-    if (assignmentsCount <= 1)
+    // Random swaps can be limited to a few pairs
+    if (!saveOnly && g_iRealityShift_Pairs > 0 && assignmentsCount > g_iRealityShift_Pairs)
+        assignmentsCount = g_iRealityShift_Pairs;
+
+    if (assignmentsCount < 1)
         return;
 
     for (int i = 0; i < assignmentsCount; i++)

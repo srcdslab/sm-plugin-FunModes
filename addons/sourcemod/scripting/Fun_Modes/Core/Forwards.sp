@@ -24,6 +24,11 @@
 #define FWD_OnTakeDamage             (1 << 13)
 #define FWD_OnWeaponEquip            (1 << 14)
 #define FWD_OnPlayerRunCmdPost       (1 << 15)
+#define FWD_OnTick                   (1 << 16)
+#define FWD_OnCheck                  (1 << 17)
+#define FWD_OnPlayerRunCmd           (1 << 18)
+#define FWD_OnClientSayCommand       (1 << 19)
+#define FWD_OnBuyCommand             (1 << 20)
 
 /* 
 * Checks whether a given forward can be executed for the current mode the compiler is reading.
@@ -121,6 +126,21 @@
 		}
 
 /*
+* Declares a specific forward with no params, only for the modes that are currently on.
+*
+* @param %1		The forward name.
+*/
+#define DECLARE_FM_FORWARD_ON_PARAM0(%1) 		for (int i = 0; i < g_iLastModeIndex; i++) 		{ 			if (g_ModesInfo[i].isOn) 				g_ModesInfo[i].forwards.Call_%1(); 		}
+
+/*
+* Declares a specific forward with one param, only for the modes that are currently on.
+*
+* @param %1		The forward name.
+* @param %2		The first param.
+*/
+#define DECLARE_FM_FORWARD_ON_PARAM1(%1,%2) 		for (int i = 0; i < g_iLastModeIndex; i++) 		{ 			if (g_ModesInfo[i].isOn) 				g_ModesInfo[i].forwards.Call_%1(%2); 		}
+
+/*
 * Declares a specific forward with three params to prepare all modes forwards execution.
 *
 * @param %1		The forward name.
@@ -183,7 +203,7 @@
 		VALIDATE_FM_ONE_FORWARD(OnTakeDamagePost, "OnTakeDamagePost") \
 		VALIDATE_FM_ONE_FORWARD(OnTakeDamage, "OnTakeDamage") \
 		VALIDATE_FM_ONE_FORWARD(OnWeaponEquip, "OnWeaponEquip") \
-		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmdPost, "OnPlayerRunCmdPost")
+		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmdPost, "OnPlayerRunCmdPost") 		VALIDATE_FM_ONE_FORWARD(OnTick, "OnTick") 		VALIDATE_FM_ONE_FORWARD(OnCheck, "OnCheck") 		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmd, "OnPlayerRunCmd") 		VALIDATE_FM_ONE_FORWARD(OnClientSayCommand, "OnClientSayCommand") 		VALIDATE_FM_ONE_FORWARD(OnBuyCommand, "OnBuyCommand")
 
 enum struct FM_Forwards
 {
@@ -283,5 +303,56 @@ enum struct FM_Forwards
 	void Call_OnPlayerRunCmdPost(int client, int buttons, int impulse)
 	{
 		CALL_FUNCTION_PARAM3(OnPlayerRunCmdPost, client, Cell, buttons, Cell, impulse, Cell)
+	}
+
+	/* Called every second while the mode is on */
+	Function fn_OnTick;
+	void Call_OnTick()
+	{
+		CALL_FUNCTION_PARAM0(OnTick)
+	}
+
+	/* Called every 0.2 seconds while the mode is on */
+	Function fn_OnCheck;
+	void Call_OnCheck(bool zombiesNow)
+	{
+		CALL_FUNCTION_PARAM1(OnCheck, zombiesNow, Cell)
+	}
+
+	/* The mode can change the player's buttons and velocity, setting changed to true */
+	Function fn_OnPlayerRunCmd;
+	void Call_OnPlayerRunCmd(int client, int &buttons, float vel[3], bool &changed)
+	{
+		CHECK_FORWARD_FLAG(OnPlayerRunCmd)
+		Call_StartFunction(null, this.fn_OnPlayerRunCmd);
+		Call_PushCell(client);
+		Call_PushCellRef(buttons);
+		Call_PushArrayEx(vel, 3, SM_PARAM_COPYBACK);
+		Call_PushCellRef(changed);
+		Call_Finish();
+	}
+
+	/* The mode can block a chat message by setting result to Plugin_Handled or Plugin_Stop */
+	Function fn_OnClientSayCommand;
+	void Call_OnClientSayCommand(int client, const char[] text, Action &result)
+	{
+		CHECK_FORWARD_FLAG(OnClientSayCommand)
+		Call_StartFunction(null, this.fn_OnClientSayCommand);
+		Call_PushCell(client);
+		Call_PushString(text);
+		Call_PushCellRef(result);
+		Call_Finish();
+	}
+
+	/* The mode can block a buy by setting result to Plugin_Handled or Plugin_Stop */
+	Function fn_OnBuyCommand;
+	void Call_OnBuyCommand(int client, const char[] weapon, Action &result)
+	{
+		CHECK_FORWARD_FLAG(OnBuyCommand)
+		Call_StartFunction(null, this.fn_OnBuyCommand);
+		Call_PushCell(client);
+		Call_PushString(weapon);
+		Call_PushCellRef(result);
+		Call_Finish();
 	}
 }

@@ -24,9 +24,9 @@
 public Plugin myinfo =
 {
 	name = "FunModes",
-	author = "Dolly",
+	author = "Dolly, Hobbitten",
 	description = "bunch of fun modes for ze mode",
-	version = "2.9.0",
+	version = "3.0.0",
 	url = "https://nide.gg"
 }
 
@@ -41,6 +41,7 @@ public void OnPluginStart()
 
 	g_cvHUDChannel = CreateConVar("sm_funmodes_hud_channel", "4", "The channel for the hud if using DynamicChannels", _, true, 0.0, true, 5.0);
 
+	Shared_OnPluginStart();
 	Forwards_OnPluginStart();
 
 	DECLARE_FM_FORWARD_PARAM0(InitCvarsValues)
@@ -54,6 +55,7 @@ public void OnPluginStart()
 	}
 
 	RegAdminCmd("sm_fmcvar", Cmd_FunModesCvars, ADMFLAG_CONVARS, "Change a FunModes cvar");
+	RegAdminCmd("sm_fm", Cmd_FunModesState, ADMFLAG_CONVARS, "sm_fm <mode> [on|off] | sm_fm list | sm_fm stop");
 
 	g_iNetPropAmmoIndex = FindSendPropInfo("CBasePlayer", "m_iAmmo");
 	if (g_iNetPropAmmoIndex == -1)
@@ -108,12 +110,16 @@ public void OnMapStart()
 
 	PrecacheSound(Beacon_Sound, true);
 
+	Shared_OnMapStart();
+
 	DECLARE_FM_FORWARD_PARAM0(OnMapStart)
 }
 
 public void OnMapEnd()
 {
 	DECLARE_FM_FORWARD_PARAM0(OnMapEnd)
+
+	Shared_OnMapEnd();
 }
 
 public void OnClientPutInServer(int client)
@@ -131,15 +137,20 @@ public void OnClientDisconnect(int client)
 
 public void ZR_OnClientInfected(int client, int attacker, bool motherInfect)
 {		
+	g_bInfectionIsMother = motherInfect;
 	DECLARE_FM_FORWARD_PARAM1(ZR_OnClientInfected, client)
 	if (motherInfect && !g_bMotherZombie)
 		g_bMotherZombie = true;
+
+	// React at once instead of waiting for the next check
+	FunModes_RunCheck();
 }
 
 void Event_RoundStart(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundEnd = false;
 	g_bMotherZombie = false;
+	Shared_RoundStart();
 	DECLARE_FM_FORWARD_PARAM0(Event_RoundStart)
 }
 
@@ -147,6 +158,7 @@ void Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	g_bRoundEnd = true;
 	g_bMotherZombie = false;
+	Shared_RoundEnd();
 	DECLARE_FM_FORWARD_PARAM0(Event_RoundEnd)
 }
 
@@ -165,6 +177,9 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
 	int client = GetClientOfUserId(event.GetInt("userid"));
 	DECLARE_FM_FORWARD_PARAM1(Event_PlayerDeath, client)
+
+	// React at once instead of waiting for the next check
+	FunModes_RunCheck();
 }
 
 void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
@@ -202,6 +217,10 @@ void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback)
 
 void FunModes_RestartRound()
 {
+	// The Event Roulette turns modes on at round start or during it, no restart then
+	if (g_bSkipRestartRound)
+		return;
+
 	// slay all players before terminating the round
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -234,6 +253,44 @@ public void OnLibraryRemoved(const char[] name)
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse)
 {
 	DECLARE_FM_FORWARD_PARAM3(OnPlayerRunCmdPost, client, buttons, impulse)
+}
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
+{
+	bool changed = false;
+	for (int i = 0; i < g_iLastModeIndex; i++)
+	{
+		if (g_ModesInfo[i].isOn)
+			g_ModesInfo[i].forwards.Call_OnPlayerRunCmd(client, buttons, vel, changed);
+	}
+
+	return changed ? Plugin_Changed : Plugin_Continue;
+}
+
+/* Buys go to the modes that lock weapons, until one of them blocks it */
+public Action CS_OnBuyCommand(int client, const char[] weapon)
+{
+	Action result = Plugin_Continue;
+	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
+	{
+		if (g_ModesInfo[i].isOn)
+			g_ModesInfo[i].forwards.Call_OnBuyCommand(client, weapon, result);
+	}
+
+	return result;
+}
+
+/* Chat goes to the modes that read answers from it, until one of them handles it */
+public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
+{
+	Action result = Plugin_Continue;
+	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
+	{
+		if (g_ModesInfo[i].isOn)
+			g_ModesInfo[i].forwards.Call_OnClientSayCommand(client, sArgs, result);
+	}
+
+	return result;
 }
 
 float GetDistanceBetween(int origin, int target, bool squarred = false)
@@ -282,18 +339,47 @@ Action Cmd_FunModes(int client, int args)
 	if (!client)
 		return Plugin_Handled;
 
+	g_iMenuCategory[client] = -1;
+
 	Menu menu = new Menu(Menu_MainModes);
 	menu.SetTitle("[FunModes] Available modes!");
 
+	char index[6], line[64];
+
+	// Modes that don't belong to a category (the Event Roulette) come first
 	for (int i = 0; i < g_iLastModeIndex; i++)
 	{
-		ModeInfo info;
-		info = g_ModesInfo[i];
+		if (g_ModesInfo[i].category != FM_CAT_MAIN)
+			continue;
 
-		char index[3];
-		IntToString(i, index, sizeof(index));
+		FormatEx(index, sizeof(index), "m%d", i);
+		FormatEx(line, sizeof(line), "%s%s", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+		menu.AddItem(index, line);
+	}
 
-		menu.AddItem(index, info.name);
+	for (int cat = 0; cat < view_as<int>(FM_CAT_COUNT); cat++)
+	{
+		int total, on;
+		for (int i = 0; i < g_iLastModeIndex; i++)
+		{
+			if (g_ModesInfo[i].category != view_as<FM_Category>(cat))
+				continue;
+
+			total++;
+			if (g_ModesInfo[i].isOn)
+				on++;
+		}
+
+		if (!total)
+			continue;
+
+		FormatEx(index, sizeof(index), "c%d", cat);
+		if (on)
+			FormatEx(line, sizeof(line), "%s (%d on)", g_sCategoryNames[cat], on);
+		else
+			FormatEx(line, sizeof(line), "%s", g_sCategoryNames[cat]);
+
+		menu.AddItem(index, line);
 	}
 
 	menu.ExitButton = true;
@@ -310,12 +396,62 @@ int Menu_MainModes(Menu menu, MenuAction action, int param1, int param2)
 
 		case MenuAction_Select:
 		{
-			char index[3];
+			char index[6];
+			menu.GetItem(param2, index, sizeof(index));
+
+			if (index[0] == 'c')
+				DisplayCategory(param1, StringToInt(index[1]));
+			else
+				DisplayModeInfo(param1, StringToInt(index[1]));
+		}
+	}
+	
+	return 0;
+}
+
+void DisplayCategory(int client, int cat)
+{
+	g_iMenuCategory[client] = cat;
+
+	Menu menu = new Menu(Menu_Category);
+	menu.SetTitle("[FunModes] %s", g_sCategoryNames[cat]);
+
+	char index[4], line[64];
+	for (int i = 0; i < g_iLastModeIndex; i++)
+	{
+		if (g_ModesInfo[i].category != view_as<FM_Category>(cat))
+			continue;
+
+		IntToString(i, index, sizeof(index));
+		FormatEx(line, sizeof(line), "%s%s", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+		menu.AddItem(index, line);
+	}
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+}
+
+int Menu_Category(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch(action)
+	{
+		case MenuAction_End:
+			delete menu;
+
+		case MenuAction_Cancel:
+		{
+			if (param2 == MenuCancel_ExitBack)
+				Cmd_FunModes(param1, 0);
+		}
+
+		case MenuAction_Select:
+		{
+			char index[4];
 			menu.GetItem(param2, index, sizeof(index));
 			DisplayModeInfo(param1, StringToInt(index));
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -350,7 +486,12 @@ int Menu_DisplayConVars(Menu menu, MenuAction action, int param1, int param2)
 		
 		case MenuAction_Cancel:
 		{
-			if (param2 == MenuCancel_ExitBack)
+			if (param2 != MenuCancel_ExitBack)
+				return 0;
+
+			if (g_iMenuCategory[param1] >= 0)
+				DisplayCategory(param1, g_iMenuCategory[param1]);
+			else
 				Cmd_FunModes(param1, 0);
 		}
 		
@@ -653,24 +794,23 @@ public void OnConfigsExecuted()
 	delete g_hKV;
 	g_hKV = new KeyValues("FunModes_Cvars");
 
-	if (!g_hKV.ImportFromFile(FUNMODES_CVAR_CONFIG))
+	// No file yet: start an empty one, it gets filled as the cvars change
+	if (!g_hKV.ImportFromFile(FUNMODES_CVAR_CONFIG) || !g_hKV.GotoFirstSubKey())
 	{
-		delete g_hKV;
+		g_hKV.Rewind();
 		return;
 	}
 
-	if (!g_hKV.GotoFirstSubKey())
-	{
-		delete g_hKV;
-		return;
-	}
-
-	int modeIndex = 0;
-	int cvarIndex = 0;
-	int maxCvars = g_ModesInfo[modeIndex].GetCvarsCount();
-	int count = 0;
+	// The cvars are matched by name, so adding a mode or a cvar never shifts the saved values
 	do
 	{
+		char name[sizeof(FM_ConVar::name)];
+		g_hKV.GetString("name", name, sizeof(name));
+
+		int modeIndex, cvarIndex;
+		if (!FunModes_FindCvar(name, modeIndex, cvarIndex))
+			continue;
+
 		FM_ConVar cvar;
 		cvar = g_ModesInfo[modeIndex].cvars[cvarIndex];
 
@@ -685,7 +825,7 @@ public void OnConfigsExecuted()
 
 		char currentValue[sizeof(FM_ConVar::currentValue)];
 		g_hKV.GetString("currentvalue", currentValue, sizeof(currentValue));
-		if (currentValue[0])			
+		if (currentValue[0])
 			FUNMODES_CVAR_SET_VALUE(cvar, String, currentValue);
 		else
 			FUNMODES_CVAR_SET_VALUE(cvar, String, defaultValue);
@@ -694,7 +834,8 @@ public void OnConfigsExecuted()
 
 		char description[sizeof(FM_ConVar::description)];
 		g_hKV.GetString("description", description, sizeof(description));
-		cvar.description = description;
+		if (description[0])
+			cvar.description = description;
 
 		char values[sizeof(FM_ConVar::values)];
 		g_hKV.GetString("values", values, sizeof(values));
@@ -703,16 +844,184 @@ public void OnConfigsExecuted()
 
 		g_ModesInfo[modeIndex].cvars[cvarIndex] = cvar;
 		g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue = cvar.currentValue;
-		if (++cvarIndex >= maxCvars)
-		{
-			if (++modeIndex >= g_iLastModeIndex)
-				break;
-
-			cvarIndex = 0;
-			maxCvars = g_ModesInfo[modeIndex].GetCvarsCount();
-		}
-		count++;
 	} while (g_hKV.GotoNextKey());
 
 	g_hKV.Rewind();
+}
+
+bool FunModes_FindCvar(const char[] name, int &modeIndex, int &cvarIndex)
+{
+	if (!name[0])
+		return false;
+
+	for (int i = 0; i < g_iLastModeIndex; i++)
+	{
+		for (int j = 0; j < sizeof(ModeInfo::cvars); j++)
+		{
+			if (strcmp(g_ModesInfo[i].cvars[j].name, name, false) != 0)
+				continue;
+
+			modeIndex = i;
+			cvarIndex = j;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/* Saves a cvar's current value in the config, adding the cvar to it if it's not there yet */
+void FunModes_SaveCvar(FM_ConVar cvar)
+{
+	if (g_hKV == null)
+		return;
+
+	g_hKV.Rewind();
+
+	int lastKey = -1;
+	bool found = false;
+	if (g_hKV.GotoFirstSubKey())
+	{
+		do
+		{
+			char section[8];
+			g_hKV.GetSectionName(section, sizeof(section));
+			if (StringToInt(section) > lastKey)
+				lastKey = StringToInt(section);
+
+			char name[sizeof(FM_ConVar::name)];
+			g_hKV.GetString("name", name, sizeof(name));
+			if (strcmp(name, cvar.name, false) != 0)
+				continue;
+
+			g_hKV.SetString("currentValue", cvar.currentValue);
+			found = true;
+			break;
+		} while (g_hKV.GotoNextKey());
+	}
+
+	g_hKV.Rewind();
+
+	if (!found)
+	{
+		char key[8];
+		IntToString(lastKey + 1, key, sizeof(key));
+		g_hKV.JumpToKey(key, true);
+		g_hKV.SetString("name", cvar.name);
+		g_hKV.SetString("Default", cvar.defaultValue);
+		g_hKV.SetString("description", cvar.description);
+		g_hKV.SetString("currentValue", cvar.currentValue);
+		g_hKV.Rewind();
+	}
+
+	g_hKV.ExportToFile(FUNMODES_CVAR_CONFIG);
+}
+
+int FunModes_FindMode(const char[] name)
+{
+	for (int i = 0; i < g_iLastModeIndex; i++)
+	{
+		if (strcmp(g_ModesInfo[i].name, name, false) == 0)
+			return i;
+	}
+
+	return -1;
+}
+
+/* Turns a mode on or off the same way its toggle command does, returns whether it's now in the wanted state */
+bool FunModes_SetModeState(int modeIndex, bool on, int client = 0)
+{
+	if (g_ModesInfo[modeIndex].isOn == on)
+		return true;
+
+	char functionName[46];
+	FormatEx(functionName, sizeof(functionName), "Cmd_%sToggle", g_ModesInfo[modeIndex].name);
+
+	Function toggle = GetFunctionByName(null, functionName);
+	if (toggle == INVALID_FUNCTION)
+		return false;
+
+	Call_StartFunction(null, toggle);
+	Call_PushCell(client);
+	Call_PushCell(0);
+	Call_Finish();
+
+	return g_ModesInfo[modeIndex].isOn == on;
+}
+
+Action Cmd_FunModesState(int client, int args)
+{
+	if (args < 1)
+	{
+		if (client)
+			Cmd_FunModes(client, 0);
+		else
+			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off] | sm_fm list | sm_fm stop");
+
+		return Plugin_Handled;
+	}
+
+	char arg[32];
+	GetCmdArg(1, arg, sizeof(arg));
+
+	if (strcmp(arg, "list", false) == 0)
+	{
+		char line[256];
+		for (int i = 0; i < g_iLastModeIndex; i++)
+		{
+			char entry[48];
+			FormatEx(entry, sizeof(entry), "%s%s%s", line[0] ? ", " : "", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+			if (strlen(line) + strlen(entry) > 180)
+			{
+				ReplyToCommand(client, "[FunModes] %s", line);
+				line[0] = '\0';
+				FormatEx(entry, sizeof(entry), "%s%s", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+			}
+
+			StrCat(line, sizeof(line), entry);
+		}
+
+		ReplyToCommand(client, "[FunModes] %s", line);
+		return Plugin_Handled;
+	}
+
+	if (strcmp(arg, "stop", false) == 0)
+	{
+		for (int i = 0; i < g_iLastModeIndex; i++)
+			FunModes_SetModeState(i, false, client);
+
+		CPrintToChatAll("{gold}[FunModes]{lightgreen} {olive}%N {lightgreen}stopped all the modes.", client);
+		LogAction(client, -1, "\"%L\" stopped all the funmodes", client);
+		return Plugin_Handled;
+	}
+
+	int modeIndex = FunModes_FindMode(arg);
+	if (modeIndex == -1)
+	{
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Unknown mode {olive}%s{lightgreen}, type sm_fm list", arg);
+		return Plugin_Handled;
+	}
+
+	bool on = !g_ModesInfo[modeIndex].isOn;
+	if (args >= 2)
+	{
+		char state[8];
+		GetCmdArg(2, state, sizeof(state));
+		if (strcmp(state, "on", false) == 0 || strcmp(state, "1") == 0)
+			on = true;
+		else if (strcmp(state, "off", false) == 0 || strcmp(state, "0") == 0)
+			on = false;
+		else
+		{
+			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off]");
+			return Plugin_Handled;
+		}
+	}
+
+	if (!FunModes_SetModeState(modeIndex, on, client))
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Couldn't turn {olive}%s {lightgreen}%s.", g_ModesInfo[modeIndex].name, on ? "on" : "off");
+	else
+		LogAction(client, -1, "\"%L\" turned the funmode %s %s", client, g_ModesInfo[modeIndex].name, on ? "on" : "off");
+
+	return Plugin_Handled;
 }

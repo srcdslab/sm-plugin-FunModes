@@ -31,6 +31,13 @@ static int g_iMathGameIndex = -1;
 #define MATHGAME_CONVAR_MAX_TRIES               7
 #define MATHGAME_CONVAR_TIME_DELAY              8
 #define MATHGAME_CONVAR_TOGGLE                  9
+#define MATHGAME_CONVAR_REWARD                  10
+#define MATHGAME_CONVAR_SAME                    11
+
+#define MATHGAME_REWARD_NONE 0
+#define MATHGAME_REWARD_HP25 1
+#define MATHGAME_REWARD_HP50 2
+#define MATHGAME_REWARD_HE   3
 
 Handle g_hMathGameTimer;
 Handle g_hMathGameTimerRepeat;
@@ -49,6 +56,12 @@ bool g_bMathGame_IncludeZombies;
 int g_iMathGame_MaxTries;
 float g_fMathGame_TimeDelay;
 bool g_bMathGame_Enabled;
+int g_iMathGame_Reward;
+bool g_bMathGame_Same;
+
+/* The question everyone gets when they all get the same one */
+int g_iMathGameSharedNumbers[2];
+char g_sMathGameSharedOper[2];
 
 public void OnPluginStart_MathGame()
 {
@@ -57,6 +70,7 @@ public void OnPluginStart_MathGame()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_GAMES;
 
 	RegAdminCmd("sm_fm_mathgame", Cmd_MathGameToggle, ADMFLAG_CONVARS, "Turn MathGame Mode On/Off");
 	RegAdminCmd("sm_mathgame_settings", Cmd_MathGameSettings, ADMFLAG_CONVARS, "Open MathGame Sttings Menu");
@@ -131,6 +145,20 @@ public void OnPluginStart_MathGame()
 	);
 	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_TOGGLE].HookChange(MathGame_OnConVarChange);
 
+	DECLARE_FM_CVAR(
+		MATHGAME_CONVAR_REWARD, "sm_mathgame_reward",
+		"0", "Reward for a right answer [0 = nothing 1 = +25 HP 2 = +50 HP 3 = HE grenade]",
+		("0,1,2,3"), CONVAR_INT
+	);
+	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_REWARD].HookChange(MathGame_OnConVarChange);
+
+	DECLARE_FM_CVAR(
+		MATHGAME_CONVAR_SAME, "sm_mathgame_same",
+		"0", "Everyone gets the same question (else each player their own)",
+		("0,1"), CONVAR_BOOL
+	);
+	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_SAME].HookChange(MathGame_OnConVarChange);
+
 	THIS_MODE_INFO.enableIndex = MATHGAME_CONVAR_TOGGLE;
 }
 
@@ -150,6 +178,8 @@ public void InitCvarsValues_MathGame()
 	g_iMathGame_MaxTries = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_MAX_TRIES, Int);
 	g_fMathGame_TimeDelay = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_TIME_DELAY, Float);
 	g_bMathGame_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_TOGGLE, Bool);
+	g_iMathGame_Reward = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_REWARD, Int);
+	g_bMathGame_Same = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_SAME, Bool);
 }
 
 void MathGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -191,6 +221,12 @@ void MathGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue
 
 			g_bMathGame_Enabled = val;
 		}
+
+		case MATHGAME_CONVAR_REWARD:
+			g_iMathGame_Reward = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
+
+		case MATHGAME_CONVAR_SAME:
+			g_bMathGame_Same = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
 	}
 }
 
@@ -255,6 +291,7 @@ public Action Cmd_MathGameToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll("%s MathGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
 
@@ -276,21 +313,17 @@ public Action Cmd_MathGameToggle(int client, int args)
 	return Plugin_Handled;
 }
 
-public Action OnClientSayCommand(int client, const char[] command, const char[] args)
+public void OnClientSayCommand_MathGame(int client, const char[] args, Action &result)
 {
-	#pragma unused command
-	if (!THIS_MODE_INFO.isOn)
-		return Plugin_Continue;
-
 	if (!g_bMathGameHasQuestion[client])
-		return Plugin_Continue;
+		return;
 
 	if (!IsCharNumeric(args[0]) && args[0] != '-' && args[0] != '+')
-		return Plugin_Continue;
+		return;
 
 	int num;
 	if (!StringToIntEx(args, num))
-		return Plugin_Continue;
+		return;
 
 	if (num == g_iMathGameAnswer[client])
 	{
@@ -298,10 +331,28 @@ public Action OnClientSayCommand(int client, const char[] command, const char[] 
 		CPrintToChatAll("%s {olive}%N {lightgreen}turns to be a smart boy and answered their question!", THIS_MODE_INFO.tag, client);
 		g_bMathGameHasQuestion[client] = false;
 		g_iMathGameAnswer[client] = 0;
-		return Plugin_Stop;
+		result = Plugin_Stop;
+
+		MathGame_Reward(client);
+	}
+}
+
+void MathGame_Reward(int client)
+{
+	if (g_iMathGame_Reward == MATHGAME_REWARD_NONE || !IsPlayerAlive(client))
+		return;
+
+	if (g_iMathGame_Reward == MATHGAME_REWARD_HE && ZR_IsClientHuman(client))
+	{
+		GivePlayerItem(client, "weapon_hegrenade");
+		CPrintToChat(client, "%s You got an {olive}HE grenade{lightgreen}!", THIS_MODE_INFO.tag);
+		return;
 	}
 
-	return Plugin_Continue;
+	// The zombies get health instead of an HE grenade
+	int heal = g_iMathGame_Reward == MATHGAME_REWARD_HP25 ? 25 : 50;
+	SetEntityHealth(client, GetClientHealth(client) + heal);
+	CPrintToChat(client, "%s You got {olive}+%d HP{lightgreen}!", THIS_MODE_INFO.tag, heal);
 }
 
 void MathGame_Ask()
@@ -316,6 +367,9 @@ void MathGame_Ask()
 
 	if (g_bMathGame_IncludeZombies)
 		CPrintToChatAll("%s Zombies will have {olive}%d maximum tries {lightgreen}to survive or they will be stuck on spec!", THIS_MODE_INFO.tag, g_iMathGame_MaxTries);
+
+	if (g_bMathGame_Same)
+		MathGame_MakeQuestion(level, g_iMathGameSharedNumbers, g_sMathGameSharedOper);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -342,6 +396,30 @@ void MathGame_SendQuestion(int client, int level)
 	char oper[2];
 	int numbers[2];
 
+	if (g_bMathGame_Same)
+	{
+		numbers = g_iMathGameSharedNumbers;
+		oper = g_sMathGameSharedOper;
+	}
+	else
+		MathGame_MakeQuestion(level, numbers, oper);
+
+	int answer;
+	switch (oper[0])
+	{
+		case '+': answer = numbers[0] + numbers[1];
+		case '-': answer = numbers[0] - numbers[1];
+		default: answer = numbers[0] * numbers[1];
+	}
+
+	g_iMathGameAnswer[client] = answer;
+	FormatEx(g_sMathGameQuestion[client], sizeof(g_sMathGameQuestion[]), "%d %s %d", numbers[0], oper, numbers[1]);
+
+	CPrintToChat(client, "%s What is [ {white}%d {olive}%s {white}%d {lightgreen}]?", THIS_MODE_INFO.tag, numbers[0], oper, numbers[1]);
+}
+
+void MathGame_MakeQuestion(int level, int numbers[2], char oper[2])
+{
 	int min, max;
 
 	if (level == 0 || level == 1)
@@ -359,19 +437,6 @@ void MathGame_SendQuestion(int client, int level)
 		numbers[1] = GetRandomInt(0, 9);
 		oper = "*";
 	}
-
-	int answer;
-	switch (oper[0])
-	{
-		case '+': answer = numbers[0] + numbers[1];
-		case '-': answer = numbers[0] - numbers[1];
-		default: answer = numbers[0] * numbers[1];
-	}
-
-	g_iMathGameAnswer[client] = answer;
-	FormatEx(g_sMathGameQuestion[client], sizeof(g_sMathGameQuestion[]), "%d %s %d", numbers[0], oper, numbers[1]);
-
-	CPrintToChat(client, "%s What is [ {white}%d {olive}%s {white}%d {lightgreen}]?", THIS_MODE_INFO.tag, numbers[0], oper, numbers[1]);
 }
 
 Action MathGame_Timer(Handle timer, int level)

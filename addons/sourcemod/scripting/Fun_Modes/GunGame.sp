@@ -40,6 +40,9 @@ static int g_iGunGameIndex = -1;
 #define GUNGAME_CONVAR_SMOKEGRENADES_COUNT  5
 #define GUNGAME_CONVAR_REWARD_SPEED         6
 #define GUNGAME_CONVAR_TOGGLE               7
+#define GUNGAME_CONVAR_SCALE                8
+#define GUNGAME_CONVAR_KEEP                 9
+#define GUNGAME_CONVAR_HUD                  10
 
 #define GUNGAME_PICKUP_COOLDOWN             60.0 // In seconds
 
@@ -90,6 +93,11 @@ int g_iGunGame_SmokeGrenadesCount;
 float g_fGunGame_RewardSpeed;
 
 bool g_bGunGame_Enabled;
+float g_fGunGame_Scale;
+bool g_bGunGame_Keep;
+bool g_bGunGame_Hud;
+
+Handle g_hGunGame_Hud;
 
 public void OnPluginStart_GunGame()
 {
@@ -98,6 +106,7 @@ public void OnPluginStart_GunGame()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_WEAPONS;
 
     RegAdminCmd("sm_fm_gungame", Cmd_GunGameToggle, ADMFLAG_CONVARS, "Turn GunGame Mode On/Off");
     RegAdminCmd("sm_gungame_settings", Cmd_GunGameSettings, ADMFLAG_CONVARS, "Open GunGame Sttings Menu");
@@ -160,6 +169,32 @@ public void OnPluginStart_GunGame()
     );
     THIS_MODE_INFO.cvars[GUNGAME_CONVAR_TOGGLE].HookChange(GunGame_OnConVarChange);
 
+    DECLARE_FM_CVAR(
+        GUNGAME_CONVAR_SCALE, "sm_gungame_scale",
+        "1.0", "Multiplier on the damage needed for every weapon",
+        ("0.5,0.75,1.0,1.5,2.0"), CONVAR_FLOAT
+    );
+
+    THIS_MODE_INFO.cvars[GUNGAME_CONVAR_SCALE].HookChange(GunGame_OnConVarChange);
+
+    DECLARE_FM_CVAR(
+        GUNGAME_CONVAR_KEEP, "sm_gungame_keep",
+        "0", "Keep the players weapon level between rounds (else everyone starts again each round)",
+        ("0,1"), CONVAR_BOOL
+    );
+
+    THIS_MODE_INFO.cvars[GUNGAME_CONVAR_KEEP].HookChange(GunGame_OnConVarChange);
+
+    DECLARE_FM_CVAR(
+        GUNGAME_CONVAR_HUD, "sm_gungame_hud",
+        "1", "Show the players their weapon and the damage left to the next one",
+        ("0,1"), CONVAR_BOOL
+    );
+
+    THIS_MODE_INFO.cvars[GUNGAME_CONVAR_HUD].HookChange(GunGame_OnConVarChange);
+
+    g_hGunGame_Hud = CreateModeHud();
+
     THIS_MODE_INFO.enableIndex = GUNGAME_CONVAR_TOGGLE;
 }
 
@@ -177,6 +212,9 @@ public void InitCvarsValues_GunGame()
     g_fGunGame_RewardSpeed = _FUNMODES_CVAR_GET_VALUE(modeIndex, GUNGAME_CONVAR_REWARD_SPEED, Float);
 
     g_bGunGame_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, GUNGAME_CONVAR_TOGGLE, Bool);
+    g_fGunGame_Scale = _FUNMODES_CVAR_GET_VALUE(modeIndex, GUNGAME_CONVAR_SCALE, Float);
+    g_bGunGame_Keep = _FUNMODES_CVAR_GET_VALUE(modeIndex, GUNGAME_CONVAR_KEEP, Bool);
+    g_bGunGame_Hud = _FUNMODES_CVAR_GET_VALUE(modeIndex, GUNGAME_CONVAR_HUD, Bool);
 }
 
 void GunGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -214,6 +252,15 @@ void GunGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue,
 
             g_bGunGame_Enabled = val;
         }
+
+        case GUNGAME_CONVAR_SCALE:
+            g_fGunGame_Scale = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+
+        case GUNGAME_CONVAR_KEEP:
+            g_bGunGame_Keep = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+
+        case GUNGAME_CONVAR_HUD:
+            g_bGunGame_Hud = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
     }
 }
 
@@ -267,7 +314,7 @@ public void ZR_OnClientInfected_GunGame(int client)
             if (EW_ClientHasItem(i))
                 continue;
 
-            GunGame_ResetHuman(i);
+            GunGame_StartHuman(i);
         }
 
         CPrintToChatAll("%s Your weapon will be upgraded when you reach the required damage for each weapon type!", THIS_MODE_INFO.tag);
@@ -301,7 +348,7 @@ Action Timer_GunGame_CheckPlayerSpawn(Handle timer, int userid)
     if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
         return Plugin_Stop;
 
-    GunGame_ResetHuman(client);
+    GunGame_StartHuman(client);
     return Plugin_Stop;
 }
 
@@ -324,7 +371,7 @@ public void OnTakeDamagePost_GunGame(int victim, int attacker, float damage)
     if (EW_ClientHasItem(attacker))
         return;
 
-    int neededDamage = g_iGunGame_DamageRequired[g_GunGameData[attacker].level[0]];
+    int neededDamage = GunGame_NeededDamage(attacker);
 
     if (g_GunGameData[attacker].dealtDamage >= neededDamage)
     {
@@ -363,22 +410,57 @@ public void OnWeaponEquip_GunGame(int client, int weapon, Action &result)
     }
 }
 
-public Action CS_OnBuyCommand(int client, const char[] weapon)
+public void OnBuyCommand_GunGame(int client, const char[] weapon, Action &result)
 {
     #pragma unused weapon
-    if (!THIS_MODE_INFO.isOn)
-        return Plugin_Continue;
-
     if (EW_ClientHasItem(client))
-        return Plugin_Continue;
+        return;
 
     if (!g_GunGameData[client].allowEquip)
     {
         CPrintToChat(client, "%s You cannot buy/equip weapons during GunGame Escape Mode", THIS_MODE_INFO.tag);
-        return Plugin_Stop;
+        result = Plugin_Stop;
+    }
+}
+
+int GunGame_NeededDamage(int client)
+{
+    return RoundToNearest(float(g_iGunGame_DamageRequired[g_GunGameData[client].level[0]]) * g_fGunGame_Scale);
+}
+
+/* A human starts the round: back to the first weapon, or the weapon they had (sm_gungame_keep) */
+void GunGame_StartHuman(int client)
+{
+    if (!g_bGunGame_Keep)
+    {
+        GunGame_ResetHuman(client);
+        return;
     }
 
-    return Plugin_Continue;
+    int weaponType = g_GunGameData[client].level[0];
+    GunGame_EquipWeapon(client, g_GunGameWeaponsList[weaponType][g_GunGameData[client].level[1]], weaponType > 0);
+}
+
+/* The weapon and the damage left to the next one */
+public void OnTick_GunGame()
+{
+    if (!g_bGunGame_Hud || !g_bMotherZombie)
+        return;
+
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (!IsClientInGame(i) || IsFakeClient(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
+            continue;
+
+        int weaponType = g_GunGameData[i].level[0];
+        int needed = GunGame_NeededDamage(i);
+        int left = needed - g_GunGameData[i].dealtDamage;
+        if (left < 0)
+            left = 0;
+
+        SetHudTextParams(-1.0, 0.88, 1.1, 192, 128, 255, 255, 0, 0.0, 0.0, 0.0);
+        ShowModeHud(i, g_hGunGame_Hud, "GunGame: %s - %d damage to the next weapon", g_GunGameWeaponsList[weaponType][g_GunGameData[i].level[1]][7], left);
+    }
 }
 
 public void GunGame_ResetHuman(int client)
@@ -399,6 +481,12 @@ public Action Cmd_GunGameToggle(int client, int args)
     }
 
     CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+    THIS_MODE_INFO.byRoulette = false;
+
+    // Both lock the weapons, they can't run together
+    int randomWeapons = FunModes_FindMode("RandomWeapons");
+    if (THIS_MODE_INFO.isOn && randomWeapons != -1 && g_ModesInfo[randomWeapons].isOn)
+        FunModes_SetModeState(randomWeapons, false);
 
     CPrintToChatAll("%s GunGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
 
