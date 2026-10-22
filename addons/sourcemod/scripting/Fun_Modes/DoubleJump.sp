@@ -35,6 +35,7 @@ public void OnPluginStart_DoubleJump()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_CHAOS;
 
 	RegAdminCmd("sm_fm_doublejump", Cmd_DoubleJumpToggle, ADMFLAG_CONVARS);
 	RegAdminCmd("sm_doublejump_settings", Cmd_DoubleJumpSettings, ADMFLAG_CONFIG);
@@ -42,7 +43,7 @@ public void OnPluginStart_DoubleJump()
 	DECLARE_FM_CVAR(
 		DOUBLEJUMP_CONVAR_BOOST, "sm_doublejump_boost",
 		"260.0", "Vertical boost applied to double jump",
-		("150.0,260.0,300.0,320.0"), CONVAR_FLOAT
+		("150.0,260.0,300.0,350.0,450.0"), CONVAR_FLOAT
 	);
 	THIS_MODE_INFO.cvars[DOUBLEJUMP_CONVAR_BOOST].HookChange(DoubleJump_OnConVarChange);
 
@@ -144,6 +145,7 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll(
 		"%s DoubleJump is now %s",
@@ -189,8 +191,13 @@ public void OnPlayerRunCmdPost_DoubleJump(int client, int buttons, int impulse)
 
 	else if (!wasJump[client]
 	&& pressingJump
-	&& jumps[client]++ <= g_iDoubleJump_MaxJumps)
+	&& jumps[client] < g_iDoubleJump_MaxJumps
+	&& GetEntityMoveType(client) != MOVETYPE_LADDER
+	&& !(GetEntityFlags(client) & FL_INWATER))
+	{
+		jumps[client]++;
 		ApplyNewJump(client);
+	}
 
 	wasJump[client] = pressingJump;
 }

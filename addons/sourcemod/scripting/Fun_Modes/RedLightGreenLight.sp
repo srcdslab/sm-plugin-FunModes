@@ -22,6 +22,10 @@ static int g_iRLGLIndex = -1;
 #define THIS_MODE_INFO g_ModesInfo[THIS_MODE_INDEX]
 
 bool g_bEnableDetecting;
+float g_fRLGLRedSince;
+
+/* Walking, strafing or jumping counts as moving (keys, not speed, so elevators and moving platforms don't count) */
+#define RLGL_MOVE_KEYS (IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT | IN_JUMP)
 
 char countDownPath[PLATFORM_MAX_PATH];
 
@@ -41,6 +45,8 @@ Handle g_hRLGLWarningTimer;
 #define RLGL_CONVAR_ZOMBIES_SPEED               6
 #define RLGL_CONVAR_COUNTDOWN_FOLDER            7
 #define RLGL_CONVAR_TOGGLE                      8
+#define RLGL_CONVAR_GRACE                       9
+#define RLGL_CONVAR_EVERYONE                    10
 
 float g_fRLGL_TimeBetweenDamage;
 float g_fRLGL_FreezeTime;
@@ -50,6 +56,8 @@ float g_fRLGL_Damage;
 float g_fRLGL_WarningTime;
 float g_fRLGL_ZombieSpeed;
 bool g_bRLGL_Enabled;
+float g_fRLGL_Grace;
+bool g_bRLGL_Everyone;
 
 public void OnPluginStart_RLGL()
 {
@@ -58,6 +66,7 @@ public void OnPluginStart_RLGL()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_GAMES;
 
 	RegAdminCmd("sm_fm_rlgl", Cmd_RLGLToggle, ADMFLAG_CONVARS, "Enable/Disable RedLightGreenLight mode.");
 	RegAdminCmd("sm_rlgl_settings", Cmd_RLGLSettings, ADMFLAG_CONVARS, "Open RLGL Settings Menu");
@@ -125,6 +134,20 @@ public void OnPluginStart_RLGL()
 	);
 	THIS_MODE_INFO.cvars[RLGL_CONVAR_TOGGLE].HookChange(RLGL_OnConVarChange);
 
+	DECLARE_FM_CVAR(
+		RLGL_CONVAR_GRACE, "sm_rlgl_grace",
+		"0.6", "Seconds the players have to stop once the red light is on",
+		("0.0,0.3,0.6,1.0"), CONVAR_FLOAT
+	);
+	THIS_MODE_INFO.cvars[RLGL_CONVAR_GRACE].HookChange(RLGL_OnConVarChange);
+
+	DECLARE_FM_CVAR(
+		RLGL_CONVAR_EVERYONE, "sm_rlgl_everyone",
+		"0", "The zombies have to stop moving on red light too",
+		("0,1"), CONVAR_BOOL
+	);
+	THIS_MODE_INFO.cvars[RLGL_CONVAR_EVERYONE].HookChange(RLGL_OnConVarChange);
+
 	THIS_MODE_INFO.enableIndex = RLGL_CONVAR_TOGGLE;
 }
 
@@ -140,6 +163,8 @@ public void InitCvarsValues_RLGL()
 	g_fRLGL_WarningTime = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_WARNING_TIME, Float);
 	g_fRLGL_ZombieSpeed = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_ZOMBIES_SPEED, Float);
 	g_bRLGL_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_TOGGLE, Bool);
+	g_fRLGL_Grace = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_GRACE, Float);
+	g_bRLGL_Everyone = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_EVERYONE, Bool);
 
 	countDownPath = _FUNMODES_CVAR_GET_VALUE(modeIndex, RLGL_CONVAR_COUNTDOWN_FOLDER, String);
 }
@@ -180,6 +205,12 @@ void RLGL_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, co
 
 			g_bRLGL_Enabled = val;
 		}
+
+		case RLGL_CONVAR_GRACE:
+			g_fRLGL_Grace = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
+
+		case RLGL_CONVAR_EVERYONE:
+			g_bRLGL_Everyone = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
 	}
 }
 
@@ -307,6 +338,7 @@ public Action Cmd_RLGLToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 	CPrintToChatAll("%s Red Light Green Light is now {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "Enabled" : "Disabled");
 
 	delete g_hRLGLTimer;
@@ -383,6 +415,7 @@ Action RLGL_Warning_Timer(Handle timer)
 	{
 		ApplyFade("Red");
 		g_bEnableDetecting = true;
+		g_fRLGLRedSince = GetGameTime();
 
 		if (g_fRLGL_ZombieSpeed > 0.0)
 			SetZombiesSpeed(g_fRLGL_ZombieSpeed);
@@ -409,9 +442,16 @@ Action RLGL_Detect_Timer(Handle timer)
 		return Plugin_Stop;
 	}
 
+	// A moment to react when it turns red
+	if (GetGameTime() < g_fRLGLRedSince + g_fRLGL_Grace)
+		return Plugin_Continue;
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
+		if (!IsClientInGame(i) || !IsPlayerAlive(i))
+			continue;
+
+		if (GetClientTeam(i) != CS_TEAM_CT && !(g_bRLGL_Everyone && GetClientTeam(i) == CS_TEAM_T))
 			continue;
 
 		MoveType moveType = GetEntityMoveType(i);
@@ -419,7 +459,7 @@ Action RLGL_Detect_Timer(Handle timer)
 			continue;
 
 		int buttons = GetClientButtons(i);
-		if (buttons & (IN_WALK | IN_BACK | IN_FORWARD | IN_RIGHT | IN_LEFT | IN_JUMP))
+		if (buttons & RLGL_MOVE_KEYS)
 		{
 			SDKHooks_TakeDamage(i, 0, 0, g_fRLGL_Damage);
 			SendHudText(i, "STOP MOVING ITS A RED LIGHT!!!", _, 1);

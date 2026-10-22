@@ -38,6 +38,7 @@ public void OnPluginStart_DamageGame()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_SURVIVAL;
 
 	/* ADMIN COMMANDS */
 	RegAdminCmd("sm_fm_damage", Cmd_DamageGameToggle, ADMFLAG_CONVARS, "Enable/Disable Damage Game mode.");
@@ -207,6 +208,7 @@ public Action Cmd_DamageGameToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll("%s Damage Game is now {olive}%s.", THIS_MODE_INFO.tag, (THIS_MODE_INFO.isOn) ? "Enabled" : "Disabled");
 

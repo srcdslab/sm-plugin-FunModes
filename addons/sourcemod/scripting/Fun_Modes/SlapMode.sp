@@ -38,6 +38,7 @@ public void OnPluginStart_SlapMode()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_CHAOS;
 
 	RegAdminCmd("sm_fm_slapmode", Cmd_SlapModeToggle, ADMFLAG_CONVARS, "Turn SlapMode On/Off");
 	RegAdminCmd("sm_slapmode_settings", Cmd_SlapModeSettings, ADMFLAG_CONVARS, "Open SlapMode Settings Menu");
@@ -112,6 +113,7 @@ public Action Cmd_SlapModeToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll("%s SlapMode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
 

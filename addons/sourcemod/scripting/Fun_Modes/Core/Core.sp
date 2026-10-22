@@ -22,6 +22,7 @@ bool g_bSDKHook_OnTakeDamage[MAXPLAYERS + 1] =  { false, ... };
 
 /* Round Checking Booleans */
 bool g_bRoundEnd;
+bool g_bSkipRestartRound;
 
 /* COLORS VARIABLES */
 int g_ColorCyan[4] =  {0, 255, 255, 255}; // cyan
@@ -35,6 +36,7 @@ int g_iLaserBeam = -1;
 /* Library Checking Booleans */
 bool g_bPlugin_DynamicChannels = false;
 bool g_bMotherZombie = false;
+bool g_bInfectionIsMother = false;     // the infection being forwarded is a mother infection
 
 /* HUD HANDLER */
 Handle g_hHudMsg = null;
@@ -45,6 +47,7 @@ int g_iCounter = 0;
 /* GLOBAL CONVARS */
 ConVar g_cvHUDChannel;
 int g_iPreviousModeIndex[MAXPLAYERS+1];
+int g_iMenuCategory[MAXPLAYERS+1] = { -1, ... };
 int g_iNetPropAmmoIndex = -1;
 
 /* SDKCall Handles */
@@ -59,8 +62,8 @@ Handle g_hSwitchSDKCall;
 #define FFADE_PURGE    (0x0010) // Purges all other fades, replacing them with this one
 
 /* Mode Management structs */
-#define MAX_MODES_NUM 32
-#define MAX_CVARS_NUM 10
+#define MAX_MODES_NUM 64
+#define MAX_CVARS_NUM 12
 
 int g_iLastModeIndex;
 
@@ -111,7 +114,7 @@ enum struct FM_ConVar
 	char defaultValue[128];
 	char description[128];
 
-	char values[32];
+	char values[64];
 	ConVarType type;
 
 	char currentValue[128];
@@ -128,17 +131,7 @@ enum struct FM_ConVar
 	void OnChange(const char[] oldVal)
 	{
 		if (g_hKV && !this.autoChange)
-		{
-			char key[5];
-			IntToString(this.GetPos(), key, sizeof(key));
-
-			if (g_hKV.JumpToKey(key))
-			{
-				g_hKV.SetString("currentValue", this.currentValue);
-				g_hKV.Rewind();
-				g_hKV.ExportToFile(FUNMODES_CVAR_CONFIG);
-			}
-		}
+			FunModes_SaveCvar(this);
 
 		if (this.hookFunc == INVALID_FUNCTION)
 			return;
@@ -261,6 +254,33 @@ enum WeaponAmmoGrenadeType
 /* Modes Forwards Include */
 #include "Forwards.sp"
 
+/* Modes Categories, used to group the modes in the main menu */
+enum FM_Category
+{
+	FM_CAT_SURVIVAL = 0,
+	FM_CAT_WEAPONS,
+	FM_CAT_HAZARDS,
+	FM_CAT_WEATHER,
+	FM_CAT_CHAOS,
+	FM_CAT_GAMES,
+	FM_CAT_ZOMBIES,
+	FM_CAT_COUNT,
+
+	/* Not in a category: shown directly in the main menu */
+	FM_CAT_MAIN
+};
+
+char g_sCategoryNames[FM_CAT_COUNT][] =
+{
+	"Survival rules",
+	"Weapons",
+	"Hazards & disasters",
+	"Weather & nature",
+	"Chaos & tricks",
+	"Mini-games",
+	"Zombies"
+};
+
 /* Modes Section */
 enum struct ModeInfo
 {
@@ -270,6 +290,14 @@ enum struct ModeInfo
 	FM_ConVar cvars[MAX_CVARS_NUM];
 	bool isOn;
 	int enableIndex;
+
+	FM_Category category;
+
+	/* Whether the Event Roulette can pick this mode (can be changed in game) */
+	bool roulette;
+
+	/* The mode was turned on by the Event Roulette, so it will turn it off again */
+	bool byRoulette;
 
 	FM_Forwards forwards;
 
@@ -384,6 +412,10 @@ int FunModes_GetCvarsCountBeforeMode(int modeIndex)
 #define FUNMODES_REGISTER_MODE() \
 		THIS_MODE_INDEX = g_iLastModeIndex++; \
 		THIS_MODE_INFO.index = THIS_MODE_INDEX; \
+		THIS_MODE_INFO.roulette = true; \
 		VALIDATE_FM_FORWARDS()
+
+/* Shared helpers for the modes (round tracking, hazards, speed, hud) */
+#include "Shared.sp"
 
 #include "ModesInclude.sp"

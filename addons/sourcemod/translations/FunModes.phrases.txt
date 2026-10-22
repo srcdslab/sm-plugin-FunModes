@@ -130,6 +130,16 @@
 		"#format"	"{1:N}"
 		"en"		"{olive}{1} {lightgreen}[{fullred}VIP{lightgreen}] has disconnected!"
 	}
+	"VIPMode_VIPInfected"
+	{
+		"#format"	"{1:N}"
+		"en"		"{olive}{1} {lightgreen}[{fullred}VIP{lightgreen}] has been infected."
+	}
+	"VIPMode_VIPMother"
+	{
+		"#format"	"{1:N}"
+		"en"		"{olive}{1} {lightgreen}[{fullred}VIP{lightgreen}] became a mother zombie, a new VIP is picked."
+	}
 	"VIPMode_KillAll"
 	{
 		"#format"	"{1:d}"
@@ -146,19 +156,5 @@
 	"VIPMode_HealBeaconOn"
 	{
 		"en"		"Heal Beacon mode is ON, VIP Mode and HealBeacon Mode can't be played together at the same time."
-	}
-	// FOG Messages
-	"Fog_Enabled"
-	{
-		"en"		"FOG Mode is now {olive}ON!"
-	}
-	"Fog_Disabled"
-	{
-		"en"		"FOG Mode is now {olive}OFF!"
-	}
-	"Fog_ColorChange"
-	{
-		"#format"	"{1:s},{2:s}"
-		"en"		"You have changed FOG color to {{1}}{2}."
 	}
 }
