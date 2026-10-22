@@ -353,7 +353,7 @@ public void OnWeaponEquip_GunGame(int client, int weapon, Action &result)
     if (className[7] == 'f' && className[8] == 'l')
         return;
 
-    if (EntWatch_IsSpecialItem(weapon))
+    if (EW_IsEntityItem(weapon))
         return;
 
     if (!g_GunGameData[client].allowEquip)
