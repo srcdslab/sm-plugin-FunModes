@@ -14,6 +14,7 @@
 #include <sdkhooks>
 #include <multicolors>
 #include <zombiereloaded>
+#include <entWatch_core>
 
 #undef REQUIRE_PLUGIN
 #tryinclude <DynamicChannels>

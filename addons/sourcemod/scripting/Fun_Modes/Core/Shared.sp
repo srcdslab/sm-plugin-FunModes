@@ -280,7 +280,7 @@ stock void ScreenTint(int client, int r, int g, int b, int a, float hold, float 
 /* A special map item (EntWatch knows best, otherwise any weapon with a name on the map) */
 stock bool IsMapItem(int weapon)
 {
-	if (EntWatch_IsSpecialItem(weapon))
+	if (EW_IsEntityItem(weapon))
 		return true;
 
 	char name[64];

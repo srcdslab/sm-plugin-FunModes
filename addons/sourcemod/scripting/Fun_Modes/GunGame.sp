@@ -19,7 +19,6 @@
 
 #define _FM_GunGame
 
-#include <entWatch_core>
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "GunGame"
