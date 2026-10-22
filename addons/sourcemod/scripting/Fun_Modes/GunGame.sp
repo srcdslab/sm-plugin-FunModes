@@ -19,7 +19,7 @@
 
 #define _FM_GunGame
 
-#include <EntWatch>
+#include <entWatch_core>
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "GunGame"
@@ -264,7 +264,7 @@ public void ZR_OnClientInfected_GunGame(int client)
             if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
                 continue;
 
-            if (EntWatch_HasSpecialItem(i))
+            if (EW_ClientHasItem(i))
                 continue;
 
             GunGame_ResetHuman(i);
@@ -321,7 +321,7 @@ public void OnTakeDamagePost_GunGame(int victim, int attacker, float damage)
     if (!(1<=attacker<=MaxClients) || !IsPlayerAlive(attacker) || !IsPlayerAlive(victim) || !ZR_IsClientZombie(victim) || !ZR_IsClientHuman(attacker))
         return;
 
-    if (EntWatch_HasSpecialItem(attacker))
+    if (EW_ClientHasItem(attacker))
         return;
 
     int neededDamage = g_iGunGame_DamageRequired[g_GunGameData[attacker].level[0]];
@@ -353,7 +353,7 @@ public void OnWeaponEquip_GunGame(int client, int weapon, Action &result)
     if (className[7] == 'f' && className[8] == 'l')
         return;
 
-    if (EntWatch_IsSpecialItem(weapon))
+    if (EW_IsEntityItem(weapon))
         return;
 
     if (!g_GunGameData[client].allowEquip)
@@ -369,7 +369,7 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
     if (!THIS_MODE_INFO.isOn)
         return Plugin_Continue;
 
-    if (EntWatch_HasSpecialItem(client))
+    if (EW_ClientHasItem(client))
         return Plugin_Continue;
 
     if (!g_GunGameData[client].allowEquip)
@@ -524,7 +524,7 @@ Action Cmd_GunGame(int client, int args)
 
     g_GunGameData[client].pickupCooldown = currentTime + GUNGAME_PICKUP_COOLDOWN;
 
-    if (EntWatch_HasSpecialItem(client))
+    if (EW_ClientHasItem(client))
     {
         static const char weapons[][] = { "weapon_p90", "weapon_tmp", "weapon_ak47", "weapon_m4a1" };
         GunGame_EquipWeapon(client, weapons[GetRandomInt(0, sizeof(weapons)-1)], true);
