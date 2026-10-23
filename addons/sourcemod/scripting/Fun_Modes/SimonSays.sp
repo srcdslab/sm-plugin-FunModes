@@ -207,7 +207,7 @@ void SimonSays_ShowHud()
 		if (!g_bSimon_In[i] || !IsClientInGame(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.40, 1.2, 96, 160, 255, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_SIMON, 1.2, 96, 160, 255, 255, 0, 0.0, 0.0, 0.0);
 		if (g_bSimon_Says)
 			ShowModeHud(i, g_hSimon_Hud, "SIMON SAYS: %s! (%d)", g_sSimon_ActionNames[g_iSimon_Action], left);
 		else
@@ -286,12 +286,13 @@ void SimonSays_End()
 
 public void OnCheck_SimonSays(bool zombiesNow)
 {
-	if (!g_bZombiesSeen)
-		return;
-
 	float now = GetGameTime();
 	if (!g_bSimon_Active)
 	{
+		// A command given from the menu can run before the zombies are out, the automatic ones wait for them
+		if (!g_bZombiesSeen)
+			return;
+
 		if (g_fSimon_Next == 0.0)
 			g_fSimon_Next = now + 10.0;
 

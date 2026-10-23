@@ -198,7 +198,9 @@ int HotSeat_Load()
 	BuildPath(Path_SM, path, sizeof(path), HOTSEAT_CONFIG);
 
 	KeyValues kv = new KeyValues("HotSeat");
-	if (kv.ImportFromFile(path) && kv.GotoFirstSubKey())
+	if (!FunModes_LoadKV(kv, path))
+		LogError("[FunModes-HotSeat] %s", g_sKvError);
+	else if (kv.GotoFirstSubKey())
 	{
 		do
 		{

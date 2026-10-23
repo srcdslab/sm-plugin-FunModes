@@ -214,7 +214,7 @@ public void OnTick_AcidRain()
 		bool exposed = AcidRain_Exposed(i);
 		if (!IsFakeClient(i))
 		{
-			SetHudTextParams(-1.0, 0.48, 1.1, exposed ? 160 : 120, 255, exposed ? 96 : 200, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_ACID, 1.1, exposed ? 160 : 120, 255, exposed ? 96 : 200, 255, 0, 0.0, 0.0, 0.0);
 			if (exposed)
 			{
 				ShowModeHud(i, g_hAcid_Hud, "ACID RAIN - GET UNDER COVER! (-%d HP/s)", g_iAcid_Damage);

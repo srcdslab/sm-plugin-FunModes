@@ -311,7 +311,7 @@ public void OnTick_BossZombie()
 		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.05, 1.1, 255, 40, 40, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_BOSS, 1.1, 255, 40, 40, 255, 0, 0.0, 0.0, 0.0);
 		ShowModeHud(i, g_hBoss_Hud, "BOSS: %N\n[%s] %d / %d", boss, bar, hp, g_iBoss_Max);
 	}
 }

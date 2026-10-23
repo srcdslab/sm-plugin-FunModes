@@ -21,7 +21,6 @@
 #include "../ChaosWeapons.sp"
 #include "../GunGame.sp"
 #include "../MathGame.sp"
-#include "../CrazyShop.sp"
 #include "../RealityShift.sp"
 #include "../PullGame.sp"
 #include "../MeteorShower.sp"
@@ -29,7 +28,6 @@
 #include "../Shockwave.sp"
 #include "../Nuke.sp"
 #include "../ToxicGas.sp"
-#include "../Radiation.sp"
 #include "../AcidRain.sp"
 #include "../FreezingCold.sp"
 #include "../Darkness.sp"
@@ -116,10 +114,6 @@ public void Forwards_OnPluginStart()
     OnPluginStart_MathGame();
 #endif
 
-#if defined _FM_CrazyShop
-    OnPluginStart_CrazyShop();
-#endif
-
 #if defined _FM_RealityShift
     OnPluginStart_RealityShift();
 #endif
@@ -146,10 +140,6 @@ public void Forwards_OnPluginStart()
 
 #if defined _FM_ToxicGas
     OnPluginStart_ToxicGas();
-#endif
-
-#if defined _FM_Radiation
-    OnPluginStart_Radiation();
 #endif
 
 #if defined _FM_AcidRain

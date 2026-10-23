@@ -155,6 +155,7 @@ void Earthquake_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldVal
 			{
 				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
 				Earthquake_Reset();
+				Earthquake_ForceShake(false);
 			}
 
 			g_bEarthquake_Enabled = val;

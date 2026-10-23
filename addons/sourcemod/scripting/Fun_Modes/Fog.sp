@@ -130,6 +130,7 @@ int g_iFog_Version;              // bumped on every change (inputs mode sends on
 int g_iFog_SentVersion[2049];
 
 KeyValues g_hFog_Config;
+char g_sFog_ConfigProblem[128];   // why there are no presets, shown by !fog presets
 char g_sFog_PendingPreset[64];
 char g_sFog_LastPreset[64];      // last preset applied, shown by !fog
 bool g_bFog_PresetEdited;        // changed by hand since then
@@ -139,6 +140,12 @@ float g_fFog_PendingAt;
 // there, point anyone on it back to nothing, switch it off and remove it.
 void Fog_RemoveLeftoverCtrl()
 {
+	// Players in game = the plugin was reloaded during the map, not a map start: they can still be linked
+	// to our controller, so it's kept (Fog_OurCtrl finds it again) and only switched off, never killed
+	bool reload = false;
+	for (int i = 1; i <= MaxClients && !reload; i++)
+		reload = IsClientInGame(i);
+
 	char name[64];
 	int e = -1;
 	while ((e = FindEntityByClassname(e, "env_fog_controller")) != -1)
@@ -146,13 +153,21 @@ void Fog_RemoveLeftoverCtrl()
 		GetEntPropString(e, Prop_Data, "m_iName", name, sizeof(name));
 		if (!StrEqual(name, FOG_OUR_NAME))
 			continue;
-		if (g_bFog_HasPlayerCtrl)
-		{
-			for (int i = 1; i <= MaxClients; i++)
-				if (IsClientInGame(i) && GetEntPropEnt(i, Prop_Send, FOG_PLAYER_CTRL_PROP) == e)
-					SetEntPropEnt(i, Prop_Send, FOG_PLAYER_CTRL_PROP, -1);
-		}
+
 		AcceptEntityInput(e, "TurnOff");
+		if (reload)
+		{
+			LogMessage("Kept the %s from before the plugin reload", FOG_OUR_NAME);
+			continue;
+		}
+
+		// Nobody may point at it once it's gone
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (IsClientInGame(i) && HasEntProp(i, Prop_Send, FOG_PLAYER_CTRL_PROP) && GetEntPropEnt(i, Prop_Send, FOG_PLAYER_CTRL_PROP) == e)
+				SetEntPropEnt(i, Prop_Send, FOG_PLAYER_CTRL_PROP, -1);
+		}
+
 		AcceptEntityInput(e, "Kill");
 		LogMessage("Removed a leftover %s at map start", FOG_OUR_NAME);
 	}
@@ -661,7 +676,7 @@ bool Fog_KvColor(const char[] key, float c[3])
 
 bool Fog_ApplyPreset(int client, const char[] name, float fade, bool quiet)
 {
-	if (g_hFog_Config == null)
+	if (!Fog_HaveConfig())
 		return false;
 	g_hFog_Config.Rewind();
 	if (!g_hFog_Config.JumpToKey("Presets") || !g_hFog_Config.JumpToKey(name))
@@ -833,7 +848,7 @@ void Fog_Help(int client)
 	Fog_Reply(client, "!fog start <n> | end <n> | range <start> <end>");
 	Fog_Reply(client, "!fog color <r g b | grey 0-255 | name | #hex> | color2 <same>  (color2 shows only with blend 1)");
 	Fog_Reply(client, "!fog density <0-1> | farz <n, -1 = off> | blend <0|1>");
-	Fog_Reply(client, "!fog preset <name> | presets | fade <sec> | sky <on|off>");
+	Fog_Reply(client, "!fog preset <name> | presets | reload | fade <sec> | sky <on|off>");
 	Fog_Reply(client, "Add seconds at the end of a change to blend it in, e.g. !fog end 800 5");
 }
 
@@ -906,12 +921,21 @@ Action Cmd_FogCommand(int client, int args)
 		Fog_Status(client);
 		return Plugin_Handled;
 	}
+	if (StrEqual(sub, "reload"))
+	{
+		if (Fog_LoadConfig())
+			Fog_Reply(client, "Fog.cfg reloaded.");
+		else
+			Fog_Reply(client, "Couldn't load the presets: %s", g_sFog_ConfigProblem);
+
+		return Plugin_Handled;
+	}
 	if (StrEqual(sub, "presets"))
 	{
 		// Many presets: one chat line per ~150 characters so nothing gets cut off.
 		char names[192], name[32];
 		int count = 0;
-		if (g_hFog_Config != null)
+		if (Fog_HaveConfig())
 		{
 			g_hFog_Config.Rewind();
 			if (g_hFog_Config.JumpToKey("Presets") && g_hFog_Config.GotoFirstSubKey())
@@ -932,7 +956,7 @@ Action Cmd_FogCommand(int client, int args)
 			g_hFog_Config.Rewind();
 		}
 		if (count == 0)
-			Fog_Reply(client, "Presets: (none - check configs/FunModes/Fog.cfg)");
+			Fog_Reply(client, "Presets: none - %s", g_sFog_ConfigProblem[0] ? g_sFog_ConfigProblem : "Fog.cfg has no \"Presets\" section");
 		else
 			Fog_Reply(client, "%s  (%d presets)", names, count);
 		return Plugin_Handled;
@@ -1293,7 +1317,7 @@ void Fog_PresetMenu(int client, int firstItem)
 	Menu menu = new Menu(Menu_FogPresets);
 	menu.SetTitle("Fog presets\n(blends in over the fade time)\n ");
 	char name[32], line[48];
-	if (g_hFog_Config != null)
+	if (Fog_HaveConfig())
 	{
 		g_hFog_Config.Rewind();
 		if (g_hFog_Config.JumpToKey("Presets") && g_hFog_Config.GotoFirstSubKey())
@@ -1407,9 +1431,8 @@ public void InitCvarsValues_Fog()
 	g_fFog_Interval = _FUNMODES_CVAR_GET_VALUE(modeIndex, FOG_CONVAR_INTERVAL, Float);
 	g_sFog_Preset = _FUNMODES_CVAR_GET_VALUE(modeIndex, FOG_CONVAR_PRESET, String);
 
-	// Late load: OnMapStart won't run for this map
+	// The config is read in OnMapStart (SourceMod calls it on a late load too), or the first time a preset is needed
 	Fog_ResetState();
-	Fog_LoadConfig();
 	Fog_StartTimer();
 }
 
@@ -1514,19 +1537,44 @@ void Fog_StartTimer()
 	g_hFog_Timer = CreateTimer(g_fFog_Interval, Fog_EnforceTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
-void Fog_LoadConfig()
+bool Fog_LoadConfig()
 {
 	delete g_hFog_Config;
+	g_sFog_ConfigProblem[0] = '\0';
+
+	// The old eventmodes location is still read, for servers that only have that one
+	static const char files[][] = { "configs/FunModes/Fog.cfg", "configs/eventmodes/dynamicfog.cfg" };
 
 	char path[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, path, sizeof(path), "configs/FunModes/Fog.cfg");
-
-	g_hFog_Config = new KeyValues("DynamicFog");
-	if (!g_hFog_Config.ImportFromFile(path))
+	for (int i = 0; i < sizeof(files); i++)
 	{
-		LogError("[FunModes-Fog] Couldn't read %s - no presets available", path);
+		BuildPath(Path_SM, path, sizeof(path), files[i]);
+		if (!FileExists(path))
+			continue;
+
+		g_hFog_Config = new KeyValues("DynamicFog");
+		if (FunModes_LoadKV(g_hFog_Config, path))
+			return true;
+
 		delete g_hFog_Config;
+		strcopy(g_sFog_ConfigProblem, sizeof(g_sFog_ConfigProblem), g_sKvError);
+		LogError("[FunModes-Fog] Couldn't parse %s", g_sKvError);
 	}
+
+	if (!g_sFog_ConfigProblem[0])
+	{
+		BuildPath(Path_SM, path, sizeof(path), files[0]);
+		LogError("[FunModes-Fog] Couldn't find %s - no presets available", path);
+		FormatEx(g_sFog_ConfigProblem, sizeof(g_sFog_ConfigProblem), "%s is missing", path);
+	}
+
+	return false;
+}
+
+/* The presets are there, reading the file again if they aren't yet (uploaded during the map) */
+bool Fog_HaveConfig()
+{
+	return g_hFog_Config != null || Fog_LoadConfig();
 }
 
 void Fog_StringToLower(char[] text)
@@ -1538,7 +1586,7 @@ void Fog_StringToLower(char[] text)
 /* A random preset name from the config, false if there are none */
 bool Fog_RandomPreset(char[] name, int maxlen)
 {
-	if (g_hFog_Config == null)
+	if (!Fog_HaveConfig())
 		return false;
 
 	int count;

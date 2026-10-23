@@ -291,7 +291,7 @@ public void OnTick_Leech()
 				if (!IsHumanAlive(i) || IsFakeClient(i))
 					continue;
 
-				SetHudTextParams(-1.0, 0.84, 1.1, 255, 200, 80, 255, 0, 0.0, 0.0, 0.0);
+				SetHudTextParams(-1.0, HUD_Y_LEECH, 1.1, 255, 200, 80, 255, 0, 0.0, 0.0, 0.0);
 				ShowModeHud(i, g_hLeech_Hud, "Worst defenders get hurt in %d s - your damage: %d", left, g_iLeech_Dealt[i]);
 			}
 
@@ -307,7 +307,7 @@ public void OnTick_Leech()
 		bool feeding = g_fLeech_LastHit[i] > 0.0 && now - g_fLeech_LastHit[i] < float(g_iLeech_Grace);
 		if (!IsFakeClient(i))
 		{
-			SetHudTextParams(-1.0, 0.84, 1.1, feeding ? 120 : 255, feeding ? 255 : 80, feeding ? 120 : 80, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_LEECH, 1.1, feeding ? 120 : 255, feeding ? 255 : 80, feeding ? 120 : 80, 255, 0, 0.0, 0.0, 0.0);
 			if (feeding)
 				ShowModeHud(i, g_hLeech_Hud, "Leech: fed (%d s)", RoundToCeil(float(g_iLeech_Grace) - (now - g_fLeech_LastHit[i])));
 			else

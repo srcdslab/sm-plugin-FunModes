@@ -15,6 +15,7 @@
 bool g_bRoundLive = true;       // false between round end and the next round start (or once the humans are slain)
 bool g_bZombiesSeen;            // the first zombies are out this round
 int g_iRoundNum;                // bumped every round, so delayed actions can tell they are stale
+bool g_bCheckRunning;           // FunModes_RunCheck is running (cleared every map and round, in case a check errored)
 
 int g_iExplosionSprite = -1;
 
@@ -36,6 +37,28 @@ float g_fGravitySet[MAXPLAYERS + 1];
 
 /* Hud Slots: one per mode text, so the modes don't overwrite each other */
 #define MAX_HUD_SLOTS 32
+
+/* Where each mode's text sits on the screen (y), so two modes never draw on top of each other */
+#define HUD_Y_BOSS        0.020    // Boss Zombie (2 lines)
+#define HUD_Y_VIP         0.090    // VIP Mode
+#define HUD_Y_HEALBEACON  0.125    // Heal Beacon
+#define HUD_Y_POTATO      0.160    // Hot Potato
+#define HUD_Y_BUDDY       0.195    // Buddy System
+#define HUD_Y_HERO        0.230    // Hero
+#define HUD_Y_TRIVIA      0.265    // Trivia (2 lines)
+#define HUD_Y_SIMON       0.335    // Simon Says
+#define HUD_Y_IC          0.370    // Inverted Controls
+#define HUD_Y_RLGL        0.405    // Red Light, Green Light
+#define HUD_Y_NUKE        0.440    // Nuke Countdown (2 lines)
+#define HUD_Y_ACID        0.510    // Acid Rain
+#define HUD_Y_COLD        0.545    // Freezing Cold
+#define HUD_Y_WIND        0.580    // Wind Gusts
+#define HUD_Y_LAVA        0.615    // Floor is Lava
+#define HUD_Y_MATHGAME    0.650    // MathGame (2 lines)
+#define HUD_Y_CHAOS       0.720    // Chaos Weapons
+#define HUD_Y_PULLGAME    0.755    // Pull Game
+#define HUD_Y_LEECH       0.790    // Leech
+#define HUD_Y_GUNGAME     0.825    // GunGame
 
 Handle g_hHudSlots[MAX_HUD_SLOTS];
 int g_iHudSlotsCount;
@@ -62,6 +85,7 @@ void Shared_OnMapStart()
 
 	g_bRoundLive = true;
 	g_bZombiesSeen = false;
+	g_bCheckRunning = false;
 
 	delete g_hCheckTimer;
 	delete g_hTickTimer;
@@ -80,6 +104,7 @@ void Shared_RoundStart()
 {
 	g_bRoundLive = true;
 	g_bZombiesSeen = false;
+	g_bCheckRunning = false;
 	g_iRoundNum++;
 }
 
@@ -91,6 +116,12 @@ void Shared_RoundEnd()
 /* Runs the OnCheck forward right away, used when someone dies or gets infected */
 void FunModes_RunCheck()
 {
+	// A mode killing someone in its OnCheck fires player_death, which calls this again: don't run the checks inside themselves
+	if (g_bCheckRunning)
+		return;
+
+	g_bCheckRunning = true;
+
 	bool zombiesNow = ZombiesAlive();
 
 	if (g_bRoundLive)
@@ -100,6 +131,8 @@ void FunModes_RunCheck()
 
 	if (zombiesNow)
 		g_bZombiesSeen = true;
+
+	g_bCheckRunning = false;
 }
 
 Action Shared_CheckTimer(Handle timer)
@@ -288,6 +321,190 @@ stock bool IsMapItem(int weapon)
 	return name[0] != '\0';
 }
 
+/* ---------------------------------------------------------------- config files */
+
+/* On some servers the engine's KeyValues reader refuses the FunModes configs (ImportFromFile fails although
+   the file is there and valid). SourceMod's own config parser reads the same format, so it's the fallback,
+   and saving falls back to writing the file by hand. */
+
+char g_sKvError[192];           // why the last FunModes_LoadKV failed
+KeyValues g_hKvParsing;
+int g_iKvParseDepth;
+
+/* Reads the file into kv (a fresh KeyValues), false if it's missing or broken (the reason in g_sKvError) */
+stock bool FunModes_LoadKV(KeyValues kv, const char[] path)
+{
+	g_sKvError[0] = '\0';
+
+	if (!FileExists(path))
+	{
+		FormatEx(g_sKvError, sizeof(g_sKvError), "%s is missing", path);
+		return false;
+	}
+
+	if (kv.ImportFromFile(path))
+		return true;
+
+	g_hKvParsing = kv;
+	g_iKvParseDepth = 0;
+
+	SMCParser parser = new SMCParser();
+	parser.OnEnterSection = FunModes_KvEnterSection;
+	parser.OnKeyValue = FunModes_KvKeyValue;
+	parser.OnLeaveSection = FunModes_KvLeaveSection;
+
+	int line, col;
+	SMCError error = parser.ParseFile(path, line, col);
+
+	char reason[96];
+	if (error != SMCError_Okay)
+		parser.GetErrorString(error, reason, sizeof(reason));
+
+	delete parser;
+	g_hKvParsing = null;
+	kv.Rewind();
+
+	if (error != SMCError_Okay)
+	{
+		FormatEx(g_sKvError, sizeof(g_sKvError), "%s line %d: %s", path, line, reason);
+		return false;
+	}
+
+	return true;
+}
+
+SMCResult FunModes_KvEnterSection(SMCParser smc, const char[] name, bool opt_quotes)
+{
+	// The file's outer section is the KeyValues root itself
+	if (g_iKvParseDepth++ > 0)
+		g_hKvParsing.JumpToKey(name, true);
+
+	return SMCParse_Continue;
+}
+
+SMCResult FunModes_KvKeyValue(SMCParser smc, const char[] key, const char[] value, bool key_quotes, bool value_quotes)
+{
+	if (g_iKvParseDepth > 0)
+		g_hKvParsing.SetString(key, value);
+
+	return SMCParse_Continue;
+}
+
+SMCResult FunModes_KvLeaveSection(SMCParser smc)
+{
+	if (--g_iKvParseDepth > 0)
+		g_hKvParsing.GoBack();
+
+	return SMCParse_Continue;
+}
+
+/* Writes kv to the file, by hand when the engine's writer refuses it too */
+stock bool FunModes_SaveKV(KeyValues kv, const char[] path)
+{
+	kv.Rewind();
+	if (kv.ExportToFile(path))
+		return true;
+
+	File file = OpenFile(path, "w");
+	if (file == null)
+	{
+		LogError("[FunModes] Couldn't write %s", path);
+		return false;
+	}
+
+	char name[128];
+	kv.GetSectionName(name, sizeof(name));
+	file.WriteLine("\"%s\"", name);
+	file.WriteLine("{");
+	FunModes_WriteKvSection(kv, file, 1);
+	file.WriteLine("}");
+
+	delete file;
+	kv.Rewind();
+	return true;
+}
+
+void FunModes_WriteKvSection(KeyValues kv, File file, int depth)
+{
+	if (!kv.GotoFirstSubKey(false))
+		return;
+
+	char indent[16];
+	for (int i = 0; i < depth && i < sizeof(indent) - 1; i++)
+		indent[i] = '\t';
+
+	char name[128], value[512];
+	do
+	{
+		kv.GetSectionName(name, sizeof(name));
+		if (kv.GetDataType(NULL_STRING) == KvData_None)
+		{
+			file.WriteLine("%s\"%s\"", indent, name);
+			file.WriteLine("%s{", indent);
+			FunModes_WriteKvSection(kv, file, depth + 1);
+			file.WriteLine("%s}", indent);
+		}
+		else
+		{
+			kv.GetString(NULL_STRING, value, sizeof(value));
+			ReplaceString(value, sizeof(value), "\"", "'");
+			file.WriteLine("%s\"%s\"\t\t\"%s\"", indent, name, value);
+		}
+	} while (kv.GotoNextKey(false));
+
+	kv.GoBack();
+}
+
+/* ---------------------------------------------------------------- chosen players */
+
+/* The key a chosen player is saved by: the Steam ID, or the user id for a bot */
+stock void GetChosenKey(int client, char[] key, int maxlen)
+{
+	if (IsFakeClient(client) || !GetClientAuthId(client, AuthId_Steam2, key, maxlen))
+		FormatEx(key, maxlen, "#%d", GetClientUserId(client));
+}
+
+stock bool ChosenListHas(ArrayList list, int client)
+{
+	if (list == null)
+		return false;
+
+	char key[32];
+	GetChosenKey(client, key, sizeof(key));
+	return list.FindString(key) != -1;
+}
+
+/* Adds the player, or removes them when they're in it already. Returns true when they're in it now */
+stock bool ChosenListToggle(ArrayList list, int client)
+{
+	char key[32];
+	GetChosenKey(client, key, sizeof(key));
+
+	int index = list.FindString(key);
+	if (index != -1)
+	{
+		list.Erase(index);
+		return false;
+	}
+
+	list.PushString(key);
+	return true;
+}
+
+/* The player left the server (not a map change): they're no longer chosen */
+stock void ChosenListForget(ArrayList list, int client)
+{
+	if (list == null)
+		return;
+
+	char key[32];
+	GetChosenKey(client, key, sizeof(key));
+
+	int index = list.FindString(key);
+	if (index != -1)
+		list.Erase(index);
+}
+
 /* ---------------------------------------------------------------- effects */
 
 /* A ring on the ground at a spot, from startRadius to endRadius over life seconds */
@@ -434,6 +651,25 @@ void Physics_ApplyGravity(int client, float mult)
 
 	g_fGravitySet[client] = want;
 	g_bGravityTouched[client] = true;
+}
+
+/* Every player back to the speed and gravity they had under the modes (plugin unload) */
+void Physics_ResetAll()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i))
+			continue;
+
+		if (g_bSpeedTouched[i])
+			SetEntPropFloat(i, Prop_Data, SPEED_PROP, g_fSpeedBase[i]);
+
+		if (g_bGravityTouched[i])
+			SetEntityGravity(i, g_fGravityBase[i]);
+
+		g_bSpeedTouched[i] = false;
+		g_bGravityTouched[i] = false;
+	}
 }
 
 void Physics_Apply()
