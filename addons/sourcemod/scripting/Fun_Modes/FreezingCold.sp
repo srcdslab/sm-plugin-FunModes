@@ -229,7 +229,7 @@ public void OnTick_FreezingCold()
 		bool warm = near >= g_iCold_Need;
 		if (!IsFakeClient(i))
 		{
-			SetHudTextParams(-1.0, 0.48, 1.1, warm ? 255 : 120, 200, 255, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_COLD, 1.1, warm ? 255 : 120, 200, 255, 255, 0, 0.0, 0.0, 0.0);
 			if (warm)
 				ShowModeHud(i, g_hCold_Hud, "Warm - %d human%s close by", near, near == 1 ? "" : "s");
 			else

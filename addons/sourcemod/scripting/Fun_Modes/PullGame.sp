@@ -43,11 +43,13 @@ int g_iPullGame_RandomsHumans;
 bool g_bPullGame_Enabled;
 
 Handle g_hPullGameTimer;
+Handle g_hPullGame_Hud;               // this mode's own text slot
 
 public void OnPluginStart_PullGame()
 {
 	// Important, this must be first before filling any other mode info!
 	FUNMODES_REGISTER_MODE()
+	g_hPullGame_Hud = CreateModeHud();
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
@@ -206,7 +208,9 @@ public Action Cmd_PullGameToggle(int client, int args)
 
 		CPrintToChatAll("%s {olive}%d Random Humans {lightgreen}and {olive}%d Random Zombies {lightgreen}will be selected for the pullgame every %d seconds", THIS_MODE_INFO.tag, humansCount, zombiesCount, interval);
 
-		FunModes_RestartRound();
+		// No round restart: turned on after the first infection, the pull rounds start now
+		if (g_bMotherZombie && !g_bRoundEnd)
+			PullGame_ToggleTimer(true);
 	}
 	else
 	{
@@ -338,7 +342,7 @@ void PullGame_PickTeamRandoms(int[] arr, int len, int min, int max)
 			g_bPullGameHas[random] = true;
 
 			CPrintToChat(random, "%s You have been selected to use pull! Press FlashLight button (F) Now!", THIS_MODE_INFO.tag);
-			SendHudText(random, "[FunModes-PullGame] You have been selected to use pull! Press FlashLight button (F) Now!");
+			SendHudText(random, "[FunModes-PullGame] You have been selected to use pull! Press FlashLight button (F) Now!", _, _, HUD_Y_PULLGAME, g_hPullGame_Hud);
 		}
 	}
 }

@@ -248,7 +248,7 @@ public void OnTick_Nuke()
 				safe = GetVectorDistance(pos, g_fNuke_Pos) <= g_fNuke_Bunker;
 			}
 
-			SetHudTextParams(-1.0, 0.32, 1.1, safe ? 64 : 255, 255, 64, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_NUKE, 1.1, safe ? 64 : 255, 255, 64, 255, 0, 0.0, 0.0, 0.0);
 			ShowModeHud(i, g_hNuke_Hud, "NUCLEAR STRIKE IN %d\n%s", left, safe ? "You're in the bunker" : "GET TO THE GREEN BUNKER!");
 		}
 

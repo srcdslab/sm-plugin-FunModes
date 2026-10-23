@@ -288,9 +288,10 @@ enum struct FM_Forwards
 	}
 
 	Function fn_OnTakeDamage;
-	void Call_OnTakeDamage(int victim, int attacker, float damage, Action &result)
+	/* The mode can change the attacker and the damage, setting result to Plugin_Changed */
+	void Call_OnTakeDamage(int victim, int &attacker, float &damage, Action &result)
 	{
-		CALL_FUNCTION_PARAM4(OnTakeDamage, victim, Cell, attacker, Cell, damage, Cell, result, CellRef)
+		CALL_FUNCTION_PARAM4(OnTakeDamage, victim, Cell, attacker, CellRef, damage, FloatRef, result, CellRef)
 	}
 
 	Function fn_OnWeaponEquip;

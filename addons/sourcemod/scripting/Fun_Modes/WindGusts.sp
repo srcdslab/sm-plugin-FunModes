@@ -253,7 +253,7 @@ public void OnTick_WindGusts()
 		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.48, 1.1, 200, 230, 230, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_WIND, 1.1, 200, 230, 230, 255, 0, 0.0, 0.0, 0.0);
 		ShowModeHud(i, g_hWind_Hud, "%s blowing %s", g_sWind_LevelNames[WindGusts_Level()], dir);
 	}
 }

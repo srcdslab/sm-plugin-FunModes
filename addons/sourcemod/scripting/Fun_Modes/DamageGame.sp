@@ -229,7 +229,9 @@ public Action Cmd_DamageGameToggle(int client, int args)
 			OnClientPutInServer_DamageGame(i);
 		}
 
-		FunModes_RestartRound();
+		// No round restart: turned on after the first infection, the checks start now
+		if (g_bMotherZombie && !g_bRoundEnd && g_hDamageGameTimer == null)
+			DamageGame_StartTimers();
 	}
 	else
 	{

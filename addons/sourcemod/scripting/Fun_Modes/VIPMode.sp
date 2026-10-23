@@ -46,6 +46,9 @@ bool g_bVIP_Hud;
 
 Handle g_hVIP_Hud;
 
+/* The players an admin chose as VIP (Steam IDs): VIP every round until they leave the server */
+ArrayList g_aVIP_Chosen;
+
 public void OnPluginStart_VIPMode()
 {
 	// Important, this must be first before filling any other mode info!
@@ -56,7 +59,12 @@ public void OnPluginStart_VIPMode()
 	THIS_MODE_INFO.category = FM_CAT_SURVIVAL;
 
 	RegAdminCmd("sm_fm_vipmode", Cmd_VIPModeToggle, ADMFLAG_CONVARS, "Turn VIPMode On/Off");
-	RegAdminCmd("sm_vipmode_setvip", Cmd_SetVIP, ADMFLAG_CONVARS, "Set a player as VIP");
+	RegAdminCmd("sm_vipmode_setvip", Cmd_SetVIP, ADMFLAG_CONVARS, "sm_vipmode_setvip <player> - VIP every round until they leave (again to undo)");
+
+	g_aVIP_Chosen = new ArrayList(ByteCountToCells(32));
+
+	// Only a real leave, not a map change (player_disconnect isn't fired on map change)
+	HookEvent("player_disconnect", Event_VIPDisconnect, EventHookMode_Pre);
 	RegConsoleCmd("sm_checkvip", Cmd_CheckVIP);
 	RegAdminCmd("sm_vipmode_settings", Cmd_VIPModeSettings, ADMFLAG_CONVARS, "Open VIPMode Settings Menu");
 
@@ -188,10 +196,11 @@ public void OnClientPutInServer_VIPMode(int client)
 public void OnClientDisconnect_VIPMode(int client)
 {
 	delete g_hVIPBeaconTimer[client];
-	
-	if (!THIS_MODE_INFO.isOn)
+
+	// Plugin unload: no "VIP left" messages, new VIPs or slay timers
+	if (!THIS_MODE_INFO.isOn || g_bUnloading)
 		return;
-	
+
 	if (!g_bIsVIP[client])
 		return;
 	
@@ -255,7 +264,7 @@ public void OnTick_VIPMode()
 		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.10, 1.1, 255, 215, 0, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_VIP, 1.1, 255, 215, 0, 255, 0, 0.0, 0.0, 0.0);
 		if (g_bIsVIP[i] && IsPlayerAlive(i))
 			ShowModeHud(i, g_hVIP_Hud, "YOU ARE A VIP - STAY ALIVE!");
 		else
@@ -296,7 +305,7 @@ public void Event_PlayerDeath_VIPMode(int client)
 	RemoveClientVIP(client, true, "VIPMode_VIPDeath");
 }
 
-public void OnTakeDamage_VIPMode(int victim, int attacker, float damage, Action &result)
+public void OnTakeDamage_VIPMode(int victim, int &attacker, float &damage, Action &result)
 {
 	#pragma unused result
 
@@ -370,6 +379,16 @@ public Action Cmd_VIPModeToggle(int client, int args)
 		delete g_hVIPBeaconTimer[i];
 	}
 
+	// Turned on during a round: the VIPs come this round too, not only from the next round start.
+	// Zombies already out -> picked now, else after the usual VIP timer
+	if (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bRoundEnd)
+	{
+		if (g_bZombiesSeen)
+			VIP_PickVIPs();
+		else
+			g_hVIPRoundStartTimer = CreateTimer(g_fVIP_Timer, VIPRoundStart_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+	}
+
 	return Plugin_Handled;
 }
 
@@ -380,10 +399,58 @@ Action VIPRoundStart_Timer(Handle timer)
 	if (!THIS_MODE_INFO.isOn)
 		return Plugin_Stop;
 
-	for (int i = 0; i < g_iVIP_Max; i++)
-		VIP_PickRandom();
-
+	VIP_PickVIPs();
 	return Plugin_Stop;
+}
+
+/* The chosen VIPs who are alive humans, then random humans until there are as many VIPs as the max */
+void VIP_PickVIPs()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!g_bIsVIP[i] && IsHumanAlive(i) && VIP_IsChosen(i))
+			VIP_Make(i);
+	}
+
+	while (GetCurrentVIPsCount() < g_iVIP_Max && VIP_PickRandom()) {}
+}
+
+bool VIP_IsChosen(int client)
+{
+	return ChosenListHas(g_aVIP_Chosen, client);
+}
+
+/* Chooses the player as VIP (every round until they leave), or un-chooses them. Returns true when now chosen */
+bool VIP_ToggleChosen(int admin, int target)
+{
+	if (!ChosenListToggle(g_aVIP_Chosen, target))
+	{
+		CPrintToChatAll("%s {olive}%N {lightgreen}is no longer a chosen VIP.", THIS_MODE_INFO.tag, target);
+		LogAction(admin, target, "\"%L\" removed \"%L\" from the chosen VIPs", admin, target);
+		return false;
+	}
+
+	CPrintToChatAll("%s {olive}%N {lightgreen}is now VIP every round until they leave, and can't be a mother zombie.", THIS_MODE_INFO.tag, target);
+	LogAction(admin, target, "\"%L\" chose \"%L\" as VIP", admin, target);
+
+	// Already in a round: VIP right now
+	if (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bIsVIP[target] && IsHumanAlive(target))
+		VIP_Make(target);
+
+	return true;
+}
+
+void Event_VIPDisconnect(Event event, const char[] name, bool dontBroadcast)
+{
+	int client = GetClientOfUserId(event.GetInt("userid"));
+	if (client)
+		ChosenListForget(g_aVIP_Chosen, client);
+}
+
+/* The VIPs (and the chosen VIPs) are never picked as mother zombie (asked by ZR_OnClientMotherZombieEligible) */
+bool VIPMode_BlocksMother(int client)
+{
+	return THIS_MODE_INFO.isOn && (g_bIsVIP[client] || VIP_IsChosen(client));
 }
 
 void RemoveClientVIP(int client, bool kill, const char[] translation = "")
@@ -395,9 +462,7 @@ void RemoveClientVIP(int client, bool kill, const char[] translation = "")
 	
 	if (kill && GetCurrentVIPsCount() == 0 && g_bVIP_Replace)
 	{
-		for (int i = 0; i < g_iVIP_Max; i++)
-			VIP_PickRandom();
-
+		VIP_PickVIPs();
 		return;
 	}
 
@@ -410,14 +475,15 @@ void RemoveClientVIP(int client, bool kill, const char[] translation = "")
 	}
 }
 
-void VIP_PickRandom()
+/* A random living human who isn't a VIP yet becomes one, false if there is nobody left */
+bool VIP_PickRandom()
 {
 	int players[MAXPLAYERS + 1];
 	int count;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT || g_bIsVIP[i])
+		if (!IsHumanAlive(i) || g_bIsVIP[i])
 			continue;
 
 		players[count] = i;
@@ -425,10 +491,14 @@ void VIP_PickRandom()
 	}
 
 	if (!count)
-		return;
+		return false;
 
-	int client = players[GetRandomInt(0, count - 1)];
+	VIP_Make(players[GetRandomInt(0, count - 1)]);
+	return true;
+}
 
+void VIP_Make(int client)
+{
 	g_bIsVIP[client] = true;
 
 	delete g_hVIPBeaconTimer[client];
@@ -497,22 +567,10 @@ public Action Cmd_SetVIP(int client, int args)
 	GetCmdArg(1, arg, sizeof(arg));
 
 	int target = FindTarget(client, arg, false, false);
-
-	if (target < 1 || !IsPlayerAlive(target) || ZR_IsClientZombie(target))
+	if (target < 1)
 		return Plugin_Handled;
 
-	g_bIsVIP[target] = true;
-
-	delete g_hVIPBeaconTimer[target];
-	g_hVIPBeaconTimer[target] = CreateTimer(
-		1.0,
-		VIP_BeaconTimer,
-		GetClientUserId(target),
-		TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE
-	);
-
-	CPrintToChatAll("%s %N has been set as VIP!", THIS_MODE_INFO.tag, target);
-
+	VIP_ToggleChosen(client, target);
 	return Plugin_Handled;
 }
 
@@ -542,13 +600,73 @@ public Action Cmd_VIPModeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_VIPModeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	menu.SetTitle("%s - Settings\nChosen VIPs stay VIP every round until they leave,\nand are never picked as mother zombie\n ", THIS_MODE_INFO.name);
+	menu.AddItem("pick", "Choose a VIP...");
+
+	char line[48];
+	FormatEx(line, sizeof(line), "Clear the chosen VIPs (%d)", g_aVIP_Chosen.Length);
+	menu.AddItem("clear", line, g_aVIP_Chosen.Length ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+
+	menu.AddItem("cvars", "Show Cvars");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
 
 	return Plugin_Handled;
+}
+
+void VIP_ChooseMenu(int client)
+{
+	Menu menu = new Menu(Menu_VIPChoose);
+	menu.SetTitle("Choose a VIP\nPick a chosen one again to undo\n ");
+
+	char info[12], line[64];
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsClientSourceTV(i))
+			continue;
+
+		IntToString(GetClientUserId(i), info, sizeof(info));
+		FormatEx(line, sizeof(line), "%N%s%s", i, VIP_IsChosen(i) ? " [CHOSEN]" : "", g_bIsVIP[i] ? " [VIP]" : "");
+		menu.AddItem(info, line);
+	}
+
+	if (!menu.ItemCount)
+		menu.AddItem("", "Nobody on the server", ITEMDRAW_DISABLED);
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+}
+
+int Menu_VIPChoose(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_End:
+			delete menu;
+
+		case MenuAction_Cancel:
+		{
+			if (param2 == MenuCancel_ExitBack)
+				Cmd_VIPModeSettings(param1, 0);
+		}
+
+		case MenuAction_Select:
+		{
+			char info[12];
+			menu.GetItem(param2, info, sizeof(info));
+
+			int target = GetClientOfUserId(StringToInt(info));
+			if (target)
+				VIP_ToggleChosen(param1, target);
+			else
+				CPrintToChat(param1, "%s That player left.", THIS_MODE_INFO.tag);
+
+			VIP_ChooseMenu(param1);
+		}
+	}
+
+	return 0;
 }
 
 int Menu_VIPModeSettings(Menu menu, MenuAction action, int param1, int param2)
@@ -566,7 +684,20 @@ int Menu_VIPModeSettings(Menu menu, MenuAction action, int param1, int param2)
 
 		case MenuAction_Select:
 		{
-			ShowCvarsInfo(param1, THIS_MODE_INFO);
+			char info[8];
+			menu.GetItem(param2, info, sizeof(info));
+
+			if (strcmp(info, "pick") == 0)
+				VIP_ChooseMenu(param1);
+			else if (strcmp(info, "clear") == 0)
+			{
+				g_aVIP_Chosen.Clear();
+				CPrintToChatAll("%s The chosen VIPs were cleared.", THIS_MODE_INFO.tag);
+				LogAction(param1, -1, "\"%L\" cleared the chosen VIPs", param1);
+				Cmd_VIPModeSettings(param1, 0);
+			}
+			else
+				ShowCvarsInfo(param1, THIS_MODE_INFO);
 		}
 	}
 

@@ -31,6 +31,10 @@ ArrayList g_aHBPlayers;
 /* Timers */
 Handle g_hRoundStart_Timer[2] = { null, ... };
 Handle g_hDamageTimer = null;
+
+/* The players an admin chose as carrier (Steam IDs): a heal beacon every round until they leave the server */
+ArrayList g_aHB_Chosen;
+Handle g_hHB_Hud;               // this mode's own text slot
 Handle g_hHealTimer = null;
 Handle g_hBeaconTimer[MAXPLAYERS + 1] = { null, ... };
 
@@ -98,9 +102,9 @@ BeaconPlayers g_BeaconPlayersData[MAXPLAYERS + 1];
 /* Called in OnPluginStart */
 public void OnPluginStart_HealBeacon()
 {
-	PrintToChatAll("Called HealBeacon OnPluginStart");
 	// Important, this must be first before filling any other mode info!
 	FUNMODES_REGISTER_MODE()
+	g_hHB_Hud = CreateModeHud();
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
@@ -113,6 +117,12 @@ public void OnPluginStart_HealBeacon()
     RegAdminCmd("sm_replacebeacon", Cmd_HealBeaconReplace, ADMFLAG_BAN, "Replace an already heal beaconed player with another one");
     RegAdminCmd("sm_addnewbeacon", Cmd_HealBeaconAddNew, ADMFLAG_BAN, "Add a new heal beaconed player");
     RegAdminCmd("sm_removebeacon", Cmd_HealBeaconRemove, ADMFLAG_BAN, "Remove heal beacon player");
+    RegAdminCmd("sm_healbeacon_choose", Cmd_HealBeaconChoose, ADMFLAG_CONVARS, "sm_healbeacon_choose <player> - a heal beacon every round until they leave (again to undo)");
+
+    g_aHB_Chosen = new ArrayList(ByteCountToCells(32));
+
+    // Only a real leave, not a map change (player_disconnect isn't fired on map change)
+    HookEvent("player_disconnect", Event_HBDisconnect, EventHookMode_Pre);
     RegConsoleCmd("sm_checkdistance", Cmd_HealBeaconCheckDistance, "...");
 
     /* CONVARS */
@@ -265,7 +275,9 @@ public void OnClientDisconnect_HealBeacon(int client)
     }
 
     RemoveBeacon(-1, client);
-    CPrintToChatAll("%s {olive}%N {lightgreen}disconnected with HealBeacon.", THIS_MODE_INFO.tag, client);
+
+    if (!g_bUnloading)
+        CPrintToChatAll("%s {olive}%N {lightgreen}disconnected with HealBeacon.", THIS_MODE_INFO.tag, client);
 }
 
 public void Event_RoundStart_HealBeacon()
@@ -382,8 +394,7 @@ Action RoundStart_Timer(Handle timer)
     if (!THIS_MODE_INFO.isOn)
         return Plugin_Stop;
 
-    for (int i = 0; i < g_iHB_RandomPlayers; i++)
-        GetRandomPlayer();
+    HealBeacon_PickCarriers();
 
     delete g_hRoundStart_Timer[1];
     g_hRoundStart_Timer[1] = CreateTimer(1.0, RoundStart_CountTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
@@ -414,7 +425,7 @@ Action RoundStart_CountTimer(Handle timer)
 
         char message[256];
         FormatEx(message, sizeof(message), "%T", "HealBeacon_Alert", i, (alertTime - g_iCounter));
-        SendHudText(i, message);
+        SendHudText(i, message, _, _, HUD_Y_HEALBEACON, g_hHB_Hud);
     }
 
     g_iCounter++;
@@ -437,7 +448,7 @@ public void GetRandomPlayer()
         clientsCount[humansCount++] = i;
     }
 
-    if (humansCount <= 0 || humansCount < g_iHB_RandomPlayers)
+    if (humansCount <= 0)
         return;
 
     int random = clientsCount[GetRandomInt(0, (humansCount - 1))];
@@ -446,6 +457,82 @@ public void GetRandomPlayer()
 
     SetHealBeaconToClient(random);
     CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", random, random);
+}
+
+/* The chosen carriers who are alive humans, then random humans until there are sm_healbeacon_randoms carriers */
+void HealBeacon_PickCarriers()
+{
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (g_BeaconPlayersData[i].hasHealBeacon || !IsHumanAlive(i) || !HealBeacon_IsChosen(i))
+            continue;
+
+        SetHealBeaconToClient(i);
+        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", i, i);
+    }
+
+    for (int tries = g_iHB_RandomPlayers; tries > 0 && g_aHBPlayers.Length < g_iHB_RandomPlayers; tries--)
+        GetRandomPlayer();
+}
+
+bool HealBeacon_IsChosen(int client)
+{
+    return ChosenListHas(g_aHB_Chosen, client);
+}
+
+/* Chooses the player as carrier (every round until they leave), or un-chooses them. Returns true when now chosen */
+bool HealBeacon_ToggleChosen(int admin, int target)
+{
+    if (!ChosenListToggle(g_aHB_Chosen, target))
+    {
+        CPrintToChatAll("%s {olive}%N {lightgreen}is no longer a chosen heal beacon carrier.", THIS_MODE_INFO.tag, target);
+        LogAction(admin, target, "\"%L\" removed \"%L\" from the chosen heal beacon carriers", admin, target);
+        return false;
+    }
+
+    CPrintToChatAll("%s {olive}%N {lightgreen}gets a heal beacon every round until they leave, and can't be a mother zombie.", THIS_MODE_INFO.tag, target);
+    LogAction(admin, target, "\"%L\" chose \"%L\" as heal beacon carrier", admin, target);
+
+    // The beacons are already out this round: theirs comes right now
+    if (THIS_MODE_INFO.isOn && g_bRoundLive && g_aHBPlayers != null && g_hRoundStart_Timer[0] == null
+        && !g_BeaconPlayersData[target].hasHealBeacon && IsHumanAlive(target))
+    {
+        SetHealBeaconToClient(target);
+        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", target, target);
+    }
+
+    return true;
+}
+
+void Event_HBDisconnect(Event event, const char[] name, bool dontBroadcast)
+{
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (client)
+        ChosenListForget(g_aHB_Chosen, client);
+}
+
+/* The carriers (and the chosen carriers) are never picked as mother zombie (asked by ZR_OnClientMotherZombieEligible) */
+bool HealBeacon_BlocksMother(int client)
+{
+    return THIS_MODE_INFO.isOn && (g_BeaconPlayersData[client].hasHealBeacon || HealBeacon_IsChosen(client));
+}
+
+public Action Cmd_HealBeaconChoose(int client, int args)
+{
+    if (args < 1)
+    {
+        CReplyToCommand(client, "%s Usage: sm_healbeacon_choose <player>", THIS_MODE_INFO.tag);
+        return Plugin_Handled;
+    }
+
+    char arg[64];
+    GetCmdArg(1, arg, sizeof(arg));
+
+    int target = FindTarget(client, arg, false, false);
+    if (target > 0)
+        HealBeacon_ToggleChosen(client, target);
+
+    return Plugin_Handled;
 }
 
 public void SetHealBeaconToClient(int client)
@@ -794,7 +881,13 @@ public Action Cmd_HealBeaconToggle(int client, int args)
         else
             CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_Enabled", client);
 
-        FunModes_RestartRound();
+        // Starts in this round, no round restart: the carriers are picked after the usual delay
+        if (g_bRoundLive && !g_bRoundEnd)
+        {
+            HealBeacon_DeleteAllTimers();
+            g_iCounter = 0;
+            g_hRoundStart_Timer[0] = CreateTimer(g_fHB_BeaconTimer, RoundStart_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+        }
     }
 
     CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);

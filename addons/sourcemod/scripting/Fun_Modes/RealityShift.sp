@@ -267,7 +267,14 @@ public Action Cmd_RealityShiftToggle(int client, int args)
             interval
         );
 
-        FunModes_RestartRound();
+        // The swaps start with the first infection: turned on after it, they start now (no round restart needed)
+        if (g_bMotherZombie && !g_bRoundEnd && g_hRealityShiftTimer == null)
+        {
+            RealityShift_StartTimer(g_fRealityShift_TimerInterval);
+
+            if (g_iRealityShift_Mode == 1)
+                RealityShift_AssignPlayers(true);
+        }
     }
     else
     {
@@ -346,7 +353,7 @@ void RealityShift_StartTimer(float interval)
 
 Action RealityShift_Timer(Handle timer)
 {
-    if (g_bRoundEnd || !g_bMotherZombie)
+    if (!THIS_MODE_INFO.isOn || g_bRoundEnd || !g_bMotherZombie)
     {
         g_hRealityShiftTimer = null;
         return Plugin_Stop;
@@ -411,17 +418,22 @@ bool RealityShift_CanSwap(int client)
     if (!IsClientInGame(client) || !IsPlayerAlive(client))
         return false;
 
+    // A crouching player could end up stuck in a crawl space
+    if (GetEntityFlags(client) & FL_DUCKING)
+        return false;
+
     if (!ZR_IsClientHuman(client) && !(g_bRealityShift_Mixed && ZR_IsClientZombie(client)))
         return false;
 
     return !EW_ClientHasItem(client);
 }
 
+/* Picks a random client still in the array, returns its index in arr (not in the filtered list) so the caller can clear it */
 int GetRandomClientFromArray(int[] arr, int len, int &client)
 {
     int count;
 
-    int[] newArr = new int[len];
+    int[] indexes = new int[len];
 
     for (int i = 0; i < len; i++)
     {
@@ -431,15 +443,15 @@ int GetRandomClientFromArray(int[] arr, int len, int &client)
         if (g_bRealityShiftSwapped[arr[i]])
             continue;
 
-        newArr[count++] = arr[i];
+        indexes[count++] = i;
     }
 
     if (!count)
         return -1;
 
-    int index = GetRandomInt(0, count - 1);
+    int index = indexes[GetRandomInt(0, count - 1)];
 
-    client = newArr[index];
+    client = arr[index];
 
     return index;
 }
