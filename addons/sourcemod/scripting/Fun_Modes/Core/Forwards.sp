@@ -170,20 +170,22 @@
 		}
 
 /*
-* Validates whether the current mode the compiler is reading can execute this specific forward.
+* Validates whether a mode can execute this specific forward.
+* Only expanded inside FunModes_ValidateForwards (Core.sp), which provides modeIndex and modeName.
 *
 * @param %1		The forward name.
 * @param %2		The forward name as char[].
 */
 #define VALIDATE_FM_ONE_FORWARD(%1,%2) \
-		THIS_MODE_INFO.forwards.fn_%1 = GetFunctionByName(null, %2 ... "_" ... THIS_MODE_NAME); \
-		if (THIS_MODE_INFO.forwards.fn_%1 != INVALID_FUNCTION) \
+		g_ModesInfo[modeIndex].forwards.fn_%1 = FunModes_GetModeForward(%2, modeName); \
+		if (g_ModesInfo[modeIndex].forwards.fn_%1 != INVALID_FUNCTION) \
 		{ \
-			THIS_MODE_INFO.forwards.flags |= FWD_%1; \
+			g_ModesInfo[modeIndex].forwards.flags |= FWD_%1; \
 		}
 
 /*
-* Gets the function ID for all available forwards for the current mode the compiler is reading.
+* Gets the function ID for all available forwards of a mode.
+* Only expanded inside FunModes_ValidateForwards (Core.sp), which provides modeIndex and modeName.
 *
 * @noparams
 */

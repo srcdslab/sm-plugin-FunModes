@@ -171,21 +171,23 @@ public void OnMapEnd_Trivia()
 }
 
 #define TRIVIA_CONFIG "configs/FunModes/Trivia.cfg"
-#define TRIVIA_MAX    500
 
 #define TRIVIA_REWARD_HP25 0
 #define TRIVIA_REWARD_HP50 1
 #define TRIVIA_REWARD_HE   2
 #define TRIVIA_REWARD_NONE 3
 
-char g_sTrivia_Question[TRIVIA_MAX][160];
-char g_sTrivia_Answers[TRIVIA_MAX][128];
-int g_iTrivia_Count;
-int g_iTrivia_Order[TRIVIA_MAX];
-int g_iTrivia_Pos;
+enum struct TriviaQuestion
+{
+	char question[160];
+	char answers[128];
+}
+
+ArrayList g_aTrivia;            // the questions of Trivia.cfg, shuffled
+int g_iTrivia_Pos;              // the next question to ask in g_aTrivia
 
 bool g_bTrivia_Active;
-int g_iTrivia_Cur;
+TriviaQuestion g_Trivia_Cur;    // a copy, so reloading the file doesn't change the question being asked
 float g_fTrivia_Asked;
 float g_fTrivia_Ends;
 float g_fTrivia_Next;
@@ -198,6 +200,7 @@ Handle g_hTrivia_Hud;
 void Trivia_OnPluginStart()
 {
 	g_hTrivia_Hud = CreateModeHud();
+	g_aTrivia = new ArrayList(sizeof(TriviaQuestion));
 }
 
 public void OnMapStart_Trivia()
@@ -207,22 +210,15 @@ public void OnMapStart_Trivia()
 
 void Trivia_Shuffle()
 {
-	for (int i = 0; i < g_iTrivia_Count; i++)
-		g_iTrivia_Order[i] = i;
-
-	for (int i = g_iTrivia_Count - 1; i > 0; i--)
-	{
-		int j = GetRandomInt(0, i), tmp = g_iTrivia_Order[i];
-		g_iTrivia_Order[i] = g_iTrivia_Order[j];
-		g_iTrivia_Order[j] = tmp;
-	}
+	for (int i = g_aTrivia.Length - 1; i > 0; i--)
+		g_aTrivia.SwapAt(i, GetRandomInt(0, i));
 
 	g_iTrivia_Pos = 0;
 }
 
 int Trivia_Load()
 {
-	g_iTrivia_Count = 0;
+	g_aTrivia.Clear();
 
 	char path[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, path, sizeof(path), TRIVIA_CONFIG);
@@ -232,21 +228,19 @@ int Trivia_Load()
 		LogError("[FunModes-Trivia] %s", g_sKvError);
 	else if (kv.GotoFirstSubKey())
 	{
+		TriviaQuestion question;
 		do
 		{
-			if (g_iTrivia_Count >= TRIVIA_MAX)
-				break;
-
-			kv.GetString("question", g_sTrivia_Question[g_iTrivia_Count], sizeof(g_sTrivia_Question[]), "");
-			kv.GetString("answer", g_sTrivia_Answers[g_iTrivia_Count], sizeof(g_sTrivia_Answers[]), "");
-			if (g_sTrivia_Question[g_iTrivia_Count][0] && g_sTrivia_Answers[g_iTrivia_Count][0])
-				g_iTrivia_Count++;
+			kv.GetString("question", question.question, sizeof(question.question), "");
+			kv.GetString("answer", question.answers, sizeof(question.answers), "");
+			if (question.question[0] && question.answers[0])
+				g_aTrivia.PushArray(question);
 		} while (kv.GotoNextKey());
 	}
 
 	delete kv;
 	Trivia_Shuffle();
-	return g_iTrivia_Count;
+	return g_aTrivia.Length;
 }
 
 /* Lowercase letters and digits, single spaces: "  The U.S.A! " -> "the usa" */
@@ -272,14 +266,14 @@ void Trivia_Normalize(const char[] text, char[] out, int maxlen)
 	out[o] = '\0';
 }
 
-bool Trivia_Matches(int question, const char[] typed)
+bool Trivia_Matches(const char[] answers, const char[] typed)
 {
 	char guess[128], parts[8][64], want[64];
 	Trivia_Normalize(typed, guess, sizeof(guess));
 	if (!guess[0])
 		return false;
 
-	int count = ExplodeString(g_sTrivia_Answers[question], "|", parts, sizeof(parts), sizeof(parts[]));
+	int count = ExplodeString(answers, "|", parts, sizeof(parts), sizeof(parts[]));
 	for (int i = 0; i < count; i++)
 	{
 		Trivia_Normalize(parts[i], want, sizeof(want));
@@ -291,11 +285,11 @@ bool Trivia_Matches(int question, const char[] typed)
 }
 
 /* "P____" from the first accepted answer: first letter of each word, the rest blanks */
-void Trivia_HintText(int question, char[] out, int maxlen)
+void Trivia_HintText(const char[] answers, char[] out, int maxlen)
 {
 	char first[64];
-	int bar = FindCharInString(g_sTrivia_Answers[question], '|');
-	strcopy(first, bar == -1 ? sizeof(first) : (bar + 1 < sizeof(first) ? bar + 1 : sizeof(first)), g_sTrivia_Answers[question]);
+	int bar = FindCharInString(answers, '|');
+	strcopy(first, bar == -1 ? sizeof(first) : (bar + 1 < sizeof(first) ? bar + 1 : sizeof(first)), answers);
 
 	int o;
 	bool wordStart = true;
@@ -336,7 +330,7 @@ public void Event_RoundStart_Trivia()
 public void Event_RoundEnd_Trivia()
 {
 	if (THIS_MODE_INFO.isOn && g_bTrivia_Active)
-		CPrintToChatAll("%s Round over - the answer was: {olive}%s", THIS_MODE_INFO.tag, g_sTrivia_Answers[g_iTrivia_Cur]);
+		CPrintToChatAll("%s Round over - the answer was: {olive}%s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers);
 
 	Trivia_Reset();
 }
@@ -351,7 +345,7 @@ bool Trivia_Plays(int client)
 
 void Trivia_Ask(int admin)
 {
-	if (!g_iTrivia_Count && !Trivia_Load())
+	if (!g_aTrivia.Length && !Trivia_Load())
 	{
 		if (admin)
 			CPrintToChat(admin, "%s No questions loaded - check addons/sourcemod/%s.", THIS_MODE_INFO.tag, TRIVIA_CONFIG);
@@ -362,10 +356,10 @@ void Trivia_Ask(int admin)
 	}
 
 	Trivia_Reset();
-	if (g_iTrivia_Pos >= g_iTrivia_Count)
+	if (g_iTrivia_Pos >= g_aTrivia.Length)
 		Trivia_Shuffle();
 
-	g_iTrivia_Cur = g_iTrivia_Order[g_iTrivia_Pos++];
+	g_aTrivia.GetArray(g_iTrivia_Pos++, g_Trivia_Cur);
 
 	float now = GetGameTime();
 	g_bTrivia_Active = true;
@@ -375,16 +369,16 @@ void Trivia_Ask(int admin)
 	g_iTrivia_Placed = 0;
 	g_sTrivia_Results[0] = '\0';
 
-	CPrintToChatAll("%s {olive}%s {lightgreen}(type the answer in chat - %d s)", THIS_MODE_INFO.tag, g_sTrivia_Question[g_iTrivia_Cur], g_iTrivia_Time);
+	CPrintToChatAll("%s {olive}%s {lightgreen}(type the answer in chat - %d s)", THIS_MODE_INFO.tag, g_Trivia_Cur.question, g_iTrivia_Time);
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 130);
 }
 
 void Trivia_Finish()
 {
 	if (!g_iTrivia_Placed)
-		CPrintToChatAll("%s Time's up! Nobody got it. The answer was: {olive}%s", THIS_MODE_INFO.tag, g_sTrivia_Answers[g_iTrivia_Cur]);
+		CPrintToChatAll("%s Time's up! Nobody got it. The answer was: {olive}%s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers);
 	else
-		CPrintToChatAll("%s The answer was: {olive}%s {lightgreen}- %s", THIS_MODE_INFO.tag, g_sTrivia_Answers[g_iTrivia_Cur], g_sTrivia_Results);
+		CPrintToChatAll("%s The answer was: {olive}%s {lightgreen}- %s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers, g_sTrivia_Results);
 
 	Trivia_Reset();
 	g_fTrivia_Next = GetGameTime() + float(g_iTrivia_Every);
@@ -423,7 +417,7 @@ public void OnClientSayCommand_Trivia(int client, const char[] text, Action &res
 	TrimString(msg);
 
 	// Wrong guesses are normal chat
-	if (!Trivia_Matches(g_iTrivia_Cur, msg))
+	if (!Trivia_Matches(g_Trivia_Cur.answers, msg))
 		return;
 
 	g_bTrivia_Won[client] = true;
@@ -474,7 +468,7 @@ public void OnTick_Trivia()
 		g_bTrivia_Hinted = true;
 
 		char hint[128];
-		Trivia_HintText(g_iTrivia_Cur, hint, sizeof(hint));
+		Trivia_HintText(g_Trivia_Cur.answers, hint, sizeof(hint));
 		CPrintToChatAll("%s Hint: {olive}%s", THIS_MODE_INFO.tag, hint);
 	}
 
@@ -485,7 +479,7 @@ public void OnTick_Trivia()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_TRIVIA, 1.1, 64, 224, 160, 255, 0, 0.0, 0.0, 0.0);
-		ShowModeHud(i, g_hTrivia_Hud, "%s\n(%d s - type the answer in chat)", g_sTrivia_Question[g_iTrivia_Cur], left);
+		ShowModeHud(i, g_hTrivia_Hud, "%s\n(%d s - type the answer in chat)", g_Trivia_Cur.question, left);
 	}
 }
 
