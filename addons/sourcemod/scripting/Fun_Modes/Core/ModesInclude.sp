@@ -21,6 +21,7 @@
 #include "../ChaosWeapons.sp"
 #include "../GunGame.sp"
 #include "../MathGame.sp"
+#include "../CrazyShop.sp"
 #include "../RealityShift.sp"
 #include "../PullGame.sp"
 #include "../MeteorShower.sp"
@@ -112,6 +113,10 @@ public void Forwards_OnPluginStart()
 
 #if defined _FM_MathGame
     OnPluginStart_MathGame();
+#endif
+
+#if defined _FM_CrazyShop
+    OnPluginStart_CrazyShop();
 #endif
 
 #if defined _FM_RealityShift

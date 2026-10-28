@@ -240,6 +240,25 @@ Humans and/or zombies need to answer math questions or they will get hurt!
 - sm_mathgame_reward - "Reward for a right answer [0 = nothing, 1 = +25 HP, 2 = +50 HP, 3 = HE grenade]"
 - sm_mathgame_same - "Everyone gets the same question (else each player their own)"
 
+## CrazyShop
+A bunch of powerful items that can be bought by earing credits by shooting the zombies
+
+### Admin Commands
+- sm_fm_crazyshop - "Toggle On/Off CrazyShop Mode"
+- sm_crazyshop_settings - "Open CrazyShop Settings Menu"
+
+### Player Commands
+- sm_crazyshop - "Open the crazyshop menu"
+- sm_myitems - "Open the list of items available to activate"
+
+### Cvars
+- sm_crazyshop_damage - "The needed damage for humans to be rewarded with credits"
+- sm_crazyshop_credits - "How many credits to reward the human when they reach the needed damage?"
+- sm_crazyshop_savecredits - "Save credits to a database or not"
+- sm_crazyshop_slowbeacon_radius - "Slow Beacon Radius"
+- sm_crazyshop_disable_shop - "Enable/Disable the !crazyshop command"
+- sm_crazyshop_enable - "Enable/Disable CrazyShop Mode (This differs from turning it on/off)"
+
 ## RealityShift
 Each human will swap their position with another every x seconds (after a countdown). Players carrying a map item are never moved
 
