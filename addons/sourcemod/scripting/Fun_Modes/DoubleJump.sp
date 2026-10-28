@@ -166,40 +166,40 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 	return Plugin_Handled;
 }
 
-public void OnPlayerRunCmdPost_DoubleJump(int client, int buttons, int impulse)
+/* Before the movement runs: on the tick of the normal jump the player is still on the ground, so only a new press in the air uses an extra jump */
+public void OnPlayerRunCmd_DoubleJump(int client, int &buttons, float vel[3], bool &changed)
 {
-	#pragma unused impulse
+	static bool wasJump[MAXPLAYERS+1];
+	static int jumps[MAXPLAYERS+1];
 
-	if (!THIS_MODE_INFO.isOn || !IsPlayerAlive(client))
+	bool pressedBefore = wasJump[client];
+	bool pressingJump = !!(buttons & IN_JUMP);
+	wasJump[client] = pressingJump;
+
+	if (!IsPlayerAlive(client))
 		return;
 
 	bool isHuman = GetClientTeam(client) == CS_TEAM_CT;
 	bool isZombie = GetClientTeam(client) == CS_TEAM_T;
 
-	if ((isHuman && !g_bDoubleJump_Humans)
-	|| (isZombie && !g_bDoubleJump_Zombies))
+	if (!((isHuman && g_bDoubleJump_Humans) || (isZombie && g_bDoubleJump_Zombies)))
 		return;
 
-	static bool wasJump[MAXPLAYERS+1];
-	static int jumps[MAXPLAYERS+1];
-
-	bool onGround = !!(GetEntityFlags(client) & FL_ONGROUND);
-	bool pressingJump = !!(buttons & IN_JUMP);
-
-	if (onGround)
-		jumps[client] = 0;
-
-	else if (!wasJump[client]
-	&& pressingJump
-	&& jumps[client] < g_iDoubleJump_MaxJumps
-	&& GetEntityMoveType(client) != MOVETYPE_LADDER
-	&& !(GetEntityFlags(client) & FL_INWATER))
+	int flags = GetEntityFlags(client);
+	if (flags & FL_ONGROUND)
 	{
-		jumps[client]++;
-		ApplyNewJump(client);
+		jumps[client] = 0;
+		return;
 	}
 
-	wasJump[client] = pressingJump;
+	if (!pressingJump || pressedBefore || jumps[client] >= g_iDoubleJump_MaxJumps)
+		return;
+
+	if (GetEntityMoveType(client) == MOVETYPE_LADDER || (flags & FL_INWATER))
+		return;
+
+	jumps[client]++;
+	ApplyNewJump(client);
 }
 
 public void ApplyNewJump(int client)

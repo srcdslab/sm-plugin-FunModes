@@ -232,7 +232,7 @@ public void OnTick_Buddy()
 			HurtPlayer(i, g_iBuddy_Bleed);
 			if (!IsFakeClient(i))
 			{
-				SetHudTextParams(-1.0, 0.22, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
+				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
 				ShowModeHud(i, g_hBuddy_Hud, "YOUR BUDDY FELL - BLEEDING %d HP/s", g_iBuddy_Bleed);
 			}
 
@@ -255,18 +255,18 @@ public void OnTick_Buddy()
 
 			if (far)
 			{
-				SetHudTextParams(-1.0, 0.22, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
+				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
 				ShowModeHud(i, g_hBuddy_Hud, "TOO FAR FROM YOUR BUDDY %N (%d) - GET BACK! -%d HP/s", buddy, dist, g_iBuddy_Bleed);
 			}
 			else
 			{
-				SetHudTextParams(-1.0, 0.22, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
+				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
 				ShowModeHud(i, g_hBuddy_Hud, "Buddy: %N (%d units away)", buddy, dist);
 			}
 		}
 		else if (g_bBuddy_Solo[i] && !IsFakeClient(i))
 		{
-			SetHudTextParams(-1.0, 0.22, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
 			ShowModeHud(i, g_hBuddy_Hud, "No buddy - you're on your own");
 		}
 	}

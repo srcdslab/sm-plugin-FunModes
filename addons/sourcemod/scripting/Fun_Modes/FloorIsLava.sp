@@ -207,12 +207,12 @@ public void OnTick_FloorIsLava()
 		float still = now - g_fLava_StillSince[i];
 		if (still >= float(g_iLava_After))
 		{
-			SetHudTextParams(-1.0, 0.52, 1.1, 255, 80, 20, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_LAVA, 1.1, 255, 80, 20, 255, 0, 0.0, 0.0, 0.0);
 			ShowModeHud(i, g_hLava_Hud, "THE FLOOR IS LAVA - MOVE! (-%d HP/s)", g_iLava_Damage >= 1000 ? 999 : g_iLava_Damage);
 		}
 		else if (still >= float(g_iLava_After) - 1.5)
 		{
-			SetHudTextParams(-1.0, 0.52, 1.1, 255, 200, 40, 255, 0, 0.0, 0.0, 0.0);
+			SetHudTextParams(-1.0, HUD_Y_LAVA, 1.1, 255, 200, 40, 255, 0, 0.0, 0.0, 0.0);
 			ShowModeHud(i, g_hLava_Hud, "Keep moving...");
 		}
 	}

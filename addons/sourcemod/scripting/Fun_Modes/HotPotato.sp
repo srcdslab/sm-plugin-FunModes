@@ -351,7 +351,7 @@ public void OnTick_HotPotato()
 		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.18, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_POTATO, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
 		if (i == holder)
 			ShowModeHud(i, g_hPotato_Hud, "YOU HAVE THE HOT POTATO! %d s - knife a human or press E next to one", g_iPotato_Left);
 		else

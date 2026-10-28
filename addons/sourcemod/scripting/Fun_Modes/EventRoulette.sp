@@ -208,13 +208,25 @@ void EventRoulette_PlanShuffle()
 	g_fRoulette_NextShuffle = GetGameTime() + float(GetRandomInt(low, high));
 }
 
+/* Remembers the modes it has on now as the last picks, unless it has none on */
+void EventRoulette_RememberPicks()
+{
+	bool any;
+	for (int i = 0; i < g_iLastModeIndex && !any; i++)
+		any = g_ModesInfo[i].byRoulette;
+
+	if (!any)
+		return;
+
+	for (int i = 0; i < g_iLastModeIndex; i++)
+		g_bRoulette_Last[i] = g_ModesInfo[i].byRoulette;
+}
+
 /* Turns off the last picks and turns on new random modes */
 void EventRoulette_Spin(bool roundStart = false)
 {
-	// What it turned on before can't come straight back
-	for (int i = 0; i < g_iLastModeIndex; i++)
-		g_bRoulette_Last[i] = g_ModesInfo[i].byRoulette;
-
+	// What it turned on before can't come straight back (at round start the round end already remembered it)
+	EventRoulette_RememberPicks();
 	EventRoulette_TurnOffMine();
 
 	int list[MAX_MODES_NUM], count;
@@ -274,7 +286,8 @@ public void Event_RoundStart_EventRoulette()
 
 public void Event_RoundEnd_EventRoulette()
 {
-	// The next round starts with a fresh spin
+	// The next round starts with a fresh spin, that can't pick this round's modes again
+	EventRoulette_RememberPicks();
 	EventRoulette_TurnOffMine();
 	g_fRoulette_NextShuffle = 0.0;
 }
@@ -300,7 +313,8 @@ void EventRoulette_LoadPool()
 	BuildPath(Path_SM, path, sizeof(path), ROULETTE_CONFIG);
 
 	KeyValues kv = new KeyValues("Roulette");
-	if (kv.ImportFromFile(path))
+	// No file yet is normal: it's written the first time an admin changes the pool
+	if (FunModes_LoadKV(kv, path))
 	{
 		for (int i = 0; i < g_iLastModeIndex; i++)
 		{
@@ -324,7 +338,7 @@ void EventRoulette_SavePool()
 			kv.SetNum(g_ModesInfo[i].name, g_ModesInfo[i].roulette ? 1 : 0);
 	}
 
-	kv.ExportToFile(path);
+	FunModes_SaveKV(kv, path);
 	delete kv;
 }
 
