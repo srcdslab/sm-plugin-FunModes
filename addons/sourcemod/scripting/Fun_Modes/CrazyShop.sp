@@ -123,12 +123,14 @@ static CrazyShop_Item g_CrazyShopItems[] =
 enum struct CrazyShop_PlayerData
 {
 	int credits;
+	int originalCredits;
 	int itemsCount[ITEMS_COUNT];
 	int originalItemsCount[ITEMS_COUNT];
 	bool isItemActive[ITEMS_COUNT];
 	
 	int dealtDamage;
 	bool isInDB;
+	bool isLoaded;
 	
 	/* Temp Vars, Basically the vars that the item activations use */
 	bool infectionProtect;
@@ -152,8 +154,10 @@ enum struct CrazyShop_PlayerData
 		if (!tempVarsOnly)
 		{
 			this.credits = 0;
+			this.originalCredits = 0;
 			this.dealtDamage = 0;
 			this.isInDB = false;
+			this.isLoaded = false;
 			for (int i = 0; i < sizeof(CrazyShop_PlayerData::itemsCount); i++)
 			{
 				this.itemsCount[i] = 0;
@@ -183,6 +187,8 @@ int g_iCrazyShopPreviousItem[MAXPLAYERS + 1];
 int g_iCrazyShopProps;
 
 Database g_hCrazyShop_DB;
+bool g_bCrazyShop_DBConnecting;
+Handle g_hCrazyShop_DBRetryTimer;
 
 /* Macros */
 /***************************************************************/
@@ -190,13 +196,16 @@ Database g_hCrazyShop_DB;
 #define CRAZYSHOP_DB_NAME				"FM_CrazyShop" // Only SQLITE is supported
 #define CRAZYSHOP_DB_DATA_COLUMN		"clients_data"
 #define CRAZYSHOP_DB_ITEMS_DATA_COLUMN	"shop_items_data"
+#define CRAZYSHOP_DB_RETRY_DELAY		30.0
 /***************************************************************/
 #define PLAYER_CREDITS(%1) 			g_CrazyShopPlayerData[%1].credits
+#define PLAYER_CREDITS_OG(%1)		g_CrazyShopPlayerData[%1].originalCredits
 #define PLAYER_ITEM_COUNT(%1,%2)	g_CrazyShopPlayerData[%1].itemsCount[%2]
 #define PLAYER_ITEM_COUNT_OG(%1,%2)	g_CrazyShopPlayerData[%1].originalItemsCount[%2]
 #define PLAYER_ITEM_ACTIVE(%1,%2)	g_CrazyShopPlayerData[%1].isItemActive[%2]
 #define DAMAGE_DEALT(%1)			g_CrazyShopPlayerData[%1].dealtDamage
 #define PLAYER_IN_DB(%1)			g_CrazyShopPlayerData[%1].isInDB
+#define PLAYER_LOADED(%1)			g_CrazyShopPlayerData[%1].isLoaded
 #define PLAYER_RESET(%1)			g_CrazyShopPlayerData[%1].Reset()
 #define PLAYER_RESET_TEMP_VARS(%1)	g_CrazyShopPlayerData[%1].Reset(true)
 #define PLAYER_TEMP_VAR(%1,%2)		g_CrazyShopPlayerData[%1].%2
@@ -351,7 +360,11 @@ public void OnClientPutInServer_CrazyShop(int client)
 
 public void OnClientDisconnect_CrazyShop(int client)
 {
-	if (!THIS_MODE_INFO.isOn || THIS_MODE_DB == null)
+	// Whoever takes this slot next has to load their own data before anything gets saved for them
+	bool loaded = PLAYER_LOADED(client);
+	PLAYER_LOADED(client) = false;
+
+	if (!THIS_MODE_INFO.isOn)
 		return;
 
 	for (int i = 1; i <= MaxClients; i++)
@@ -360,15 +373,12 @@ public void OnClientDisconnect_CrazyShop(int client)
 			PLAYER_TEMP_VAR(i, grabbedTarget) = -1;
 	}
 
-	if (!THIS_MODE_INFO.isOn || THIS_MODE_DB == null)
+	if (THIS_MODE_DB == null)
 		return;
 
-	if (!PLAYER_IN_DB(client))
-		CrazyShop_DB_AddPlayer(client);
-	else
-		CrazyShop_DB_SaveCredits(client);
-
-	CrazyShop_DB_CheckItems(client);
+	// Saving a player whose data was never loaded would overwrite their saved credits and items with 0
+	if (loaded)
+		CrazyShop_DB_SavePlayer(client);
 
 	PLAYER_RESET(client);
 }
@@ -580,23 +590,52 @@ public void OnClientPostAdminCheck(int client)
 	if (IsFakeClient(client))
 		return;
 
-	CrazyShop_DB_GetData(client, CRAZYSHOP_DB_DATA_COLUMN, "credits");
-	CrazyShop_DB_GetData(client, CRAZYSHOP_DB_ITEMS_DATA_COLUMN, "item,count");
+	CrazyShop_DB_GetData(client);
+}
+
+void CrazyShop_DB_Connect()
+{
+	if (THIS_MODE_DB != null || g_bCrazyShop_DBConnecting)
+		return;
+
+	g_bCrazyShop_DBConnecting = true;
+	Database.Connect(CrazyShop_DB_OnConnect, CRAZYSHOP_DB_NAME);
 }
 
 void CrazyShop_DB_OnConnect(Database db, const char[] error, any data)
 {
-	// We are not bothered to reconnect
+	g_bCrazyShop_DBConnecting = false;
+
 	if (db == null || error[0])
 	{
-		LogError("[FM-%s] Couldn't connect to database, error: %s", THIS_MODE_INFO.name, error);
+		LogError("[FM-%s] Couldn't connect to database, retrying in %.0f seconds, error: %s", THIS_MODE_INFO.name, CRAZYSHOP_DB_RETRY_DELAY, error);
+		delete db;
+
+		if (g_hCrazyShop_DBRetryTimer == null)
+			g_hCrazyShop_DBRetryTimer = CreateTimer(CRAZYSHOP_DB_RETRY_DELAY, Timer_CrazyShop_DBRetry);
+
+		return;
+	}
+
+	if (THIS_MODE_DB != null)
+	{
+		delete db;
 		return;
 	}
 
 	THIS_MODE_DB = db;
-	THIS_MODE_DB.SetCharset("utf8mb4");
 
 	CrazyShop_DB_CreateTables();
+}
+
+Action Timer_CrazyShop_DBRetry(Handle timer)
+{
+	g_hCrazyShop_DBRetryTimer = null;
+
+	if (THIS_MODE_INFO.isOn && g_bCrazyShop_SaveCredits)
+		CrazyShop_DB_Connect();
+
+	return Plugin_Stop;
 }
 
 void CrazyShop_DB_CreateTables()
@@ -638,168 +677,142 @@ void DB_CrazyShop_TablesOnSuccess(Database database, any data, int queries, Hand
 	LogMessage("[FM-%s] Successfully created tables (SQLITE)", THIS_MODE_INFO.name);
 
 	// here is where we get players' credits and items:
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (!IsClientInGame(i) || IsFakeClient(i))
-			continue;
-
-		CrazyShop_DB_GetData(i, CRAZYSHOP_DB_DATA_COLUMN, "credits");
-		CrazyShop_DB_GetData(i, CRAZYSHOP_DB_ITEMS_DATA_COLUMN, "item,count");
-	}
+	CrazyShop_DB_GetAllData();
 }
 
 void DB_CrazyShop_TablesOnError(Database database, any data, int queries, const char[] error, int failIndex, any[] queryData)
 {
-	LogError("[FM-%s] Error while creating tables (SQLITE): %s", error);
+	LogError("[FM-%s] Error while creating tables (SQLITE): %s", THIS_MODE_INFO.name, error);
 }
 
-void CrazyShop_DB_GetData(int client, const char[] table, const char[] column)
+void CrazyShop_DB_GetAllData()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsFakeClient(i) || PLAYER_LOADED(i))
+			continue;
+
+		CrazyShop_DB_GetData(i);
+	}
+}
+
+void CrazyShop_DB_GetData(int client)
 {
 	int steamID = GetSteamAccountID(client);
 	if (!steamID)
 		return;
 
-	char query[1024];
-	THIS_MODE_DB.Format(query, sizeof(query), "SELECT %s FROM `%s` WHERE `client_steamid`=%d", column, table, steamID);
+	Transaction tr = new Transaction();
 
-	DataPack pack = new DataPack();
-	pack.WriteCell(GetClientUserId(client));
-	pack.WriteCell(column[0]);
+	char query[256];
+	THIS_MODE_DB.Format(query, sizeof(query), "SELECT `credits` FROM `%s` WHERE `client_steamid`=%d", CRAZYSHOP_DB_DATA_COLUMN, steamID);
+	tr.AddQuery(query);
 
-	THIS_MODE_DB.Query(DB_CrazyShop_OnGetData, query, pack, DBPrio_Normal);
+	THIS_MODE_DB.Format(query, sizeof(query), "SELECT `item`, `count` FROM `%s` WHERE `client_steamid`=%d", CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID);
+	tr.AddQuery(query);
+
+	THIS_MODE_DB.Execute(tr, DB_CrazyShop_OnGetData, DB_CrazyShop_OnGetDataError, GetClientUserId(client), DBPrio_Normal);
 }
 
-void DB_CrazyShop_OnGetData(Database db, DBResultSet results, const char[] error, DataPack pack)
+void DB_CrazyShop_OnGetData(Database db, any userid, int queries, DBResultSet[] results, any[] queryData)
 {
-	if (error[0])
-	{
-		LogError("[FM-%s] Error getting client data: %s", THIS_MODE_INFO.name, error);
-		delete pack;
-		return;
-	}
-
-	if (results == null || !results.RowCount)
-	{
-		delete pack;
-		return;
-	}
-
-	pack.Reset();
-
-	int client = GetClientOfUserId(pack.ReadCell());
+	int client = GetClientOfUserId(userid);
 	if (!client)
-	{
-		delete pack;
-		return;
-	}
-
-	bool isCredits = pack.ReadCell() == 'c';
-	delete pack;
-
-	if (!results.FetchRow())
 		return;
 
-	if (isCredits)
-	{
-		PLAYER_IN_DB(client) = true;
-		PLAYER_CREDITS(client) = results.FetchInt(0);
-	}
-	else
-	{
-		// 2 fields here (item and count)
-		results.Rewind();
-		while (results.FetchRow())
-		{
-			int item = results.FetchInt(0);
-			int count = results.FetchInt(1);
-
-			PLAYER_ITEM_COUNT(client, item) = count;
-			PLAYER_ITEM_COUNT_OG(client, item) = count;
-		}
-	}
-}
-
-void CrazyShop_DB_AddPlayer(int client)
-{
-	int steamID = GetSteamAccountID(client);
-	if (!steamID)
-		return;
-
-	char query[1024];
-	THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `credits`) VALUES (%d, %d) "
-										    ... "ON CONFLICT(`client_steamid`) DO UPDATE SET `credits`=excluded.credits",
-										    	CRAZYSHOP_DB_DATA_COLUMN, steamID, PLAYER_CREDITS(client));
-
-	THIS_MODE_DB.Query(DB_CrazyShop_OnAddPlayer, query, _, DBPrio_High);
-}
-
-void DB_CrazyShop_OnAddPlayer(Database db, DBResultSet results, const char[] error, DataPack pack)
-{
-	if (error[0])
-		LogError("[FM-%s] Error while inserting data: %s", THIS_MODE_INFO.name, error);
-}
-
-void CrazyShop_DB_SaveCredits(int client)
-{
-	int steamID = GetSteamAccountID(client);
-	if (!steamID)
-		return;
-
-	char query[1024];
-	THIS_MODE_DB.Format(query, sizeof(query), 	"UPDATE `%s` SET `credits`=%d WHERE `client_steamid`=%d",
-										    	CRAZYSHOP_DB_DATA_COLUMN, PLAYER_CREDITS(client), steamID);
-
-	THIS_MODE_DB.Query(DB_CrazyShop_OnSaveCredits, query, _, DBPrio_High);
-}
-
-void DB_CrazyShop_OnSaveCredits(Database db, DBResultSet results, const char[] error, DataPack pack)
-{
-	if (error[0])
-		LogError("[FM-%s] Error while saving player credits: %s", THIS_MODE_INFO.name, error);
-}
-
-void CrazyShop_DB_CheckItems(int client)
-{
-	int steamID = GetSteamAccountID(client);
-	if (!steamID)
-		return;
-
-	char query[1024];
-	bool hasItems = false;
+	// The database is the source of truth, drop whatever this slot held before
+	PLAYER_CREDITS(client) = 0;
+	PLAYER_CREDITS_OG(client) = 0;
 	for (int i = 0; i < sizeof(CrazyShop_PlayerData::itemsCount); i++)
 	{
+		PLAYER_ITEM_COUNT(client, i) = 0;
+		PLAYER_ITEM_COUNT_OG(client, i) = 0;
+	}
+
+	PLAYER_IN_DB(client) = results[0].FetchRow();
+	if (PLAYER_IN_DB(client))
+	{
+		PLAYER_CREDITS(client) = results[0].FetchInt(0);
+		PLAYER_CREDITS_OG(client) = PLAYER_CREDITS(client);
+	}
+
+	// 2 fields here (item and count)
+	while (results[1].FetchRow())
+	{
+		int item = results[1].FetchInt(0);
+		if (item < 0 || item >= sizeof(CrazyShop_PlayerData::itemsCount))
+			continue;
+
+		int count = results[1].FetchInt(1);
+
+		PLAYER_ITEM_COUNT(client, item) = count;
+		PLAYER_ITEM_COUNT_OG(client, item) = count;
+	}
+
+	PLAYER_LOADED(client) = true;
+}
+
+void DB_CrazyShop_OnGetDataError(Database db, any userid, int queries, const char[] error, int failIndex, any[] queryData)
+{
+	LogError("[FM-%s] Error getting client data: %s", THIS_MODE_INFO.name, error);
+}
+
+/* Only writes what changed since the player's data was loaded, all in one transaction */
+void CrazyShop_DB_SavePlayer(int client)
+{
+	int steamID = GetSteamAccountID(client);
+	if (!steamID)
+		return;
+
+	Transaction tr = new Transaction();
+	int queries = 0;
+
+	char query[512];
+	if (!PLAYER_IN_DB(client) || PLAYER_CREDITS(client) != PLAYER_CREDITS_OG(client))
+	{
+		THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `credits`) VALUES (%d, %d) "
+											    ... "ON CONFLICT(`client_steamid`) DO UPDATE SET `credits`=excluded.credits",
+											    	CRAZYSHOP_DB_DATA_COLUMN, steamID, PLAYER_CREDITS(client));
+
+		tr.AddQuery(query);
+		queries++;
+	}
+
+	for (int i = 0; i < sizeof(CrazyShop_PlayerData::itemsCount); i++)
+	{
+		if (PLAYER_ITEM_COUNT(client, i) == PLAYER_ITEM_COUNT_OG(client, i))
+			continue;
+
+		// A missing row loads as a count of 0
 		if (PLAYER_ITEM_COUNT(client, i) > 0)
-		{
-			hasItems = true;
-			break;
-		}
-	}
-
-	if (!hasItems)
-	{
-		THIS_MODE_DB.Format(query, sizeof(query), 	"DELETE FROM `%s` WHERE `client_steamid`=%d",
-											    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID);
-
-		THIS_MODE_DB.Query(DB_CrazyShop_OnCheckItems, query, _, DBPrio_High);
-	}
-	else
-	{
-		for (int i = 0; i < sizeof(CrazyShop_PlayerData::itemsCount); i++)
 		{
 			THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `item`, `count`) VALUES "
 													... "(%d, %d, %d) ON CONFLICT(`client_steamid`, `item`) DO UPDATE SET "
-													... "`count` = excluded.count WHERE `count` != excluded.count",
+													... "`count` = excluded.count",
 												    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID, i, PLAYER_ITEM_COUNT(client, i));
-
-			THIS_MODE_DB.Query(DB_CrazyShop_OnCheckItems, query, _, DBPrio_High);
 		}
+		else
+		{
+			THIS_MODE_DB.Format(query, sizeof(query), 	"DELETE FROM `%s` WHERE `client_steamid`=%d AND `item`=%d",
+												    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID, i);
+		}
+
+		tr.AddQuery(query);
+		queries++;
 	}
+
+	if (!queries)
+	{
+		delete tr;
+		return;
+	}
+
+	THIS_MODE_DB.Execute(tr, _, DB_CrazyShop_OnSavePlayerError, _, DBPrio_High);
 }
 
-void DB_CrazyShop_OnCheckItems(Database db, DBResultSet results, const char[] error, DataPack pack)
+void DB_CrazyShop_OnSavePlayerError(Database db, any data, int queries, const char[] error, int failIndex, any[] queryData)
 {
-	if (error[0])
-		LogError("[FM-%s] Error while checking player credits: %s", THIS_MODE_INFO.name, error);
+	LogError("[FM-%s] Error while saving player data: %s", THIS_MODE_INFO.name, error);
 }
 
 public Action Cmd_CrazyShopToggle(int client, int args)
@@ -823,8 +836,13 @@ public Action Cmd_CrazyShopToggle(int client, int args)
 		CPrintToChatAll("%s Earn credits by defending and shooting the zombies!", THIS_MODE_INFO.tag);
 		CPrintToChatAll("%s Type {olive}!crazyshop {lightgreen}to open the Shop Menu and buy powerful items!", THIS_MODE_INFO.tag);
 
-		if (g_bCrazyShop_SaveCredits && THIS_MODE_DB == null)
-			Database.Connect(CrazyShop_DB_OnConnect, CRAZYSHOP_DB_NAME);
+		if (g_bCrazyShop_SaveCredits)
+		{
+			if (THIS_MODE_DB == null)
+				CrazyShop_DB_Connect();
+			else
+				CrazyShop_DB_GetAllData(); // Players who joined while the mode was off were never loaded
+		}
 
 		CrazyShop_GetItems();
 
@@ -2299,8 +2317,10 @@ public Action ZR_OnClientInfect(int &client, int &attacker, bool &motherInfect)
 #undef THIS_MODE_DB
 #undef CRAZYSHOP_DB_NAME
 #undef PLAYER_CREDITS
+#undef PLAYER_CREDITS_OG
 #undef PLAYER_ITEM_COUNT
 #undef PLAYER_ITEM_ACTIVE
 #undef DAMAGE_DEALT
 #undef PLAYER_IN_DB
+#undef PLAYER_LOADED
 #undef PLAYER_RESET
