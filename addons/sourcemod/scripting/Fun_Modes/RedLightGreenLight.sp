@@ -30,11 +30,13 @@ float g_fRLGLRedSince;
 char countDownPath[PLATFORM_MAX_PATH];
 
 float g_fOriginalSpeed[MAXPLAYERS + 1];
+int g_iRLGLTimePassed;             // seconds of the red light warning so far
 
 /* Timers */
 Handle g_hRLGLTimer;
 Handle g_hRLGLDetectTimer;
 Handle g_hRLGLWarningTimer;
+Handle g_hRLGL_Hud;               // this mode's own text slot
 
 #define RLGL_CONVAR_TIME_BETWEEN_DAMAGE         0
 #define RLGL_CONVAR_FREEZE_TIME                 1
@@ -63,6 +65,7 @@ public void OnPluginStart_RLGL()
 {
 	// Important, this must be first before filling any other mode info!
 	FUNMODES_REGISTER_MODE()
+	g_hRLGL_Hud = CreateModeHud();
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
@@ -200,8 +203,11 @@ void RLGL_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, co
 		case RLGL_CONVAR_TOGGLE:
 		{
 			bool val = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
-			if (THIS_MODE_INFO.isOn)
-				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, val, THIS_MODE_INFO.index);
+			if (THIS_MODE_INFO.isOn && !val)
+			{
+				CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
+				RLGL_Stop();
+			}
 
 			g_bRLGL_Enabled = val;
 		}
@@ -217,7 +223,6 @@ void RLGL_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, co
 public void OnMapStart_RLGL()
 {
 	countDownPath = _FUNMODES_CVAR_GET_VALUE(THIS_MODE_INFO.index, RLGL_CONVAR_COUNTDOWN_FOLDER, String);
-	PrintToChatAll("countdown path: %s", countDownPath);
 	for (int i = 1; i <= RoundToNearest(g_fRLGL_WarningTime); i++)
 	{
 		char sndPath[PLATFORM_MAX_PATH];
@@ -255,18 +260,32 @@ public void ZR_OnClientInfected_RLGL(int client)
 	if (g_fRLGL_ZombieSpeed <= 0.0)
 		return;
 
-	g_fOriginalSpeed[client] = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
-	SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", g_fRLGL_ZombieSpeed);
+	SetSpeedMult(client, THIS_MODE_INDEX, g_fRLGL_ZombieSpeed);
 }
 
 public void Event_RoundStart_RLGL()
+{
+	RLGL_Stop();
+
+	if (THIS_MODE_INFO.isOn)
+		StartRLGLTimer();
+}
+
+/* No red light during the round end screen */
+public void Event_RoundEnd_RLGL()
+{
+	RLGL_Stop();
+}
+
+/* Stops the cycle: back to green, zombies at their own speed */
+void RLGL_Stop()
 {
 	delete g_hRLGLWarningTimer;
 	delete g_hRLGLTimer;
 	delete g_hRLGLDetectTimer;
 
-	if (THIS_MODE_INFO.isOn)
-		StartRLGLTimer();
+	g_bEnableDetecting = false;
+	SetZombiesSpeed(1.0);
 }
 
 void ApplyFade(const char[] sColor)
@@ -341,19 +360,12 @@ public Action Cmd_RLGLToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	CPrintToChatAll("%s Red Light Green Light is now {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "Enabled" : "Disabled");
 
-	delete g_hRLGLTimer;
-	delete g_hRLGLDetectTimer;
-	delete g_hRLGLWarningTimer;
+	RLGL_Stop();
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		StartRLGLTimer();
-	}
-	else
-	{
-		g_bEnableDetecting = false;
-		SetZombiesSpeed(1.0);
 	}
 
 	return Plugin_Handled;
@@ -363,9 +375,17 @@ Action RLGL_Timer(Handle timer)
 {
 	g_hRLGLTimer = null;
 
-	if (!THIS_MODE_INFO.isOn)
+	if (!THIS_MODE_INFO.isOn || !g_bRoundLive)
 		return Plugin_Stop;
 
+	// No red light before the zombies are out
+	if (!g_bZombiesSeen)
+	{
+		StartRLGLTimer();
+		return Plugin_Stop;
+	}
+
+	g_iRLGLTimePassed = 0;
 	delete g_hRLGLWarningTimer;
 	g_hRLGLWarningTimer = CreateTimer(1.0, RLGL_Warning_Timer, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 
@@ -382,13 +402,11 @@ Action RLGL_Warning_Timer(Handle timer)
 		return Plugin_Stop;
 	}
 
-	static int timePassed;
-
 	char sMessage[256];
-	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (RoundToNearest(g_fRLGL_WarningTime) - timePassed));
+	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (RoundToNearest(g_fRLGL_WarningTime) - g_iRLGLTimePassed));
 
 	char numStr[3];
-	IntToString(RoundToNearest(g_fRLGL_WarningTime) - timePassed, numStr, sizeof(numStr));
+	IntToString(RoundToNearest(g_fRLGL_WarningTime) - g_iRLGLTimePassed, numStr, sizeof(numStr));
 
 	char sndPath[PLATFORM_MAX_PATH];
 	strcopy(sndPath, sizeof(sndPath), countDownPath);
@@ -404,14 +422,14 @@ Action RLGL_Warning_Timer(Handle timer)
 		if (!IsClientInGame(i))
 			continue;
 
-		SendHudText(i, sMessage, _, 0);
+		SendHudText(i, sMessage, _, 0, HUD_Y_RLGL, g_hRLGL_Hud);
 		if (playSnd)
 			EmitSoundToClient(i, sndPath);
 	}
 
-	timePassed++;
+	g_iRLGLTimePassed++;
 
-	if (timePassed > RoundToNearest(g_fRLGL_WarningTime))
+	if (g_iRLGLTimePassed > RoundToNearest(g_fRLGL_WarningTime))
 	{
 		ApplyFade("Red");
 		g_bEnableDetecting = true;
@@ -422,7 +440,7 @@ Action RLGL_Warning_Timer(Handle timer)
 
 		CreateTimer(g_fRLGL_FreezeTime, RLGL_Detect_Time_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
 
-		timePassed = 0;
+		g_iRLGLTimePassed = 0;
 		g_hRLGLWarningTimer = null;
 
 		delete g_hRLGLDetectTimer;
@@ -462,7 +480,7 @@ Action RLGL_Detect_Timer(Handle timer)
 		if (buttons & RLGL_MOVE_KEYS)
 		{
 			SDKHooks_TakeDamage(i, 0, 0, g_fRLGL_Damage);
-			SendHudText(i, "STOP MOVING ITS A RED LIGHT!!!", _, 1);
+			SendHudText(i, "STOP MOVING ITS A RED LIGHT!!!", _, 1, HUD_Y_RLGL, g_hRLGL_Hud);
 		}
 	}
 
@@ -485,28 +503,28 @@ Action RLGL_Detect_Time_Timer(Handle timer)
 		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
 			continue;
 
-		SendHudText(i, "YOU CAN MOVE NOW, ITS A GREEN LIGHT!", _, 2);
+		SendHudText(i, "YOU CAN MOVE NOW, ITS A GREEN LIGHT!", _, 2, HUD_Y_RLGL, g_hRLGL_Hud);
 	}
 
 	return Plugin_Continue;
 }
 
+/* Through the shared speed stacking, so the zombie class speed and the other modes' speeds are kept. 1.0 = back to normal */
 public void SetZombiesSpeed(float val)
 {
+	if (val == 1.0)
+	{
+		ResetModeMults(THIS_MODE_INDEX);
+		return;
+	}
+
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_T)
+		if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientZombie(i))
 			continue;
 
-		g_fOriginalSpeed[i] = (val == 1.0) ? 0.0 : GetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue");
-		float thisVal = (val == 1.0) ? g_fOriginalSpeed[i] : val;
-
-		if (thisVal == 0.0)
-			thisVal = 1.0;
-
-		SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", thisVal);
-		CPrintToChat(i, "%s Your speed has been changed to {olive}%.2f", THIS_MODE_INFO.tag, thisVal);
-		CPrintToChat(i, "%s This is a part of {olive}Red Light Green Light.{white} An admin decided to have this kicker.", THIS_MODE_INFO.tag);
+		SetSpeedMult(i, THIS_MODE_INDEX, val);
+		CPrintToChat(i, "%s Red light: zombies are slowed to {olive}%.2fx{lightgreen}!", THIS_MODE_INFO.tag, val);
 	}
 }
 

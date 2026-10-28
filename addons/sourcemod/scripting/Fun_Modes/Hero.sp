@@ -280,7 +280,7 @@ public void OnTick_Hero()
 		if (!IsClientInGame(i) || IsFakeClient(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.26, 1.1, 100, 160, 255, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_HERO, 1.1, 100, 160, 255, 255, 0, 0.0, 0.0, 0.0);
 		if (i == hero)
 			ShowModeHud(i, g_hHero_Hud, "YOU ARE THE HERO! (%d HP)", GetClientHealth(hero));
 		else

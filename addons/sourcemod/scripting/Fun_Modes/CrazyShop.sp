@@ -839,7 +839,8 @@ public Action Cmd_CrazyShopToggle(int client, int args)
 			g_bSDKHook_OnTakeDamage[i] = true;
 		}
 
-		FunModes_RestartRound();
+		// No round restart: the shop opens in the current round
+		Event_RoundStart_CrazyShop();
 	}
 	else
 	{
@@ -865,8 +866,9 @@ void CrazyShop_GetItems()
 
 	KeyValues kv = new KeyValues("Items");
 
-	if (!kv.ImportFromFile(filePath))
+	if (!FunModes_LoadKV(kv, filePath))
 	{
+		LogError("[FunModes-CrazyShop] %s", g_sKvError);
 		delete kv;
 		return;
 	}
@@ -1157,8 +1159,9 @@ void CrazyShop_UpdateItemData(int client, int item, const char[] key, const char
 
 	KeyValues kv = new KeyValues("Items");
 
-	if (!kv.ImportFromFile(filePath))
+	if (!FunModes_LoadKV(kv, filePath))
 	{
+		LogError("[FunModes-CrazyShop] %s", g_sKvError);
 		CPrintToChat(client, "%s Sorry, no settings file was found, Changes will not be saved (Report this to the server manager).", THIS_MODE_INFO.tag);
 		delete kv;
 	}
@@ -1172,7 +1175,7 @@ void CrazyShop_UpdateItemData(int client, int item, const char[] key, const char
 		{
 			kv.SetString(key, value);
 			kv.Rewind();
-			kv.ExportToFile(filePath);
+			FunModes_SaveKV(kv, filePath);
 		}
 		else
 			CPrintToChat(client, "%s Sorry, the item is not in the settings file, changes will not be saved, (Report this to the server manager)", THIS_MODE_INFO.tag);

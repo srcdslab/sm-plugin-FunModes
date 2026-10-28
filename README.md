@@ -8,7 +8,8 @@ Many of the modes (most of the hazards, weather, mini-games and zombie modes, th
 
 # Global Admin Commands
 
-- sm_funmodes - "Show all available funmodes"
+- sm_funmodes / sm_fm - "Open the FunModes menu: category -> mode page, where each setting shows its value and goes to the next one when picked"
+- sm_em - "Alias of sm_fm"
 - sm_fm <mode> [on|off] - "Turn a mode on/off from chat, console or rcon (no on/off = switch it)"
 - sm_fm list - "List the modes and which ones are on"
 - sm_fm stop - "Turn every mode off"
@@ -27,6 +28,9 @@ Many of the modes (most of the hazards, weather, mini-games and zombie modes, th
 - Besides the usual forwards, a mode can define `OnTick_<Mode>()` (every second), `OnCheck_<Mode>(bool zombiesNow)` (every 0.2 seconds), `OnPlayerRunCmd_<Mode>(client, &buttons, vel[3], &changed)`, `OnClientSayCommand_<Mode>(client, text, &result)` and `OnBuyCommand_<Mode>(client, weapon, &result)`. The tick, check, run cmd, chat and buy forwards are only called while the mode is on.
 - Set `THIS_MODE_INFO.category` to one of the `FM_CAT_*` categories, and `THIS_MODE_INFO.roulette = false` if the Event Roulette should never pick the mode.
 - `configs/FunModes/ConVars.cfg` is matched by cvar name, so adding a mode or a cvar never shifts the saved values. Cvars missing from the file use their default and are added the first time they are changed.
+- Read and write the config files with `FunModes_LoadKV` / `FunModes_SaveKV` (Shared.sp), not `ImportFromFile` / `ExportToFile` directly: on some servers the engine's KeyValues reader refuses the files, and these fall back to SourceMod's own parser.
+- No mode restarts the round when it's turned on: a mode turned on mid-round starts in that round.
+- Each mode text has its own row on the screen (`HUD_Y_*` in Shared.sp) and its own hud slot (`CreateModeHud`), so two modes never draw over each other.
 
 # Current FunModes Available
 
@@ -41,6 +45,7 @@ Picks random humans (based on a cvar) and beacons them, other humans need to be 
 - sm_replacebeacon - "Replace an already heal beaconed player with another one"
 - sm_addnewbeacon - "Add a new heal beaconed player"
 - sm_removebeacon - "Remove heal beacon player"
+- sm_healbeacon_choose <player> - "Chosen carrier: a heal beacon every round until they leave the server, never picked as mother zombie (again to undo)"
 
 ### Player Commands
 - sm_checkdistance - "Check the distance between the player and the target"
@@ -62,7 +67,7 @@ Picks random humans (based on a cvar) and beacons them, if all selected humans d
 ### Admin Commands
 - sm_fm_vipmode - "Toggle On/Off VIP Mode"
 - sm_vipmode_settings - "Opens VIPMode Settings Menu"
-- sm_vipmode_setvip - "Set a specific human as VIP"
+- sm_vipmode_setvip <player> - "Chosen VIP: VIP every round until they leave the server, never picked as mother zombie (again to undo)"
 
 ### Player Commands
 - sm_checkvip - "Check the current VIPs list"
@@ -230,8 +235,6 @@ Humans and/or zombies need to answer math questions or they will get hurt!
 - sm_mathgame_easy_damage - "The amount of damage to apply to those who can't answer easy questions"
 - sm_mathgame_medium_damage - "The amount of damage to apply to those who can't answer medium questions"
 - sm_mathgame_hard_damage - "The amount of damage to apply to those who can't answer hard questions"
-- sm_mathgame_include_zombies - "Include zombies to the math game (1 = Enabled, 0 = Disabled)"
-- sm_mathgame_max_tries - "How many failed tries for zombies to answer question until they can never respawn again?"
 - sm_mathgame_time_delay - "The delayed time after each math question"
 - sm_mathgame_enable - "Enable/Disable MathGame Mode (This differs from turning it on/off)"
 - sm_mathgame_reward - "Reward for a right answer [0 = nothing, 1 = +25 HP, 2 = +50 HP, 3 = HE grenade]"
@@ -360,21 +363,6 @@ Once the zombies are out, every few seconds green clouds of gas appear where som
 - sm_gas_damage - "Damage per second inside a gas cloud"
 - sm_gas_zombies - "The gas hurts the zombies too"
 - sm_gas_enable - "Enable/Disable Toxic Gas Mode (This differs from turning it on/off)"
-
-## Radiation
-Once the zombies are out, a human who camps in one spot for too long turns it radioactive: the spot stays for the rest of the round and hurts whoever stands in it.
-
-### Admin Commands
-- sm_fm_radiation - "Toggle On/Off Radiation"
-- sm_radiation_settings - "Open Radiation Settings Menu"
-
-### Cvars
-- sm_radiation_after - "Seconds of camping before a spot turns radioactive"
-- sm_radiation_radius - "Radius of a radioactive spot"
-- sm_radiation_damage - "Damage per second inside a radioactive spot"
-- sm_radiation_max - "Radioactive spots at most per round"
-- sm_radiation_zombies - "Radioactive spots hurt the zombies too"
-- sm_radiation_enable - "Enable/Disable Radiation Mode (This differs from turning it on/off)"
 
 ## AcidRain
 Once the zombies are out, every few seconds it rains acid for a while: whoever has nothing but sky above their head gets hurt, so get under a roof.

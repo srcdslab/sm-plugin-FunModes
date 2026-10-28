@@ -23,6 +23,7 @@ bool g_bSDKHook_OnTakeDamage[MAXPLAYERS + 1] =  { false, ... };
 /* Round Checking Booleans */
 bool g_bRoundEnd;
 bool g_bSkipRestartRound;
+bool g_bUnloading;              // the plugin is being unloaded: the modes only clean up, no gameplay
 
 /* COLORS VARIABLES */
 int g_ColorCyan[4] =  {0, 255, 255, 255}; // cyan
@@ -69,6 +70,7 @@ int g_iLastModeIndex;
 
 /* ConVars Section */
 KeyValues g_hKV;
+bool g_bCvarConfigBroken;       // ConVars.cfg is there but couldn't be read: don't overwrite it
 
 #define FUNMODES_CVAR_CONFIG "addons/sourcemod/configs/FunModes/ConVars.cfg"
 

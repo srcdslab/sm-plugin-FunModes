@@ -29,7 +29,6 @@
 #include "../Shockwave.sp"
 #include "../Nuke.sp"
 #include "../ToxicGas.sp"
-#include "../Radiation.sp"
 #include "../AcidRain.sp"
 #include "../FreezingCold.sp"
 #include "../Darkness.sp"
@@ -146,10 +145,6 @@ public void Forwards_OnPluginStart()
 
 #if defined _FM_ToxicGas
     OnPluginStart_ToxicGas();
-#endif
-
-#if defined _FM_Radiation
-    OnPluginStart_Radiation();
 #endif
 
 #if defined _FM_AcidRain

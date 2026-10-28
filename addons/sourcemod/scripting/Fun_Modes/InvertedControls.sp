@@ -312,7 +312,7 @@ void IC_ShowHud()
 		if (!g_bIC_Flipped[i] || !IsClientInGame(i))
 			continue;
 
-		SetHudTextParams(-1.0, 0.44, 1.2, 192, 96, 255, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_IC, 1.2, 192, 96, 255, 255, 0, 0.0, 0.0, 0.0);
 		ShowModeHud(i, g_hIC_Hud, "CONTROLS INVERTED! (%d)", left > 0 ? left : 0);
 	}
 }
