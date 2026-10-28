@@ -41,6 +41,12 @@ Handle g_hBeaconTimer[MAXPLAYERS + 1] = { null, ... };
 #define HB_CONVAR_RANDOMS           4
 #define HB_CONVAR_DEFAULT_DISTANCE  5
 #define HB_CONVAR_TOGGLE            6
+#define HB_CONVAR_ON_LOST           7
+#define HB_CONVAR_SOUND             8
+
+#define HB_LOST_NOTHING 0
+#define HB_LOST_PASS    1
+#define HB_LOST_SLAY    2
 
 float g_fHB_BeaconTimer;
 float g_fHB_AlertTimer;
@@ -51,6 +57,8 @@ int g_iHB_BeaconHeal;
 int g_iHB_RandomPlayers;
 
 bool g_bHealBeacon_Enabled;
+int g_iHB_OnLost;
+bool g_bHB_Sound;
 
 enum struct BeaconPlayers
 {
@@ -96,6 +104,7 @@ public void OnPluginStart_HealBeacon()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_SURVIVAL;
 
     /* ADMIN COMMANDS */
     RegAdminCmd("sm_fm_healbeacon", Cmd_HealBeaconToggle, ADMFLAG_CONVARS, "Enable/Disable Healbeacon");
@@ -156,6 +165,22 @@ public void OnPluginStart_HealBeacon()
     );
     THIS_MODE_INFO.cvars[HB_CONVAR_TOGGLE].HookChange(HealBeacon_OnConVarChange);
 
+    DECLARE_FM_CVAR(
+        HB_CONVAR_ON_LOST, "sm_healbeacon_on_lost",
+        "0", "When a carrier dies or gets infected [0 = the beacon is gone 1 = a random human gets it 2 = all humans are slain]",
+        ("0,1,2"), CONVAR_INT
+    );
+
+    THIS_MODE_INFO.cvars[HB_CONVAR_ON_LOST].HookChange(HealBeacon_OnConVarChange);
+
+    DECLARE_FM_CVAR(
+        HB_CONVAR_SOUND, "sm_healbeacon_sound",
+        "0", "The heal beacons beep every second",
+        ("0,1"), CONVAR_BOOL
+    );
+
+    THIS_MODE_INFO.cvars[HB_CONVAR_SOUND].HookChange(HealBeacon_OnConVarChange);
+
     THIS_MODE_INFO.enableIndex = HB_CONVAR_TOGGLE;
 }
 
@@ -171,6 +196,8 @@ public void InitCvarsValues_HealBeacon()
     g_fHB_DefaultDistance = _FUNMODES_CVAR_GET_VALUE(modeIndex, HB_CONVAR_DEFAULT_DISTANCE, Float);
 
     g_bHealBeacon_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, HB_CONVAR_TOGGLE, Bool);
+    g_iHB_OnLost = _FUNMODES_CVAR_GET_VALUE(modeIndex, HB_CONVAR_ON_LOST, Int);
+    g_bHB_Sound = _FUNMODES_CVAR_GET_VALUE(modeIndex, HB_CONVAR_SOUND, Bool);
 }
 
 void HealBeacon_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -203,6 +230,12 @@ void HealBeacon_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldVal
 
             g_bHealBeacon_Enabled = val;
         }
+
+        case HB_CONVAR_ON_LOST:
+            g_iHB_OnLost = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
+
+        case HB_CONVAR_SOUND:
+            g_bHB_Sound = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
     }
 }
 
@@ -259,6 +292,70 @@ public void Event_PlayerDeath_HealBeacon(int client)
 
     RemoveBeacon(-1, client);
     CPrintToChatAll("%s {olive}%N {lightgreen}died with HealBeacon.", THIS_MODE_INFO.tag, client);
+    HealBeacon_CarrierLost(client);
+}
+
+public void ZR_OnClientInfected_HealBeacon(int client)
+{
+    if (!THIS_MODE_INFO.isOn || !g_BeaconPlayersData[client].hasHealBeacon)
+        return;
+
+    RemoveBeacon(-1, client);
+    CPrintToChatAll("%s {olive}%N {lightgreen}got infected with HealBeacon.", THIS_MODE_INFO.tag, client);
+    HealBeacon_CarrierLost(client);
+}
+
+/* A carrier fell: the beacon passes on to a random human, or every human falls (sm_healbeacon_on_lost) */
+void HealBeacon_CarrierLost(int lost)
+{
+    // The humans are already being slain (the other carriers die with them)
+    if (!g_bRoundLive)
+        return;
+
+    if (g_iHB_OnLost == HB_LOST_SLAY)
+    {
+        CPrintToChatAll("%s A heal beacon carrier has fallen, {olive}all humans are slain{lightgreen}!", THIS_MODE_INFO.tag);
+        SlayAllHumans();
+        return;
+    }
+
+    if (g_iHB_OnLost != HB_LOST_PASS)
+        return;
+
+    int clients[MAXPLAYERS + 1];
+    int count;
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (i == lost || !IsHumanAlive(i) || g_BeaconPlayersData[i].hasHealBeacon)
+            continue;
+
+        clients[count++] = i;
+    }
+
+    if (!count)
+        return;
+
+    int target = clients[GetRandomInt(0, count - 1)];
+    SetHealBeaconToClient(target);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Announce", target);
+}
+
+/* A beep from every beacon each second */
+public void OnTick_HealBeacon()
+{
+    if (!g_bHB_Sound || g_aHBPlayers == null)
+        return;
+
+    for (int i = 0; i < g_aHBPlayers.Length; i++)
+    {
+        int carrier = g_aHBPlayers.Get(i);
+        if (!IsHumanAlive(carrier))
+            continue;
+
+        float pos[3];
+        GetClientAbsOrigin(carrier, pos);
+        EmitAmbientSound(Beacon_Sound, pos, carrier, SNDLEVEL_NORMAL);
+    }
 }
 
 public void Event_PlayerTeam_HealBeacon(Event event)
@@ -701,6 +798,7 @@ public Action Cmd_HealBeaconToggle(int client, int args)
     }
 
     CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+    THIS_MODE_INFO.byRoulette = false;
     return Plugin_Handled;
 }
 

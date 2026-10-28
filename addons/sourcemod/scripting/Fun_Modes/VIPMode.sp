@@ -26,6 +26,8 @@ static int g_iVIPModeIndex = -1;
 #define VIPMODE_CONVAR_LASER     2
 #define VIPMODE_CONVAR_VIP_MAX   3
 #define VIPMODE_CONVAR_TOGGLE    4
+#define VIPMODE_CONVAR_REPLACE   5
+#define VIPMODE_CONVAR_HUD       6
 
 bool g_bDiedFromLaser[MAXPLAYERS + 1];
 bool g_bIsVIP[MAXPLAYERS + 1];
@@ -39,6 +41,10 @@ float g_fVIP_KillDelay;
 bool g_bVIP_LaserException;
 int g_iVIP_Max;
 bool g_bVIP_Enabled;
+bool g_bVIP_Replace;
+bool g_bVIP_Hud;
+
+Handle g_hVIP_Hud;
 
 public void OnPluginStart_VIPMode()
 {
@@ -47,6 +53,7 @@ public void OnPluginStart_VIPMode()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_SURVIVAL;
 
 	RegAdminCmd("sm_fm_vipmode", Cmd_VIPModeToggle, ADMFLAG_CONVARS, "Turn VIPMode On/Off");
 	RegAdminCmd("sm_vipmode_setvip", Cmd_SetVIP, ADMFLAG_CONVARS, "Set a player as VIP");
@@ -88,7 +95,23 @@ public void OnPluginStart_VIPMode()
 	);
 	THIS_MODE_INFO.cvars[VIPMODE_CONVAR_TOGGLE].HookChange(VIPMode_OnConVarChange);
 
+	DECLARE_FM_CVAR(
+		VIPMODE_CONVAR_REPLACE, "sm_vipmode_replace",
+		"0", "When all the VIPs die pick new VIPs instead of killing all the humans",
+		("0,1"), CONVAR_BOOL
+	);
+	THIS_MODE_INFO.cvars[VIPMODE_CONVAR_REPLACE].HookChange(VIPMode_OnConVarChange);
+
+	DECLARE_FM_CVAR(
+		VIPMODE_CONVAR_HUD, "sm_vipmode_hud",
+		"1", "Show the VIPs names on everyone's screen",
+		("0,1"), CONVAR_BOOL
+	);
+	THIS_MODE_INFO.cvars[VIPMODE_CONVAR_HUD].HookChange(VIPMode_OnConVarChange);
+
 	THIS_MODE_INFO.enableIndex = VIPMODE_CONVAR_TOGGLE;
+
+	g_hVIP_Hud = CreateModeHud();
 }
 
 public void InitCvarsValues_VIPMode()
@@ -100,6 +123,8 @@ public void InitCvarsValues_VIPMode()
 	g_bVIP_LaserException = _FUNMODES_CVAR_GET_VALUE(modeIndex, VIPMODE_CONVAR_LASER, Bool);
 	g_iVIP_Max = _FUNMODES_CVAR_GET_VALUE(modeIndex, VIPMODE_CONVAR_VIP_MAX, Int);
 	g_bVIP_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, VIPMODE_CONVAR_TOGGLE, Bool);
+	g_bVIP_Replace = _FUNMODES_CVAR_GET_VALUE(modeIndex, VIPMODE_CONVAR_REPLACE, Bool);
+	g_bVIP_Hud = _FUNMODES_CVAR_GET_VALUE(modeIndex, VIPMODE_CONVAR_HUD, Bool);
 }
 
 void VIPMode_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -126,6 +151,12 @@ void VIPMode_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue,
 
 			g_bVIP_Enabled = val;
 		}
+
+		case VIPMODE_CONVAR_REPLACE:
+			g_bVIP_Replace = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
+
+		case VIPMODE_CONVAR_HUD:
+			g_bVIP_Hud = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
 	}
 }
 
@@ -184,6 +215,52 @@ public void Event_RoundStart_VIPMode()
 
 	delete g_hVIPRoundStartTimer;
 	g_hVIPRoundStartTimer = CreateTimer(g_fVIP_Timer, VIPRoundStart_Timer, _, TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public void ZR_OnClientInfected_VIPMode(int client)
+{
+	if (!THIS_MODE_INFO.isOn || !g_bIsVIP[client])
+		return;
+
+	// Becoming a mother zombie isn't the humans' fault: another VIP takes over
+	if (g_bInfectionIsMother)
+	{
+		RemoveClientVIP(client, false, "VIPMode_VIPMother");
+		VIP_PickRandom();
+		return;
+	}
+
+	RemoveClientVIP(client, true, "VIPMode_VIPInfected");
+}
+
+/* The VIPs' names on everyone's screen */
+public void OnTick_VIPMode()
+{
+	if (!g_bVIP_Hud || !GetCurrentVIPsCount())
+		return;
+
+	char names[160];
+	int count;
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!g_bIsVIP[i] || !IsClientInGame(i))
+			continue;
+
+		Format(names, sizeof(names), "%s%s%N", names, count ? ", " : "", i);
+		count++;
+	}
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsFakeClient(i))
+			continue;
+
+		SetHudTextParams(-1.0, 0.10, 1.1, 255, 215, 0, 255, 0, 0.0, 0.0, 0.0);
+		if (g_bIsVIP[i] && IsPlayerAlive(i))
+			ShowModeHud(i, g_hVIP_Hud, "YOU ARE A VIP - STAY ALIVE!");
+		else
+			ShowModeHud(i, g_hVIP_Hud, count > 1 ? "VIPs: %s" : "VIP: %s", names);
+	}
 }
 
 public void Event_PlayerTeam_VIPMode(Event event)
@@ -270,6 +347,7 @@ public Action Cmd_VIPModeToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll("%s VIPMode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
 
@@ -315,6 +393,14 @@ void RemoveClientVIP(int client, bool kill, const char[] translation = "")
 	
 	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, translation, client);
 	
+	if (kill && GetCurrentVIPsCount() == 0 && g_bVIP_Replace)
+	{
+		for (int i = 0; i < g_iVIP_Max; i++)
+			VIP_PickRandom();
+
+		return;
+	}
+
 	if (kill && GetCurrentVIPsCount() == 0)
 	{
 		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_KillAll", RoundToNearest(g_fVIP_KillDelay));

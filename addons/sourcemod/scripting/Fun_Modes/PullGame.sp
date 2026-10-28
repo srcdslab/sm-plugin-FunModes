@@ -51,6 +51,7 @@ public void OnPluginStart_PullGame()
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
+	THIS_MODE_INFO.category = FM_CAT_ZOMBIES;
 
 	RegAdminCmd("sm_fm_pullgame", Cmd_PullGameToggle, ADMFLAG_CONVARS, "Turn PullGame Mode On/Off");
 	RegAdminCmd("sm_pullgame_settings", Cmd_PullGameSettings, ADMFLAG_CONVARS, "Open PullGame Sttings Menu");
@@ -188,6 +189,7 @@ public Action Cmd_PullGameToggle(int client, int args)
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
+	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll("%s PullGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
 
