@@ -108,6 +108,8 @@ public void OnPluginStart_HotSeat()
 		THIS_MODE_INFO.cvars[i].HookChange(HotSeat_OnConVarChange);
 
 	THIS_MODE_INFO.enableIndex = HOTSEAT_CONVAR_TOGGLE;
+
+	HotSeat_OnPluginStart();
 }
 
 public void InitCvarsValues_HotSeat()
@@ -170,20 +172,28 @@ public void OnMapEnd_HotSeat()
 }
 
 #define HOTSEAT_CONFIG "configs/FunModes/HotSeat.cfg"
-#define HOTSEAT_MAX    500
 
 #define HOTSEAT_SRC_FILE 0
 #define HOTSEAT_SRC_MATH 1
 #define HOTSEAT_SRC_MIX  2
 
-char g_sHotSeat_Statement[HOTSEAT_MAX][160];
-bool g_bHotSeat_True[HOTSEAT_MAX];
-int g_iHotSeat_Count;
+enum struct HotSeatStatement
+{
+	char text[160];
+	bool isTrue;
+}
+
+ArrayList g_aHotSeat;           // the statements of HotSeat.cfg
 
 float g_fHotSeat_Next;
 bool g_bHotSeat_Pending[MAXPLAYERS + 1];
 char g_sHotSeat_Text[MAXPLAYERS + 1][160];
 bool g_bHotSeat_Answer[MAXPLAYERS + 1];
+
+void HotSeat_OnPluginStart()
+{
+	g_aHotSeat = new ArrayList(sizeof(HotSeatStatement));
+}
 
 public void OnMapStart_HotSeat()
 {
@@ -192,7 +202,7 @@ public void OnMapStart_HotSeat()
 
 int HotSeat_Load()
 {
-	g_iHotSeat_Count = 0;
+	g_aHotSeat.Clear();
 
 	char path[PLATFORM_MAX_PATH], truth[16];
 	BuildPath(Path_SM, path, sizeof(path), HOTSEAT_CONFIG);
@@ -202,23 +212,21 @@ int HotSeat_Load()
 		LogError("[FunModes-HotSeat] %s", g_sKvError);
 	else if (kv.GotoFirstSubKey())
 	{
+		HotSeatStatement statement;
 		do
 		{
-			if (g_iHotSeat_Count >= HOTSEAT_MAX)
-				break;
-
-			kv.GetString("statement", g_sHotSeat_Statement[g_iHotSeat_Count], sizeof(g_sHotSeat_Statement[]), "");
+			kv.GetString("statement", statement.text, sizeof(statement.text), "");
 			kv.GetString("answer", truth, sizeof(truth), "");
-			if (!g_sHotSeat_Statement[g_iHotSeat_Count][0])
+			if (!statement.text[0])
 				continue;
 
-			g_bHotSeat_True[g_iHotSeat_Count] = truth[0] == 't' || truth[0] == 'T' || truth[0] == 'y' || truth[0] == 'Y' || truth[0] == '1';
-			g_iHotSeat_Count++;
+			statement.isTrue = truth[0] == 't' || truth[0] == 'T' || truth[0] == 'y' || truth[0] == 'Y' || truth[0] == '1';
+			g_aHotSeat.PushArray(statement);
 		} while (kv.GotoNextKey());
 	}
 
 	delete kv;
-	return g_iHotSeat_Count;
+	return g_aHotSeat.Length;
 }
 
 void HotSeat_Reset()
@@ -278,12 +286,13 @@ void HotSeat_MakeSum(char[] text, int maxlen, bool &truth)
 
 void HotSeat_Pick(int client)
 {
-	bool useFile = g_iHotSeat_Count > 0 && (g_iHotSeat_Source == HOTSEAT_SRC_FILE || (g_iHotSeat_Source == HOTSEAT_SRC_MIX && GetRandomInt(0, 1) == 1));
+	bool useFile = g_aHotSeat.Length > 0 && (g_iHotSeat_Source == HOTSEAT_SRC_FILE || (g_iHotSeat_Source == HOTSEAT_SRC_MIX && GetRandomInt(0, 1) == 1));
 	if (useFile)
 	{
-		int question = GetRandomInt(0, g_iHotSeat_Count - 1);
-		strcopy(g_sHotSeat_Text[client], sizeof(g_sHotSeat_Text[]), g_sHotSeat_Statement[question]);
-		g_bHotSeat_Answer[client] = g_bHotSeat_True[question];
+		HotSeatStatement statement;
+		g_aHotSeat.GetArray(GetRandomInt(0, g_aHotSeat.Length - 1), statement);
+		strcopy(g_sHotSeat_Text[client], sizeof(g_sHotSeat_Text[]), statement.text);
+		g_bHotSeat_Answer[client] = statement.isTrue;
 	}
 	else
 		HotSeat_MakeSum(g_sHotSeat_Text[client], sizeof(g_sHotSeat_Text[]), g_bHotSeat_Answer[client]);

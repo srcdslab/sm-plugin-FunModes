@@ -340,14 +340,24 @@ int FunModes_GetCvarsCountBeforeMode(int modeIndex)
 * @param %6		Cvar's value type.
 */
 #define DECLARE_FM_CVAR(%1,%2,%3,%4,%5,%6) \
-		THIS_MODE_INFO.cvars[%1].modeIndex = THIS_MODE_INDEX; \
-		THIS_MODE_INFO.cvars[%1].cvarIndex = %1; \
-		THIS_MODE_INFO.cvars[%1].name = %2; \
-		THIS_MODE_INFO.cvars[%1].defaultValue = %3; \
-		THIS_MODE_INFO.cvars[%1].currentValue = %3; \
-		THIS_MODE_INFO.cvars[%1].description = %4; \
-		THIS_MODE_INFO.cvars[%1].values = %5; \
-		THIS_MODE_INFO.cvars[%1].type = %6
+		FunModes_DeclareCvar(THIS_MODE_INDEX, %1, %2, %3, %4, %5, %6)
+
+/*
+* Kept as a function rather than inlined in the macro: every mode declares its cvars
+* in OnPluginStart, so inlining this code made the plugin much bigger in memory.
+*/
+void FunModes_DeclareCvar(int modeIndex, int cvarIndex, const char[] name, const char[] defaultValue,
+							const char[] description, const char[] values, ConVarType type)
+{
+	g_ModesInfo[modeIndex].cvars[cvarIndex].modeIndex = modeIndex;
+	g_ModesInfo[modeIndex].cvars[cvarIndex].cvarIndex = cvarIndex;
+	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].name, sizeof(FM_ConVar::name), name);
+	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].defaultValue, sizeof(FM_ConVar::defaultValue), defaultValue);
+	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue, sizeof(FM_ConVar::currentValue), defaultValue);
+	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].description, sizeof(FM_ConVar::description), description);
+	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].values, sizeof(FM_ConVar::values), values);
+	g_ModesInfo[modeIndex].cvars[cvarIndex].type = type;
+}
 
 /*
 * Changes the current mode the compiler is reading's info.
@@ -412,10 +422,30 @@ int FunModes_GetCvarsCountBeforeMode(int modeIndex)
 * @param %3		The index of the enable/disable cvar relative to the mode.
 */
 #define FUNMODES_REGISTER_MODE() \
-		THIS_MODE_INDEX = g_iLastModeIndex++; \
-		THIS_MODE_INFO.index = THIS_MODE_INDEX; \
-		THIS_MODE_INFO.roulette = true; \
-		VALIDATE_FM_FORWARDS()
+		THIS_MODE_INDEX = FunModes_RegisterMode(THIS_MODE_NAME);
+
+int FunModes_RegisterMode(const char[] modeName)
+{
+	int modeIndex = g_iLastModeIndex++;
+	g_ModesInfo[modeIndex].index = modeIndex;
+	g_ModesInfo[modeIndex].roulette = true;
+
+	FunModes_ValidateForwards(modeIndex, modeName);
+	return modeIndex;
+}
+
+void FunModes_ValidateForwards(int modeIndex, const char[] modeName)
+{
+	VALIDATE_FM_FORWARDS()
+}
+
+/* The forward of a mode is the function named "<forward>_<mode name>" */
+Function FunModes_GetModeForward(const char[] forwardName, const char[] modeName)
+{
+	char name[64];
+	FormatEx(name, sizeof(name), "%s_%s", forwardName, modeName);
+	return GetFunctionByName(null, name);
+}
 
 /* Shared helpers for the modes (round tracking, hazards, speed, hud) */
 #include "Shared.sp"
