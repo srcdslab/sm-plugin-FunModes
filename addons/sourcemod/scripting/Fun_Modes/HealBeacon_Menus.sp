@@ -36,11 +36,72 @@ stock void HealBeacon_DisplayMainMenu(int client)
 			menu.AddItem("", "None", ITEMDRAW_DISABLED);
 	}
 
+	menu.AddItem("choose", "Choose a carrier...");
+
+	char line[48];
+	FormatEx(line, sizeof(line), "Clear the chosen carriers (%d)", g_aHB_Chosen.Length);
+	menu.AddItem("clear", line, g_aHB_Chosen.Length ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+
 	menu.AddItem("option2", "Change Heal Beacon Settings");
 	menu.AddItem("option3", "Show Cvars");
 
+	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
-	menu.ExitButton = true;
+}
+
+/* Chosen carriers get a heal beacon every round until they leave, and are never picked as mother zombie */
+void HealBeacon_ChooseMenu(int client)
+{
+	Menu menu = new Menu(HealBeacon_ChooseMenu_Handler);
+	menu.SetTitle("Choose a heal beacon carrier\nKept every round until they leave\nPick a chosen one again to undo\n ");
+
+	char info[12], line[64];
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsClientSourceTV(i))
+			continue;
+
+		IntToString(GetClientUserId(i), info, sizeof(info));
+		FormatEx(line, sizeof(line), "%N%s%s", i, HealBeacon_IsChosen(i) ? " [CHOSEN]" : "", g_BeaconPlayersData[i].hasHealBeacon ? " [BEACON]" : "");
+		menu.AddItem(info, line);
+	}
+
+	if (!menu.ItemCount)
+		menu.AddItem("", "Nobody on the server", ITEMDRAW_DISABLED);
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int HealBeacon_ChooseMenu_Handler(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_End:
+			delete menu;
+
+		case MenuAction_Cancel:
+		{
+			if (param2 == MenuCancel_ExitBack)
+				HealBeacon_DisplayMainMenu(param1);
+		}
+
+		case MenuAction_Select:
+		{
+			char info[12];
+			menu.GetItem(param2, info, sizeof(info));
+
+			int target = GetClientOfUserId(StringToInt(info));
+			if (target)
+				HealBeacon_ToggleChosen(param1, target);
+			else
+				CPrintToChat(param1, "%s That player left.", THIS_MODE_INFO.tag);
+
+			HealBeacon_ChooseMenu(param1);
+		}
+	}
+
+	return 0;
 }
 
 public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2)
@@ -51,11 +112,29 @@ public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2
 		{
 			delete menu;
 		}
+		case MenuAction_Cancel:
+		{
+			if (param2 == MenuCancel_ExitBack)
+				DisplayModeInfo(param1, g_iPreviousModeIndex[param1]);
+		}
 		case MenuAction_Select:
 		{
 			char buffer[64];
 			menu.GetItem(param2, buffer, sizeof(buffer));
-			if (strcmp(buffer, "option2") == 0)
+			if (strcmp(buffer, "choose") == 0)
+			{
+				HealBeacon_ChooseMenu(param1);
+				return 0;
+			}
+			else if (strcmp(buffer, "clear") == 0)
+			{
+				g_aHB_Chosen.Clear();
+				CPrintToChatAll("%s The chosen heal beacon carriers were cleared.", THIS_MODE_INFO.tag);
+				LogAction(param1, -1, "\"%L\" cleared the chosen heal beacon carriers", param1);
+				HealBeacon_DisplayMainMenu(param1);
+				return 0;
+			}
+			else if (strcmp(buffer, "option2") == 0)
 			{
 				HealBeacon_DisplaySettingsMenu(param1);
 				return 0;

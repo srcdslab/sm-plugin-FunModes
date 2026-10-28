@@ -36,6 +36,7 @@ static int g_iChaosWeaponsIndex = -1;
 #define CHAOSWEAPONS_CONVAR_TOGGLE 			3
 
 Handle g_hChaosWeaponsTimer;
+Handle g_hChaos_Hud;               // this mode's own text slot
 
 char g_sChaosWeaponCurrent[32];
 
@@ -65,6 +66,7 @@ public void OnPluginStart_ChaosWeapons()
 {
 	// Important, this must be first before filling any other mode info!
 	FUNMODES_REGISTER_MODE()
+	g_hChaos_Hud = CreateModeHud();
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
@@ -272,7 +274,7 @@ Action Timer_ChaosWeaponsRepeat(Handle timer)
 		if (!IsClientInGame(i))
 			continue;
 	
-		SendHudText(i, msg, _, 1);
+		SendHudText(i, msg, _, 1, HUD_Y_CHAOS, g_hChaos_Hud);
 	}
 
 	return Plugin_Continue;
@@ -298,7 +300,7 @@ void PickRandomWeapon()
 		if (!IsClientInGame(i))
 			continue;
 	
-		SendHudText(i, msg, _, 1);
+		SendHudText(i, msg, _, 1, HUD_Y_CHAOS, g_hChaos_Hud);
 		CPrintToChat(i, "%s %s", THIS_MODE_INFO.tag, msg);
 	}
 }

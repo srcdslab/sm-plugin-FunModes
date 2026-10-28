@@ -304,21 +304,25 @@ public void ZR_OnClientInfected_GunGame(int client)
         return;
 
     if (!g_bMotherZombie)
+        GunGame_StartHumans();
+}
+
+/* Gives every human their first GunGame weapon */
+void GunGame_StartHumans()
+{
+    for (int i = 1; i <= MaxClients; i++)
     {
-        for (int i = 1; i <= MaxClients; i++)
-        {
-            if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
-                continue;
+        if (!IsClientInGame(i) || !IsPlayerAlive(i) || !ZR_IsClientHuman(i))
+            continue;
 
-            if (EW_ClientHasItem(i))
-                continue;
+        if (EW_ClientHasItem(i))
+            continue;
 
-            GunGame_StartHuman(i);
-        }
-
-        CPrintToChatAll("%s Your weapon will be upgraded when you reach the required damage for each weapon type!", THIS_MODE_INFO.tag);
-        CPrintToChatAll("%s Type {olive}!gungame {lightgreen}if you lost your weapons!", THIS_MODE_INFO.tag);
+        GunGame_StartHuman(i);
     }
+
+    CPrintToChatAll("%s Your weapon will be upgraded when you reach the required damage for each weapon type!", THIS_MODE_INFO.tag);
+    CPrintToChatAll("%s Type {olive}!gungame {lightgreen}if you lost your weapons!", THIS_MODE_INFO.tag);
 }
 
 public void Event_RoundEnd_GunGame()
@@ -457,7 +461,7 @@ public void OnTick_GunGame()
         if (left < 0)
             left = 0;
 
-        SetHudTextParams(-1.0, 0.88, 1.1, 192, 128, 255, 255, 0, 0.0, 0.0, 0.0);
+        SetHudTextParams(-1.0, HUD_Y_GUNGAME, 1.1, 192, 128, 255, 255, 0, 0.0, 0.0, 0.0);
         ShowModeHud(i, g_hGunGame_Hud, "GunGame: %s - %d damage to the next weapon", g_GunGameWeaponsList[weaponType][g_GunGameData[i].level[1]][7], left);
     }
 }
@@ -508,7 +512,9 @@ public Action Cmd_GunGameToggle(int client, int args)
                 GunGame_GiveReward(i, REWARD_NONE);
         }
 
-        FunModes_RestartRound();
+        // No round restart: turned on after the first infection, the humans get their first weapon now
+        if (g_bMotherZombie && !g_bRoundEnd)
+            GunGame_StartHumans();
 
         ConVar cvar = FindConVar("zr_weapons_zmarket_rebuy");
         if (cvar != null)

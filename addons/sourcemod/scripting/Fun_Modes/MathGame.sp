@@ -27,12 +27,10 @@ static int g_iMathGameIndex = -1;
 #define MATHGAME_CONVAR_EASY_DAMAGE             3
 #define MATHGAME_CONVAR_MEDIUM_DAMAGE           4
 #define MATHGAME_CONVAR_HARD_DAMAGE             5
-#define MATHGAME_CONVAR_INCLUDE_ZOMBIE          6
-#define MATHGAME_CONVAR_MAX_TRIES               7
-#define MATHGAME_CONVAR_TIME_DELAY              8
-#define MATHGAME_CONVAR_TOGGLE                  9
-#define MATHGAME_CONVAR_REWARD                  10
-#define MATHGAME_CONVAR_SAME                    11
+#define MATHGAME_CONVAR_TIME_DELAY              6
+#define MATHGAME_CONVAR_TOGGLE                  7
+#define MATHGAME_CONVAR_REWARD                  8
+#define MATHGAME_CONVAR_SAME                    9
 
 #define MATHGAME_REWARD_NONE 0
 #define MATHGAME_REWARD_HP25 1
@@ -42,18 +40,15 @@ static int g_iMathGameIndex = -1;
 Handle g_hMathGameTimer;
 Handle g_hMathGameTimerRepeat;
 Handle g_hMathGameTimerDelay;
+Handle g_hMathGame_Hud;               // this mode's own text slot
 
 bool g_bMathGameHasQuestion[MAXPLAYERS + 1];
 int g_iMathGameAnswer[MAXPLAYERS + 1];
-int g_iMathGameFailedAnswers[MAXPLAYERS + 1];
-bool g_bMathGameDisableRespawn[MAXPLAYERS + 1];
 char g_sMathGameQuestion[MAXPLAYERS + 1][32];
 int g_iMathGameTime;
 
 float g_fMathGame_TimerIntervals[3];
 float g_fMathGame_Damages[3];
-bool g_bMathGame_IncludeZombies;
-int g_iMathGame_MaxTries;
 float g_fMathGame_TimeDelay;
 bool g_bMathGame_Enabled;
 int g_iMathGame_Reward;
@@ -67,6 +62,7 @@ public void OnPluginStart_MathGame()
 {
 	// Important, this must be first before filling any other mode info!
 	FUNMODES_REGISTER_MODE()
+	g_hMathGame_Hud = CreateModeHud();
 
 	THIS_MODE_INFO.name = THIS_MODE_NAME;
 	THIS_MODE_INFO.tag = "{gold}[FunModes-" ... THIS_MODE_NAME ... "]{lightgreen}";
@@ -118,20 +114,6 @@ public void OnPluginStart_MathGame()
 	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_HARD_DAMAGE].HookChange(MathGame_OnConVarChange);
 
 	DECLARE_FM_CVAR(
-		MATHGAME_CONVAR_INCLUDE_ZOMBIE, "sm_mathgame_include_zombies",
-		"0", "Include zombies to the math game (1 = Enabled, 0 = Disabled)",
-		("0,1"), CONVAR_BOOL
-	);
-	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_INCLUDE_ZOMBIE].HookChange(MathGame_OnConVarChange);
-
-	DECLARE_FM_CVAR(
-		MATHGAME_CONVAR_MAX_TRIES, "sm_mathgame_max_tries",
-		"3", "How many failed tries for zombies to answer question until they can never respawn again?",
-		("1,2,3,4,5"), CONVAR_INT
-	);
-	THIS_MODE_INFO.cvars[MATHGAME_CONVAR_MAX_TRIES].HookChange(MathGame_OnConVarChange);
-
-	DECLARE_FM_CVAR(
 		MATHGAME_CONVAR_TIME_DELAY, "sm_mathgame_time_delay",
 		"15.0", "The delayed time after each math question",
 		("15.0,20.0,30.0,35.0"), CONVAR_FLOAT
@@ -174,8 +156,6 @@ public void InitCvarsValues_MathGame()
 	g_fMathGame_Damages[1] = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_MEDIUM_DAMAGE, Float);
 	g_fMathGame_Damages[2] = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_HARD_DAMAGE, Float);
 
-	g_bMathGame_IncludeZombies = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_INCLUDE_ZOMBIE, Bool);
-	g_iMathGame_MaxTries = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_MAX_TRIES, Int);
 	g_fMathGame_TimeDelay = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_TIME_DELAY, Float);
 	g_bMathGame_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_TOGGLE, Bool);
 	g_iMathGame_Reward = _FUNMODES_CVAR_GET_VALUE(modeIndex, MATHGAME_CONVAR_REWARD, Int);
@@ -203,12 +183,6 @@ void MathGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue
 
 		case MATHGAME_CONVAR_HARD_DAMAGE:
 			g_fMathGame_Damages[2] = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
-
-		case MATHGAME_CONVAR_INCLUDE_ZOMBIE:
-			g_bMathGame_IncludeZombies = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
-
-		case MATHGAME_CONVAR_MAX_TRIES:
-			g_iMathGame_MaxTries = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Int);
 
 		case MATHGAME_CONVAR_TIME_DELAY:
 			g_fMathGame_TimeDelay = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Float);
@@ -242,8 +216,6 @@ public void OnMapEnd_MathGame()
 public void OnClientPutInServer_MathGame(int client)
 {
 	g_bMathGameHasQuestion[client] = false;
-	g_iMathGameFailedAnswers[client] = 0;
-	g_bMathGameDisableRespawn[client] = false;
 }
 
 public void Event_RoundStart_MathGame()
@@ -256,30 +228,20 @@ public void Event_RoundStart_MathGame()
 	delete g_hMathGameTimerDelay;
 
 	MathGame_ResetPlayers();
-	CreateTimer(30.0, Timer_StartMathGame, _, TIMER_FLAG_NO_MAPCHANGE);
+
+	// Kept in the delay timer, so a second round start (or the roulette) doesn't stack another one
+	g_hMathGameTimerDelay = CreateTimer(30.0, Timer_StartMathGame, _, TIMER_FLAG_NO_MAPCHANGE);
 }
 
 Action Timer_StartMathGame(Handle timer)
 {
+	g_hMathGameTimerDelay = null;
+
 	if (!THIS_MODE_INFO.isOn)
 		return Plugin_Stop;
 
 	MathGame_Ask();
 	return Plugin_Stop;
-}
-
-public Action ZR_OnClientRespawn(int &client, ZR_RespawnCondition &condition)
-{
-	if (!THIS_MODE_INFO.isOn)
-		return Plugin_Continue;
-
-	if (condition != ZR_Respawn_Zombie)
-		return Plugin_Continue;
-
-	if (!g_bMathGameDisableRespawn[client])
-		return Plugin_Continue;
-
-	return Plugin_Handled;
 }
 
 public Action Cmd_MathGameToggle(int client, int args)
@@ -300,7 +262,15 @@ public Action Cmd_MathGameToggle(int client, int args)
 		MathGame_ResetPlayers();
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
-		MathGame_Ask();
+
+		// The Event Roulette turns it on at round start, where the round start's delayed first question takes over
+		if (g_bSkipRestartRound)
+		{
+			delete g_hMathGameTimerDelay;
+			g_hMathGameTimerDelay = CreateTimer(30.0, Timer_StartMathGame, _, TIMER_FLAG_NO_MAPCHANGE);
+		}
+		else
+			MathGame_Ask();
 	}
 	else
 	{
@@ -365,9 +335,6 @@ void MathGame_Ask()
 	CPrintToChatAll("%s Alright gentlemen, Each player will now receive a math question to answer, You have got only {olive}%d seconds", THIS_MODE_INFO.tag, time);
 	CPrintToChatAll("%s Question Level: {olive}%s", THIS_MODE_INFO.tag, levels[level]);
 
-	if (g_bMathGame_IncludeZombies)
-		CPrintToChatAll("%s Zombies will have {olive}%d maximum tries {lightgreen}to survive or they will be stuck on spec!", THIS_MODE_INFO.tag, g_iMathGame_MaxTries);
-
 	if (g_bMathGame_Same)
 		MathGame_MakeQuestion(level, g_iMathGameSharedNumbers, g_sMathGameSharedOper);
 
@@ -376,7 +343,8 @@ void MathGame_Ask()
 		if (!IsClientInGame(i) || IsFakeClient(i) || !IsPlayerAlive(i))
 			continue;
 
-		if (ZR_IsClientHuman(i) || (g_bMathGame_IncludeZombies && ZR_IsClientZombie(i)))
+		// Humans only: the zombies don't play
+		if (ZR_IsClientHuman(i))
 			MathGame_SendQuestion(i, level);
 	}
 
@@ -459,25 +427,16 @@ Action MathGame_Timer(Handle timer, int level)
 	{
 		if (g_bMathGameHasQuestion[i])
 		{
-			if (ZR_IsClientHuman(i))
-			{
-				CPrintToChatAll("%s {olive}%N {lightgreen}has been damaged for not answering their math question!", THIS_MODE_INFO.tag, i);
-				SDKHooks_TakeDamage(i, 0, 0, damage);
-			}
-			else
-			{
-				if (!g_bMathGame_IncludeZombies)
-					continue;
+			// Left or died while thinking
+			if (!IsClientInGame(i) || !IsPlayerAlive(i))
+				continue;
 
-				g_iMathGameFailedAnswers[i]++;
-				if (g_iMathGameFailedAnswers[i] >= g_iMathGame_MaxTries)
-				{
-					ForcePlayerSuicide(i);
-					CPrintToChat(i, "%s You will not be able to respawn for failing to answer math questions {olive}%d in a row", THIS_MODE_INFO.tag, g_iMathGame_MaxTries);
-					g_bMathGameDisableRespawn[i] = true;
-					g_iMathGameFailedAnswers[i] = 0;
-				}
-			}
+			// Got infected while thinking: no damage for a zombie
+			if (!ZR_IsClientHuman(i))
+				continue;
+
+			CPrintToChatAll("%s {olive}%N {lightgreen}has been damaged for not answering their math question!", THIS_MODE_INFO.tag, i);
+			SDKHooks_TakeDamage(i, 0, 0, damage);
 		}
 	}
 
@@ -515,7 +474,7 @@ Action MathGame_TimerRepeat(Handle timer, int time)
 		if (g_bMathGameHasQuestion[i])
 			FormatEx(thisMsg, sizeof(thisMsg), "%s\n[ %s ]", thisMsg, g_sMathGameQuestion[i]);
 
-		SendHudText(i, thisMsg);
+		SendHudText(i, thisMsg, _, _, HUD_Y_MATHGAME, g_hMathGame_Hud);
 	}
 
 	g_iMathGameTime++;
@@ -567,7 +526,5 @@ void MathGame_ResetPlayers()
 	{
 		g_bMathGameHasQuestion[i] = false;
 		g_iMathGameAnswer[i] = 0;
-		g_iMathGameFailedAnswers[i] = 0;
-		g_bMathGameDisableRespawn[i] = false;
 	}
 }

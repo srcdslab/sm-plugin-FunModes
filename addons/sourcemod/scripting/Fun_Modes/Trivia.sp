@@ -228,7 +228,9 @@ int Trivia_Load()
 	BuildPath(Path_SM, path, sizeof(path), TRIVIA_CONFIG);
 
 	KeyValues kv = new KeyValues("Trivia");
-	if (kv.ImportFromFile(path) && kv.GotoFirstSubKey())
+	if (!FunModes_LoadKV(kv, path))
+		LogError("[FunModes-Trivia] %s", g_sKvError);
+	else if (kv.GotoFirstSubKey())
 	{
 		do
 		{
@@ -482,7 +484,7 @@ public void OnTick_Trivia()
 		if (!Trivia_Plays(i) || g_bTrivia_Won[i])
 			continue;
 
-		SetHudTextParams(-1.0, 0.26, 1.1, 64, 224, 160, 255, 0, 0.0, 0.0, 0.0);
+		SetHudTextParams(-1.0, HUD_Y_TRIVIA, 1.1, 64, 224, 160, 255, 0, 0.0, 0.0, 0.0);
 		ShowModeHud(i, g_hTrivia_Hud, "%s\n(%d s - type the answer in chat)", g_sTrivia_Question[g_iTrivia_Cur], left);
 	}
 }

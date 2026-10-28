@@ -209,6 +209,10 @@ public void OnCheck_Shockwave(bool zombiesNow)
 	if (g_fShockwave_LastRadius == 0.0)
 	{
 		// The wave itself: one ring that grows over the whole travel time
+		// A speed of 0 (set by hand) would never reach anyone: treat it as the slowest wave
+		if (g_fShockwave_Speed < 50.0)
+			g_fShockwave_Speed = 50.0;
+
 		DrawRingAt(g_fShockwave_Center, 10.0, g_fShockwave_Size, g_fShockwave_Size / g_fShockwave_Speed, g_iShockwave_Color, 20.0);
 		EmitAmbientSound(Explode_Sound, g_fShockwave_Center, SOUND_FROM_WORLD, SNDLEVEL_RAIDSIREN, _, 0.6, 60);
 	}
