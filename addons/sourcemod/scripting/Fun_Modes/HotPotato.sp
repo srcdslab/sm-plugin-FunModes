@@ -26,10 +26,12 @@ static int g_iHotPotatoIndex = -1;
 #define POTATO_CONVAR_TIME   0
 #define POTATO_CONVAR_BLAST  1
 #define POTATO_CONVAR_TOGGLE 2
+#define POTATO_CONVAR_ZOMBIES 3
 
 int g_iPotato_Time;
 int g_iPotato_Blast;
 bool g_bHotPotato_Enabled;
+bool g_bPotato_PassZombies;
 
 public void OnPluginStart_HotPotato()
 {
@@ -63,7 +65,13 @@ public void OnPluginStart_HotPotato()
 		("0,1"), CONVAR_BOOL
 	);
 
-	for (int i = 0; i <= POTATO_CONVAR_TOGGLE; i++)
+	DECLARE_FM_CVAR(
+		POTATO_CONVAR_ZOMBIES, "sm_potato_pass_zombies",
+		"0", "A human holding the potato can also pass it to a zombie (knife or E) - the zombie keeps it until it blows",
+		("0,1"), CONVAR_BOOL
+	);
+
+	for (int i = 0; i <= POTATO_CONVAR_ZOMBIES; i++)
 		THIS_MODE_INFO.cvars[i].HookChange(HotPotato_OnConVarChange);
 
 	THIS_MODE_INFO.enableIndex = POTATO_CONVAR_TOGGLE;
@@ -78,6 +86,7 @@ public void InitCvarsValues_HotPotato()
 	g_iPotato_Time = _FUNMODES_CVAR_GET_VALUE(modeIndex, POTATO_CONVAR_TIME, Int);
 	g_iPotato_Blast = _FUNMODES_CVAR_GET_VALUE(modeIndex, POTATO_CONVAR_BLAST, Int);
 	g_bHotPotato_Enabled = _FUNMODES_CVAR_GET_VALUE(modeIndex, POTATO_CONVAR_TOGGLE, Bool);
+	g_bPotato_PassZombies = _FUNMODES_CVAR_GET_VALUE(modeIndex, POTATO_CONVAR_ZOMBIES, Bool);
 }
 
 void HotPotato_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue, const char[] newValue)
@@ -101,6 +110,9 @@ void HotPotato_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValu
 
 			g_bHotPotato_Enabled = val;
 		}
+
+		case POTATO_CONVAR_ZOMBIES:
+			g_bPotato_PassZombies = _FUNMODES_CVAR_GET_VALUE(modeIndex, cvarIndex, Bool);
 	}
 }
 
@@ -122,6 +134,7 @@ float g_fPotato_PassReady;          // the holder can't pass it on before this (
 int g_iPotato_Prev;                 // userid of the last holder ...
 float g_fPotato_NoBackUntil;        // ... who can't get it straight back before this
 int g_iPotato_LastButtons[MAXPLAYERS + 1];
+bool g_bPotato_OnZombie;            // a human passed it to a zombie: the zombie keeps it until it blows
 Handle g_hPotato_Hud;
 
 void HotPotato_OnPluginStart()
@@ -150,6 +163,7 @@ void HotPotato_Drop()
 		SetEntityRenderColor(holder, 255, 255, 255, 255);
 
 	g_iPotato_Holder = 0;
+	g_bPotato_OnZombie = false;
 }
 
 void HotPotato_Reset()
@@ -175,6 +189,24 @@ bool HotPotato_IsHolder(int client)
 	return g_iPotato_Holder && GetClientUserId(client) == g_iPotato_Holder;
 }
 
+/* The holder still counts: a living human, or the living zombie a human passed it to */
+bool HotPotato_HolderValid(int holder)
+{
+	if (g_bPotato_OnZombie)
+		return holder > 0 && IsClientInGame(holder) && IsPlayerAlive(holder) && ZR_IsClientZombie(holder);
+
+	return IsHumanAlive(holder);
+}
+
+/* Who a human holder can pass it to */
+bool HotPotato_CanReceive(int target)
+{
+	if (IsHumanAlive(target))
+		return true;
+
+	return g_bPotato_PassZombies && IsClientInGame(target) && IsPlayerAlive(target) && ZR_IsClientZombie(target);
+}
+
 void HotPotato_Give(int client, int from)
 {
 	if (!client)
@@ -182,13 +214,23 @@ void HotPotato_Give(int client, int from)
 
 	HotPotato_Drop();
 	g_iPotato_Holder = GetClientUserId(client);
+	g_bPotato_OnZombie = ZR_IsClientZombie(client);
 	g_fPotato_PassReady = GetGameTime() + 1.0;
 	g_iPotato_Prev = from ? GetClientUserId(from) : 0;
 	g_fPotato_NoBackUntil = GetGameTime() + 3.0;
 	SetEntityRenderColor(client, 255, 80, 80, 255);
 
+	if (g_bPotato_OnZombie)
+	{
+		CPrintToChatAll("%s {olive}%N {lightgreen}passed the hot potato to the zombie {olive}%N{lightgreen}! It blows in {olive}%d {lightgreen}s - keep away from it!", THIS_MODE_INFO.tag, from, client, g_iPotato_Left);
+		PrintCenterText(client, "YOU HAVE THE HOT POTATO! IT BLOWS IN %d s - TAKE THE HUMANS WITH YOU!", g_iPotato_Left);
+		return;
+	}
+
 	if (from)
 		CPrintToChatAll("%s {olive}%N {lightgreen}passed the hot potato to {olive}%N{lightgreen}! (%d s left)", THIS_MODE_INFO.tag, from, client, g_iPotato_Left);
+	else if (g_bPotato_PassZombies)
+		CPrintToChatAll("%s {olive}%N {lightgreen}has the hot potato! {olive}%d {lightgreen}seconds - knife someone or press E next to them to pass it (zombies too).", THIS_MODE_INFO.tag, client, g_iPotato_Left);
 	else
 		CPrintToChatAll("%s {olive}%N {lightgreen}has the hot potato! {olive}%d {lightgreen}seconds - knife another human or press E next to one to pass it.", THIS_MODE_INFO.tag, client, g_iPotato_Left);
 
@@ -197,7 +239,11 @@ void HotPotato_Give(int client, int from)
 
 void HotPotato_TryPass(int holder, int target)
 {
-	if (!THIS_MODE_INFO.isOn || !g_bRoundLive || !HotPotato_IsHolder(holder) || target == holder || !IsHumanAlive(target))
+	if (!THIS_MODE_INFO.isOn || !g_bRoundLive || !HotPotato_IsHolder(holder) || target == holder)
+		return;
+
+	// A zombie can't get rid of it, and the target must be someone who can take it
+	if (g_bPotato_OnZombie || !IsHumanAlive(holder) || !HotPotato_CanReceive(target))
 		return;
 
 	float now = GetGameTime();
@@ -216,7 +262,7 @@ void HotPotato_TryPass(int holder, int target)
 /* Knife hits between teammates still reach TraceAttack with friendly fire off */
 Action HotPotato_TraceAttack(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &ammotype, int hitbox, int hitgroup)
 {
-	if (!THIS_MODE_INFO.isOn || attacker < 1 || attacker > MaxClients || !HotPotato_IsHolder(attacker) || !IsHumanAlive(victim))
+	if (!THIS_MODE_INFO.isOn || attacker < 1 || attacker > MaxClients || !HotPotato_IsHolder(attacker) || !HotPotato_CanReceive(victim))
 		return Plugin_Continue;
 
 	char weapon[32];
@@ -227,7 +273,7 @@ Action HotPotato_TraceAttack(int victim, int &attacker, int &inflictor, float &d
 	return Plugin_Continue;
 }
 
-/* E next to a human passes it too */
+/* E next to a human (or a zombie, with sm_potato_pass_zombies) passes it too */
 public void OnPlayerRunCmd_HotPotato(int client, int &buttons, float vel[3], bool &changed)
 {
 	bool pressed = (buttons & IN_USE) && !(g_iPotato_LastButtons[client] & IN_USE);
@@ -242,7 +288,7 @@ public void OnPlayerRunCmd_HotPotato(int client, int &buttons, float vel[3], boo
 	float bestDist = POTATO_PASS_RANGE;
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (i == client || !IsHumanAlive(i))
+		if (i == client || !HotPotato_CanReceive(i))
 			continue;
 
 		GetClientAbsOrigin(i, pos);
@@ -263,8 +309,17 @@ public void OnCheck_HotPotato(bool zombiesNow)
 	if (g_iPotato_Holder)
 	{
 		int holder = GetClientOfUserId(g_iPotato_Holder);
-		if (IsHumanAlive(holder))
+		if (HotPotato_HolderValid(holder))
 			return;
+
+		// The zombie holding it died or left before it blew: that potato is gone, a new one comes in a few seconds
+		if (g_bPotato_OnZombie)
+		{
+			CPrintToChatAll("%s The zombie with the hot potato is gone - a new potato comes soon!", THIS_MODE_INFO.tag);
+			HotPotato_Drop();
+			g_fPotato_NextAt = GetGameTime() + 3.0;
+			return;
+		}
 
 		// The holder died, got infected or left before the countdown ran out: it jumps on
 		if (holder)
@@ -327,7 +382,7 @@ void HotPotato_Explode(int holder)
 public void OnTick_HotPotato()
 {
 	int holder = GetClientOfUserId(g_iPotato_Holder);
-	if (!IsHumanAlive(holder))
+	if (!HotPotato_HolderValid(holder))
 		return;
 
 	g_iPotato_Left--;
@@ -352,8 +407,12 @@ public void OnTick_HotPotato()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_POTATO, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
-		if (i == holder)
-			ShowModeHud(i, g_hPotato_Hud, "YOU HAVE THE HOT POTATO! %d s - knife a human or press E next to one", g_iPotato_Left);
+		if (i == holder && g_bPotato_OnZombie)
+			ShowModeHud(i, g_hPotato_Hud, "YOU HAVE THE HOT POTATO! %d s - get close to the humans before it blows", g_iPotato_Left);
+		else if (i == holder)
+			ShowModeHud(i, g_hPotato_Hud, "YOU HAVE THE HOT POTATO! %d s - knife someone or press E next to them", g_iPotato_Left);
+		else if (g_bPotato_OnZombie)
+			ShowModeHud(i, g_hPotato_Hud, "Hot potato: zombie %N - %d s - keep away!", holder, g_iPotato_Left);
 		else
 			ShowModeHud(i, g_hPotato_Hud, "Hot potato: %N - %d s", holder, g_iPotato_Left);
 	}

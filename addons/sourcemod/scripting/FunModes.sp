@@ -636,6 +636,7 @@ static const char g_sCvarLabels[][] =
 	"sm_healbeacon_on_lost|When a carrier is lost|0=The beacon is gone;1=A random human gets it;2=All humans are slain",
 	"sm_hero_delay|Seconds before the hero is picked",
 	"sm_hotseat_humans_only|Only living humans",
+	"sm_potato_pass_zombies|Humans can pass it to zombies",
 	"sm_ic_mode|Inverted|0=Everyone, all the time;1=Random bursts",
 	"sm_ic_every|Bursts: seconds between two",
 	"sm_ic_last|Bursts: seconds each lasts",
