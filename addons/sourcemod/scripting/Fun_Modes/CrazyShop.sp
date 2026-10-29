@@ -333,9 +333,33 @@ public void OnMapStart_CrazyShop()
 	PrecacheModel(PROP_MODEL);
 }
 
+/* The shop's speed changes go through the stacked speeds (SetSpeedMult), never straight into the player's speed:
+   a speed saved and written back later could freeze someone (a slow beacon at round end left zombies at 0.01) */
+float g_fCrazyShop_MoreSpeed[MAXPLAYERS + 1];      // More Speed item: extra speed (0 = none)
+float g_fCrazyShop_SlowSpeed = 1.0;                // speed of a zombie inside a slow beacon
+
+void CrazyShop_UpdateSpeed(int client)
+{
+	float mult = 1.0 + g_fCrazyShop_MoreSpeed[client];
+	if (PLAYER_TEMP_VAR(client, gotSlowed))
+		mult *= g_fCrazyShop_SlowSpeed;
+
+	SetSpeedMult(client, THIS_MODE_INDEX, mult);
+}
+
+/* Everyone back to their own speed and gravity as far as the shop is concerned (round start, mode off, map end) */
+void CrazyShop_ResetMults()
+{
+	for (int i = 0; i <= MAXPLAYERS; i++)
+		g_fCrazyShop_MoreSpeed[i] = 0.0;
+
+	ResetModeMults(THIS_MODE_INDEX);
+}
+
 public void OnMapEnd_CrazyShop()
 {
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
+	CrazyShop_ResetMults();
 
 	g_iCrazyShopProps = 0;
 }
@@ -360,6 +384,8 @@ public void OnClientPutInServer_CrazyShop(int client)
 
 public void OnClientDisconnect_CrazyShop(int client)
 {
+	g_fCrazyShop_MoreSpeed[client] = 0.0;
+
 	// Whoever takes this slot next has to load their own data before anything gets saved for them
 	bool loaded = PLAYER_LOADED(client);
 	PLAYER_LOADED(client) = false;
@@ -389,6 +415,9 @@ public void Event_RoundStart_CrazyShop()
 
 	for (int i = 1; i <= MaxClients; i++)
 		PLAYER_RESET_TEMP_VARS(i);
+
+	// Nobody starts the round slowed or sped up by the last round's items
+	CrazyShop_ResetMults();
 }
 
 // CrazyShop is the only mode that hooks this event, so it's fine
@@ -862,6 +891,8 @@ public Action Cmd_CrazyShopToggle(int client, int args)
 	}
 	else
 	{
+		CrazyShop_ResetMults();
+
 		THIS_MODE_INFO.isOn = true;
 		for (int i = 1; i <= MaxClients; i++)
 		{
@@ -1673,14 +1704,12 @@ void CrazyShop_Activate(int client, int itemNum)
 		{
 			PLAYER_ITEM_ACTIVE(client, itemNum) = true;
 
-			float originalSpeed = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
-
-			SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", originalSpeed + item.amount);
+			g_fCrazyShop_MoreSpeed[client] = item.amount;
+			CrazyShop_UpdateSpeed(client);
 
 			DataPack pack = new DataPack();
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
-			pack.WriteFloat(originalSpeed);
 
 			CreateTimer(item.time, Timer_CrazyShop_MoreSpeed, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
@@ -1705,7 +1734,7 @@ void CrazyShop_Activate(int client, int itemNum)
 		{
 			PLAYER_ITEM_ACTIVE(client, itemNum) = true;
 
-			SetEntityGravity(client, 1.0 + item.amount);
+			SetGravityMult(client, THIS_MODE_INDEX, 1.0 + item.amount);
 
 			DataPack pack = new DataPack();
 			pack.WriteCell(GetClientUserId(client));
@@ -1967,39 +1996,29 @@ Action Timer_SlowBeaconRepeat(Handle timer, int userid)
 		if (!PLAYER_TEMP_VAR(i, gotSlowed) && squarredDistance <= ((beaconRadius / 2.0) * (beaconRadius / 2.0)))
 		{
 			PLAYER_TEMP_VAR(i, gotSlowed) = true;
-			PLAYER_TEMP_VAR(i, originalSpeed) = GetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue");
-			SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", g_CrazyShopItems[itemNum].amount);
+			g_fCrazyShop_SlowSpeed = g_CrazyShopItems[itemNum].amount;
+			CrazyShop_UpdateSpeed(i);
 		}
-		else
+		else if (PLAYER_TEMP_VAR(i, gotSlowed) && squarredDistance > ((beaconRadius / 2.0) * (beaconRadius / 2.0)))
 		{
-			if (PLAYER_TEMP_VAR(i, gotSlowed) && PLAYER_TEMP_VAR(i, originalSpeed) > 0.0)
-			{
-				// More Speed - 4
-				if (PLAYER_ITEM_ACTIVE(i, 4))
-					continue;
-
-				PLAYER_TEMP_VAR(i, gotSlowed) = false;
-				SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", PLAYER_TEMP_VAR(i, originalSpeed));
-			}
+			PLAYER_TEMP_VAR(i, gotSlowed) = false;
+			CrazyShop_UpdateSpeed(i);
 		}
 	}
 
 	return Plugin_Continue;
 }
 
+/* The slow beacon is gone: nobody is slowed by it any more */
 void CrazyShop_ResetSpeed()
 {
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (PLAYER_TEMP_VAR(i, gotSlowed) && PLAYER_TEMP_VAR(i, originalSpeed) > 0.0)
-		{
-			// More Speed - 4
-			if (PLAYER_ITEM_ACTIVE(i, 4))
-				continue;
+		if (!PLAYER_TEMP_VAR(i, gotSlowed))
+			continue;
 
-			PLAYER_TEMP_VAR(i, gotSlowed) = false;
-			SetEntPropFloat(i, Prop_Data, "m_flLaggedMovementValue", PLAYER_TEMP_VAR(i, originalSpeed));
-		}
+		PLAYER_TEMP_VAR(i, gotSlowed) = false;
+		CrazyShop_UpdateSpeed(i);
 	}
 }
 
@@ -2015,17 +2034,15 @@ Action Timer_CrazyShop_MoreSpeed(Handle timer, DataPack pack)
 	}
 
 	int itemNum = pack.ReadCell();
-	float speed = pack.ReadFloat();
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	SetEntProp(client, Prop_Send, "m_iProgressBarDuration", 0);
 
 	delete pack;
 
-	if (!THIS_MODE_INFO.isOn || g_bRoundEnd)
-		return Plugin_Stop;
-
-	SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", speed);
+	// Always ends, also after the round end (it used to stay on into the next round then)
+	g_fCrazyShop_MoreSpeed[client] = 0.0;
+	CrazyShop_UpdateSpeed(client);
 	return Plugin_Stop;
 }
 
@@ -2063,7 +2080,7 @@ Action Timer_CrazyShop_LowerGravity(Handle timer, DataPack pack)
 	int itemNum = pack.ReadCell();
 	delete pack;
 
-	SetEntityGravity(client, 1.0);
+	SetGravityMult(client, THIS_MODE_INDEX, 1.0);
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	SetEntProp(client, Prop_Send, "m_iProgressBarDuration", 0);
 	return Plugin_Stop;

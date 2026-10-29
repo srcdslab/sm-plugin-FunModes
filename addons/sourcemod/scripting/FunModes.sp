@@ -134,6 +134,7 @@ public void OnMapEnd()
 
 public void OnClientPutInServer(int client)
 {
+	Physics_ResetClient(client);
 	DECLARE_FM_FORWARD_PARAM1(OnClientPutInServer, client)
 }
 
@@ -143,6 +144,7 @@ public void OnClientDisconnect(int client)
 	g_bSDKHook_OnTakeDamage[client] = false;
 	g_bSDKHook_WeaponEquip[client] = false;
 	DECLARE_FM_FORWARD_PARAM1(OnClientDisconnect, client)
+	Physics_ResetClient(client);
 }
 
 public void ZR_OnClientInfected(int client, int attacker, bool motherInfect)
@@ -210,12 +212,17 @@ void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
 void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype)
 {
+	if (!g_bFunModesActive)
+		return;
+
 	DECLARE_FM_FORWARD_PARAM3(OnTakeDamagePost, victim, attacker, damage)
 }
 
 Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
 	Action result = Plugin_Continue;
+	if (!g_bFunModesActive)
+		return result;
 
 	DECLARE_FM_FORWARD_PARAM4(OnTakeDamage, victim, attacker, damage, result)
 
@@ -225,6 +232,8 @@ Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, in
 Action OnWeaponEquip(int client, int weapon)
 {
 	Action result = Plugin_Continue;
+	if (!g_bFunModesActive)
+		return result;
 
 	DECLARE_FM_FORWARD_PARAM3(OnWeaponEquip, client, weapon, result)
 
@@ -260,11 +269,17 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse)
 {
+	if (!g_bFunModesActive)
+		return;
+
 	DECLARE_FM_FORWARD_PARAM3(OnPlayerRunCmdPost, client, buttons, impulse)
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
+	if (!g_bFunModesActive)
+		return Plugin_Continue;
+
 	bool changed = false;
 	for (int i = 0; i < g_iLastModeIndex; i++)
 	{
@@ -279,6 +294,9 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 public Action CS_OnBuyCommand(int client, const char[] weapon)
 {
 	Action result = Plugin_Continue;
+	if (!g_bFunModesActive)
+		return result;
+
 	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
 	{
 		if (g_ModesInfo[i].isOn)
@@ -292,6 +310,9 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
 	Action result = Plugin_Continue;
+	if (!g_bFunModesActive)
+		return result;
+
 	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
 	{
 		if (g_ModesInfo[i].isOn)

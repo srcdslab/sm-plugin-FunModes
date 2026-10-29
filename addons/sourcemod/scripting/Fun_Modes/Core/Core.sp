@@ -368,7 +368,7 @@ void FunModes_DeclareCvar(int modeIndex, int cvarIndex, const char[] name, const
 * @param %4		The mode's index. (Unused)
 */
 #define CHANGE_MODE_INFO(%1,%2,%3,%4) \
-		%1.%2 = %3
+		FunModes_SetModeOn(%4, %3)
 
 /*
 * Retrieves a cvar's value. (Using the cvar's enum struct)

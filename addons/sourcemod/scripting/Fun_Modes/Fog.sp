@@ -212,6 +212,14 @@ Action Fog_EnforceTimer(Handle timer)
 	}
 	if (g_bFog_Active && !g_bFog_Lerping)
 		Fog_ApplyAll();
+
+	// Nothing to keep up: the timer starts again when the fog is turned on
+	if (!g_bFog_Active && g_sFog_PendingPreset[0] == '\0')
+	{
+		g_hFog_Timer = null;
+		return Plugin_Stop;
+	}
+
 	return Plugin_Continue;
 }
 
@@ -510,6 +518,8 @@ void Fog_TakeOver(int admin)
 	}
 	g_bFog_Lerping = false;
 	g_bFog_Active = true;
+	if (g_hFog_Timer == null)
+		Fog_StartTimer();
 	g_iFog_Version++;
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, true, THIS_MODE_INFO.index);
 
@@ -1478,7 +1488,9 @@ public void OnMapStart_Fog()
 	Fog_ResetState();
 	Fog_RemoveLeftoverCtrl();
 	Fog_LoadConfig();
-	Fog_StartTimer();
+
+	// The last map's timer died with it; a new one starts with the fog, or below for a map preset
+	g_hFog_Timer = null;
 
 	// Automatic preset for this map ("MapPresets" in configs/FunModes/Fog.cfg), applied once the entities are up
 	if (g_hFog_Config == null)
@@ -1495,6 +1507,7 @@ public void OnMapStart_Fog()
 	}
 
 	g_hFog_Config.Rewind();
+	Fog_StartTimer();
 }
 
 /* The fog never carries over to the next map: switch it off and forget everything now */
@@ -1531,10 +1544,12 @@ Action Fog_SpawnedTimer(Handle timer)
 	return Plugin_Stop;
 }
 
+/* (Re)starts the fog timer, only when there is something to do: the fog is on, or a map preset is waiting */
 void Fog_StartTimer()
 {
 	delete g_hFog_Timer;
-	g_hFog_Timer = CreateTimer(g_fFog_Interval, Fog_EnforceTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	if (g_bFog_Active || g_sFog_PendingPreset[0] != '\0')
+		g_hFog_Timer = CreateTimer(g_fFog_Interval, Fog_EnforceTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 bool Fog_LoadConfig()

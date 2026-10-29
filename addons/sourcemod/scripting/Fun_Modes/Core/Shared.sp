@@ -22,7 +22,13 @@ int g_iExplosionSprite = -1;
 Handle g_hCheckTimer = null;
 Handle g_hTickTimer = null;
 
-/* Stacked Speed And Gravity: each mode reports a multiplier, the product is applied on top of the player's own value */
+/* At least one mode is on. With none on the plugin is idle: no timers, and the per-player hooks return at once */
+bool g_bFunModesActive;
+
+/* Stacked Speed And Gravity: each mode reports a multiplier, the product is applied on top of the player's own value.
+   Several modes can slow or speed up the same player (Boss, Quicksand, Last Stand, RLGL...) without overwriting each other,
+   and when they stop the player gets their own speed back (the zombie class speed), not a hard 1.0.
+   0.0 in the arrays means "this mode doesn't change it": the globals start at 0, so nothing needs filling in first */
 #define SPEED_PROP "m_flLaggedMovementValue"
 
 float g_fSpeedMult[MAXPLAYERS + 1][MAX_MODES_NUM];
@@ -65,15 +71,6 @@ int g_iHudSlotsCount;
 
 void Shared_OnPluginStart()
 {
-	for (int i = 0; i <= MaxClients; i++)
-	{
-		for (int j = 0; j < MAX_MODES_NUM; j++)
-		{
-			g_fSpeedMult[i][j] = 1.0;
-			g_fGravityMult[i][j] = 1.0;
-		}
-	}
-
 	FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 	FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
 }
@@ -87,10 +84,35 @@ void Shared_OnMapStart()
 	g_bZombiesSeen = false;
 	g_bCheckRunning = false;
 
-	delete g_hCheckTimer;
-	delete g_hTickTimer;
-	g_hCheckTimer = CreateTimer(0.2, Shared_CheckTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-	g_hTickTimer = CreateTimer(1.0, Shared_TickTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+	// The timers of the last map died with it (TIMER_FLAG_NO_MAPCHANGE): they start again with the first mode turned on
+	g_hCheckTimer = null;
+	g_hTickTimer = null;
+	FunModes_UpdateActive();
+}
+
+/* Every mode is turned on and off through here (CHANGE_MODE_INFO) */
+void FunModes_SetModeOn(int modeIndex, bool on)
+{
+	g_ModesInfo[modeIndex].isOn = on;
+	FunModes_UpdateActive();
+}
+
+/* Starts the check and tick timers when the first mode is on. They stop by themselves when none is on any more */
+void FunModes_UpdateActive()
+{
+	bool active = false;
+	for (int i = 0; i < g_iLastModeIndex && !active; i++)
+		active = g_ModesInfo[i].isOn;
+
+	g_bFunModesActive = active;
+	if (!active)
+		return;
+
+	if (g_hCheckTimer == null)
+		g_hCheckTimer = CreateTimer(0.2, Shared_CheckTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+
+	if (g_hTickTimer == null)
+		g_hTickTimer = CreateTimer(1.0, Shared_TickTimer, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 }
 
 void Shared_OnMapEnd()
@@ -120,6 +142,10 @@ void FunModes_RunCheck()
 	if (g_bCheckRunning)
 		return;
 
+	// Nothing is on: nothing to check (the first check once a mode is on catches up on the zombies)
+	if (!g_bFunModesActive)
+		return;
+
 	g_bCheckRunning = true;
 
 	bool zombiesNow = ZombiesAlive();
@@ -139,11 +165,25 @@ Action Shared_CheckTimer(Handle timer)
 {
 	FunModes_RunCheck();
 	Physics_Apply();
+
+	// The last mode was turned off: once every player has their own speed and gravity back, the timer stops
+	if (!g_bFunModesActive && !Physics_AnyTouched())
+	{
+		g_hCheckTimer = null;
+		return Plugin_Stop;
+	}
+
 	return Plugin_Continue;
 }
 
 Action Shared_TickTimer(Handle timer)
 {
+	if (!g_bFunModesActive)
+	{
+		g_hTickTimer = null;
+		return Plugin_Stop;
+	}
+
 	if (!g_bRoundLive)
 		return Plugin_Continue;
 
@@ -578,24 +618,38 @@ stock void ExplodeAt(const float pos[3], float radius, int damage, float knock, 
 
 /* ---------------------------------------------------------------- speed and gravity */
 
+/* 1.0 (or anything not above 0) = no change from this mode */
 stock void SetSpeedMult(int client, int modeIndex, float mult)
 {
-	g_fSpeedMult[client][modeIndex] = mult;
+	g_fSpeedMult[client][modeIndex] = (mult > 0.0 && !Physics_Near(mult, 1.0)) ? mult : 0.0;
 }
 
 stock void SetGravityMult(int client, int modeIndex, float mult)
 {
-	g_fGravityMult[client][modeIndex] = mult;
+	g_fGravityMult[client][modeIndex] = (mult > 0.0 && !Physics_Near(mult, 1.0)) ? mult : 0.0;
 }
 
 /* Puts every player's speed and gravity of a mode back to normal (when the mode stops) */
 stock void ResetModeMults(int modeIndex)
 {
-	for (int i = 0; i <= MaxClients; i++)
+	for (int i = 0; i <= MAXPLAYERS; i++)
 	{
-		g_fSpeedMult[i][modeIndex] = 1.0;
-		g_fGravityMult[i][modeIndex] = 1.0;
+		g_fSpeedMult[i][modeIndex] = 0.0;
+		g_fGravityMult[i][modeIndex] = 0.0;
 	}
+}
+
+/* A player joined or left: nothing of the slot's last player carries over */
+void Physics_ResetClient(int client)
+{
+	for (int m = 0; m < MAX_MODES_NUM; m++)
+	{
+		g_fSpeedMult[client][m] = 0.0;
+		g_fGravityMult[client][m] = 0.0;
+	}
+
+	g_bSpeedTouched[client] = false;
+	g_bGravityTouched[client] = false;
 }
 
 bool Physics_Near(float a, float b)
@@ -606,6 +660,10 @@ bool Physics_Near(float a, float b)
 void Physics_ApplySpeed(int client, float mult)
 {
 	float cur = GetEntPropFloat(client, Prop_Data, SPEED_PROP);
+
+	// Something else froze them (a map, another plugin): leave them alone, and never build on a speed of 0
+	if (cur <= 0.0)
+		return;
 
 	// The value to build on (zombie reloaded may have set it)
 	if (!g_bSpeedTouched[client] || !Physics_Near(cur, g_fSpeedSet[client]))
@@ -672,6 +730,18 @@ void Physics_ResetAll()
 	}
 }
 
+/* A mode still has a speed or gravity of its own on someone */
+bool Physics_AnyTouched()
+{
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (g_bSpeedTouched[i] || g_bGravityTouched[i])
+			return true;
+	}
+
+	return false;
+}
+
 void Physics_Apply()
 {
 	for (int i = 1; i <= MaxClients; i++)
@@ -688,10 +758,17 @@ void Physics_Apply()
 		{
 			for (int m = 0; m < g_iLastModeIndex; m++)
 			{
-				speed *= g_fSpeedMult[i][m];
-				gravity *= g_fGravityMult[i][m];
+				if (g_fSpeedMult[i][m] > 0.0)
+					speed *= g_fSpeedMult[i][m];
+
+				if (g_fGravityMult[i][m] > 0.0)
+					gravity *= g_fGravityMult[i][m];
 			}
 		}
+
+		// No mode changes this player and none did before: nothing to do
+		if (Physics_Near(speed, 1.0) && Physics_Near(gravity, 1.0) && !g_bSpeedTouched[i] && !g_bGravityTouched[i])
+			continue;
 
 		Physics_ApplySpeed(i, speed);
 		Physics_ApplyGravity(i, gravity);

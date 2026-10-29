@@ -266,6 +266,7 @@ void GunGame_OnConVarChange(int modeIndex, int cvarIndex, const char[] oldValue,
 public void OnMapEnd_GunGame()
 {
     CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, false, THIS_MODE_INFO.index);
+    ResetModeMults(THIS_MODE_INDEX);
 
     for (int i = 1; i <= MaxClients; i++)
         g_GunGameData[i].rewardTimer = null;
@@ -534,6 +535,14 @@ public Action Cmd_GunGameToggle(int client, int args)
     }
     else
     {
+        // The speed rewards end with the mode
+        ResetModeMults(THIS_MODE_INDEX);
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            delete g_GunGameData[i].rewardTimer;
+            g_GunGameData[i].originalSpeed = 0.0;
+        }
+
         ConVar cvar = FindConVar("zr_weapons_zmarket_rebuy");
         if (cvar != null)
         {
@@ -783,8 +792,9 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
             if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
                 return;
 
-            g_GunGameData[client].originalSpeed = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
-            SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", g_GunGameData[client].originalSpeed + 0.3);
+            // Through the stacked speeds, so the end of the reward can't leave the player at a saved (wrong) speed
+            g_GunGameData[client].originalSpeed = 1.0;
+            SetSpeedMult(client, THIS_MODE_INDEX, 1.3);
 
             CPrintToChat(client, "%s You have been granted an extra speed for finishing a gungame cycle!", THIS_MODE_INFO.tag);
 
@@ -796,7 +806,7 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
         {
             if (g_GunGameData[client].originalSpeed != 0.0)
             {
-                SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", g_GunGameData[client].originalSpeed);
+                SetSpeedMult(client, THIS_MODE_INDEX, 1.0);
                 g_GunGameData[client].originalSpeed = 0.0;
             }
 
@@ -819,7 +829,7 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
         {
             if (g_GunGameData[client].originalSpeed != 0.0)
             {
-                SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", g_GunGameData[client].originalSpeed);
+                SetSpeedMult(client, THIS_MODE_INDEX, 1.0);
                 g_GunGameData[client].originalSpeed = 0.0;
             }
         }
