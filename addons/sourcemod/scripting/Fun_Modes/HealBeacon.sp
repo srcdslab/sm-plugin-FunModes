@@ -456,7 +456,7 @@ public void GetRandomPlayer()
         return;
 
     SetHealBeaconToClient(random);
-    CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", random, random);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", random);
 }
 
 /* The chosen carriers who are alive humans, then random humans until there are sm_healbeacon_randoms carriers */
@@ -468,7 +468,7 @@ void HealBeacon_PickCarriers()
             continue;
 
         SetHealBeaconToClient(i);
-        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", i, i);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", i);
     }
 
     for (int tries = g_iHB_RandomPlayers; tries > 0 && g_aHBPlayers.Length < g_iHB_RandomPlayers; tries--)
@@ -498,7 +498,7 @@ bool HealBeacon_ToggleChosen(int admin, int target)
         && !g_BeaconPlayersData[target].hasHealBeacon && IsHumanAlive(target))
     {
         SetHealBeaconToClient(target);
-        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", target, target);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", target);
     }
 
     return true;
@@ -779,7 +779,7 @@ public void RemoveNeon(int client)
 public void AddNewBeacon(int client, int target)
 {
     SetHealBeaconToClient(target);
-    CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", client, target);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", target);
 }
 
 public void RemoveBeacon(int client, int target)
@@ -802,7 +802,7 @@ public void RemoveBeacon(int client, int target)
 
     if (client > 0)
     {
-        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_RemoveAnnounce", client, client, target);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_RemoveAnnounce", client, target);
         LogAction(client, target, "[FunModes-HealBeacon] \"%L\" removed HealBeacon from \"%L\"", client, target);
     }
 }
@@ -833,14 +833,14 @@ public void ReplaceBeacon(int client, int random, int target)
         int newRandom = clientsCount[GetRandomInt(0, humansCount - 1)];
         SetHealBeaconToClient(newRandom);
 
-        CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_RepickAnnounce", client, client, newRandom, random);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_RepickAnnounce", client, newRandom, random);
         return;
     }
 
     RemoveBeacon(-1, random);
     SetHealBeaconToClient(target);
 
-    CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "HealBeacon_ReplaceAnnounce", client, client, target, random);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_ReplaceAnnounce", client, target, random);
 }
 
 /*---------------------*/
