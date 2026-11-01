@@ -150,7 +150,7 @@ public void OnMapEnd_SimonSays()
 
 #define SIMON_STILL 5
 
-char g_sSimon_ActionNames[][] = { "CROUCH", "JUMP", "SHOOT", "RELOAD", "PRESS E", "STAND STILL" };
+char g_sSimon_ActionNames[][] = { "Simon_Act_Crouch", "Simon_Act_Jump", "Simon_Act_Shoot", "Simon_Act_Reload", "Simon_Act_Use", "Simon_Act_Still" };   // phrase names
 int g_iSimon_Buttons[] = { IN_DUCK, IN_JUMP, IN_ATTACK, IN_RELOAD, IN_USE, SIMON_MOVE };
 
 bool g_bSimon_Active;
@@ -182,7 +182,7 @@ public void Event_RoundStart_SimonSays()
 {
 	SimonSays_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Simon Says is on: only do it when {olive}SIMON SAYS {lightgreen}so!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Simon_Intro");
 }
 
 public void OnPlayerRunCmd_SimonSays(int client, int &buttons, float vel[3], bool &changed)
@@ -208,10 +208,12 @@ void SimonSays_ShowHud()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_SIMON, 1.2, 96, 160, 255, 255, 0, 0.0, 0.0, 0.0);
+		char action[64];
+		FormatEx(action, sizeof(action), "%T", g_sSimon_ActionNames[g_iSimon_Action], i);
 		if (g_bSimon_Says)
-			ShowModeHud(i, g_hSimon_Hud, "SIMON SAYS: %s! (%d)", g_sSimon_ActionNames[g_iSimon_Action], left);
+			ShowModeHud(i, g_hSimon_Hud, "%t", "Simon_HudSays", action, left);
 		else
-			ShowModeHud(i, g_hSimon_Hud, "%s! (%d)", g_sSimon_ActionNames[g_iSimon_Action], left);
+			ShowModeHud(i, g_hSimon_Hud, "%s! (%d)", action, left);
 	}
 }
 
@@ -264,21 +266,35 @@ void SimonSays_End()
 
 		failed++;
 		if (g_bSimon_Says && g_iSimon_Action != SIMON_STILL)
-			CPrintToChat(i, "%s You didn't {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, g_sSimon_ActionNames[g_iSimon_Action]);
+		{
+			char action[64];
+			FormatEx(action, sizeof(action), "%T", g_sSimon_ActionNames[g_iSimon_Action], i);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Simon_YouDidnt", action);
+		}
 		else if (g_bSimon_Says)
-			CPrintToChat(i, "%s You moved!", THIS_MODE_INFO.tag);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Simon_YouMoved");
 		else
-			CPrintToChat(i, "%s Simon didn't say so!", THIS_MODE_INFO.tag);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Simon_DidntSay");
 
 		HurtPlayer(i, g_iSimon_Damage);
 	}
 
 	if (!failed)
-		CPrintToChatAll("%s Everyone got it right!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Simon_AllRight");
 	else if (!g_bSimon_Says)
-		CPrintToChatAll("%s Simon didn't say! {olive}%d {lightgreen}player%s fell for it.", THIS_MODE_INFO.tag, failed, failed == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, failed == 1 ? "Simon_FellFor" : "Simon_FellForPlural", failed);
 	else
-		CPrintToChatAll("%s {olive}%d {lightgreen}player%s failed to {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, failed, failed == 1 ? "" : "s", g_sSimon_ActionNames[g_iSimon_Action]);
+	{
+		char action[64];
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (!IsClientInGame(i) || IsFakeClient(i))
+				continue;
+
+			FormatEx(action, sizeof(action), "%T", g_sSimon_ActionNames[g_iSimon_Action], i);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, failed == 1 ? "Simon_Failed" : "Simon_FailedPlural", failed, action);
+		}
+	}
 
 	SimonSays_Reset();
 	g_fSimon_Next = GetGameTime() + float(g_iSimon_Every);
@@ -316,7 +332,7 @@ public Action Cmd_SimonSaysToggle(int client, int args)
 {
 	if (!g_bSimonSays_Enabled)
 	{
-		CReplyToCommand(client, "%s Simon Says is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Simon Says");
 		return Plugin_Handled;
 	}
 
@@ -324,9 +340,9 @@ public Action Cmd_SimonSaysToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	SimonSays_Reset();
 
-	CPrintToChatAll("%s Simon Says is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Simon Says");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Only do it when {olive}SIMON SAYS {lightgreen}so!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Simon_Hint");
 
 	return Plugin_Handled;
 }
@@ -339,10 +355,10 @@ public Action Cmd_SimonSaysSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_SimonSaysSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Give a command now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bSimon_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Simon_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bSimon_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

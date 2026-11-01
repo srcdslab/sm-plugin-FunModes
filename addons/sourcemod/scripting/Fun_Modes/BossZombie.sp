@@ -195,7 +195,7 @@ public void Event_RoundStart_BossZombie()
 	ResetModeMults(THIS_MODE_INDEX);
 
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Boss Zombie is on: a boss rises {olive}%s {lightgreen}after the zombies come!", THIS_MODE_INFO.tag, g_iBoss_Delay == 0 ? "right" : "soon");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iBoss_Delay == 0 ? "Boss_IntroRight" : "Boss_IntroSoon");
 }
 
 public void Event_RoundEnd_BossZombie()
@@ -227,8 +227,8 @@ void BossZombie_Make(int zombie)
 	GetEntityRenderColor(zombie, r, g, b, a);
 	SetEntityRenderColor(zombie, 255, 60, 60, a);
 
-	CPrintToChatAll("%s {olive}%N {lightgreen}has become the {olive}BOSS ZOMBIE {lightgreen}with {olive}%d {lightgreen}health! Take it down!", THIS_MODE_INFO.tag, zombie, g_iBoss_Max);
-	PrintCenterTextAll("%N IS THE BOSS ZOMBIE!", zombie);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Boss_Start", zombie, g_iBoss_Max);
+	PrintCenterTextAll("%t", "Boss_Center", zombie);
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 40);
 }
 
@@ -237,9 +237,11 @@ void BossZombie_Defeated(int boss)
 	g_iBoss = 0;
 	ResetModeMults(THIS_MODE_INDEX);
 
-	CPrintToChatAll("%s The boss {olive}%N {lightgreen}has been {olive}DEFEATED!%s", THIS_MODE_INFO.tag, boss,
-		g_iBoss_Reward == BOSS_REWARD_HEAL ? " {lightgreen}Every human gets +50 HP." : (g_iBoss_Reward == BOSS_REWARD_HE ? " {lightgreen}Every human gets an HE grenade." : ""));
-	PrintCenterTextAll("THE BOSS IS DEFEATED!");
+	if (g_iBoss_Reward == BOSS_REWARD_HEAL || g_iBoss_Reward == BOSS_REWARD_HE)
+		CPrintToChatAll("%s %t %t", THIS_MODE_INFO.tag, "Boss_Defeated", boss, g_iBoss_Reward == BOSS_REWARD_HEAL ? "Boss_RewardHeal" : "Boss_RewardHE");
+	else
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Boss_Defeated", boss);
+	PrintCenterTextAll("%t", "Boss_DefeatedCenter");
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -262,7 +264,7 @@ public void OnCheck_BossZombie(bool zombiesNow)
 		{
 			g_iBoss = 0;
 			ResetModeMults(THIS_MODE_INDEX);
-			CPrintToChatAll("%s The boss left the server.", THIS_MODE_INFO.tag);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Boss_Left");
 		}
 		else if (!IsPlayerAlive(boss))
 			BossZombie_Defeated(boss);
@@ -270,7 +272,7 @@ public void OnCheck_BossZombie(bool zombiesNow)
 		{
 			// Cured or moved team
 			BossZombie_Release();
-			CPrintToChatAll("%s The boss is no longer a zombie.", THIS_MODE_INFO.tag);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Boss_Cured");
 		}
 
 		return;
@@ -312,7 +314,7 @@ public void OnTick_BossZombie()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_BOSS, 1.1, 255, 40, 40, 255, 0, 0.0, 0.0, 0.0);
-		ShowModeHud(i, g_hBoss_Hud, "BOSS: %N\n[%s] %d / %d", boss, bar, hp, g_iBoss_Max);
+		ShowModeHud(i, g_hBoss_Hud, "%t\n[%s] %d / %d", "Boss_Hud", boss, bar, hp, g_iBoss_Max);
 	}
 }
 
@@ -320,7 +322,7 @@ public Action Cmd_BossZombieToggle(int client, int args)
 {
 	if (!g_bBossZombie_Enabled)
 	{
-		CReplyToCommand(client, "%s Boss Zombie is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Boss Zombie");
 		return Plugin_Handled;
 	}
 
@@ -328,9 +330,9 @@ public Action Cmd_BossZombieToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	BossZombie_Reset();
 
-	CPrintToChatAll("%s Boss Zombie is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Boss Zombie");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s A boss rises after the zombies come!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Boss_Hint");
 
 	return Plugin_Handled;
 }
@@ -343,10 +345,10 @@ public Action Cmd_BossZombieSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_BossZombieSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Make a random zombie the boss now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Boss_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

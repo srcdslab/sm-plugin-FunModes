@@ -156,7 +156,7 @@ public void Event_RoundStart_AcidRain()
 {
 	AcidRain_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Acid Rain is on: when it rains, get {olive}under a roof{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Acid_Intro");
 }
 
 bool AcidRain_IgnorePlayers(int entity, int mask)
@@ -184,8 +184,8 @@ void AcidRain_Start()
 	g_bAcid_Active = true;
 	g_fAcid_Ends = GetGameTime() + float(g_iAcid_Last);
 
-	CPrintToChatAll("%s {olive}ACID RAIN {lightgreen}for {olive}%d {lightgreen}seconds - get under cover!", THIS_MODE_INFO.tag, g_iAcid_Last);
-	PrintCenterTextAll("ACID RAIN! GET UNDER COVER!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Acid_Start", g_iAcid_Last);
+	PrintCenterTextAll("%t", "Acid_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 65);
 }
 
@@ -202,7 +202,7 @@ public void OnTick_AcidRain()
 	if (GetGameTime() >= g_fAcid_Ends)
 	{
 		g_bAcid_Active = false;
-		CPrintToChatAll("%s The acid rain has stopped.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Acid_Over");
 		return;
 	}
 
@@ -217,11 +217,11 @@ public void OnTick_AcidRain()
 			SetHudTextParams(-1.0, HUD_Y_ACID, 1.1, exposed ? 160 : 120, 255, exposed ? 96 : 200, 255, 0, 0.0, 0.0, 0.0);
 			if (exposed)
 			{
-				ShowModeHud(i, g_hAcid_Hud, "ACID RAIN - GET UNDER COVER! (-%d HP/s)", g_iAcid_Damage);
+				ShowModeHud(i, g_hAcid_Hud, "%t", "Acid_HudOut", g_iAcid_Damage);
 				ScreenTint(i, 120, 255, 60, 50, 0.3, 0.6);
 			}
 			else
-				ShowModeHud(i, g_hAcid_Hud, "Acid rain - you're under cover");
+				ShowModeHud(i, g_hAcid_Hud, "%t", "Acid_HudCovered");
 		}
 
 		if (exposed)
@@ -233,7 +233,7 @@ public Action Cmd_AcidRainToggle(int client, int args)
 {
 	if (!g_bAcidRain_Enabled)
 	{
-		CReplyToCommand(client, "%s Acid Rain is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Acid Rain");
 		return Plugin_Handled;
 	}
 
@@ -241,9 +241,9 @@ public Action Cmd_AcidRainToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	AcidRain_Reset();
 
-	CPrintToChatAll("%s Acid Rain is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Acid Rain");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When it rains, get {olive}under a roof{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Acid_Hint");
 
 	return Plugin_Handled;
 }
@@ -256,10 +256,10 @@ public Action Cmd_AcidRainSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_AcidRainSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Make it rain now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bAcid_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Acid_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bAcid_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -143,13 +143,14 @@ char g_sHalluc_Sounds[][] =
 
 char g_sHalluc_Lies[][] =
 {
-	"A ZOMBIE IS RIGHT BEHIND YOU!",
-	"LOOK OUT!",
-	"Did you hear that?",
-	"RUN!",
-	"Something is watching you...",
-	"YOU ARE THE LAST HUMAN",
-	"Your ammo is empty!"
+	// phrase names
+	"Halluc_Lie_Behind",
+	"Halluc_Lie_LookOut",
+	"Halluc_Lie_Hear",
+	"Halluc_Lie_Run",
+	"Halluc_Lie_Watching",
+	"Halluc_Lie_LastHuman",
+	"Halluc_Lie_Ammo"
 };
 
 int g_iHalluc_FakeColor[4] = { 255, 30, 30, 255 };
@@ -171,7 +172,7 @@ public void Event_RoundStart_Hallucinations()
 {
 	g_fHalluc_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hallucinations are on: don't trust everything you see and hear...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Halluc_Intro");
 }
 
 void Hallucinations_Trick(int client)
@@ -204,7 +205,7 @@ void Hallucinations_Trick(int client)
 			ScreenTint(client, GetRandomInt(0, 255), GetRandomInt(0, 80), GetRandomInt(0, 255), 110, 0.2, 1.0);
 
 		case 2:
-			PrintCenterText(client, g_sHalluc_Lies[GetRandomInt(0, sizeof(g_sHalluc_Lies) - 1)]);
+			PrintCenterText(client, "%t", g_sHalluc_Lies[GetRandomInt(0, sizeof(g_sHalluc_Lies) - 1)]);
 
 		case 3:
 		{
@@ -243,7 +244,7 @@ public Action Cmd_HallucinationsToggle(int client, int args)
 {
 	if (!g_bHallucinations_Enabled)
 	{
-		CReplyToCommand(client, "%s Hallucinations is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Hallucinations");
 		return Plugin_Handled;
 	}
 
@@ -251,9 +252,9 @@ public Action Cmd_HallucinationsToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Hallucinations_Reset();
 
-	CPrintToChatAll("%s Hallucinations is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Hallucinations");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Don't trust everything you see and hear...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Halluc_Hint");
 
 	return Plugin_Handled;
 }
@@ -266,10 +267,10 @@ public Action Cmd_HallucinationsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_HallucinationsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Make them see things now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Halluc_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

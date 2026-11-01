@@ -444,7 +444,7 @@ public void OnTakeDamagePost_CrazyShop(int victim, int attacker, float damage)
 		if (credits <= 0)
 			return;
 
-		CPrintToChat(attacker, "%s You have been given {olive}%d credits {lightgreen}for damaging the zombies!", THIS_MODE_INFO.tag, credits);
+		CPrintToChat(attacker, "%s %t", THIS_MODE_INFO.tag, "Shop_Earned", credits);
 
 		PLAYER_CREDITS(attacker) += credits;
 		DAMAGE_DEALT(attacker) = 0;
@@ -819,22 +819,22 @@ public Action Cmd_CrazyShopToggle(int client, int args)
 {
 	if (!g_bCrazyShop_Enabled)
 	{
-		CReplyToCommand(client, "%s CrazyShop Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "CrazyShop Mode");
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s CrazyShop Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOnPlain" : "FM_NowOffPlain", "CrazyShop Mode");
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
 
-		CPrintToChatAll("%s Earn credits by defending and shooting the zombies!", THIS_MODE_INFO.tag);
-		CPrintToChatAll("%s Type {olive}!crazyshop {lightgreen}to open the Shop Menu and buy powerful items!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Shop_Intro");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Shop_IntroCmd");
 
 		if (g_bCrazyShop_SaveCredits)
 		{
@@ -929,12 +929,12 @@ void CrazyShop_AdminPanel(int client)
 {
 	Menu menu = new Menu(Menu_CrazyShop_AdminPanel);
 
-	menu.SetTitle("[CrazyShop] Admin Panel (The secret place, shhh!)");
+	menu.SetTitle("[CrazyShop] %T", "Shop_AdminTitle", client);
 
 	for (int i = 0; i < sizeof(g_CrazyShopItems); i++)
 	{
 		char item[128];
-		FormatEx(item, sizeof(item), "%s - Edit", g_CrazyShopItems[i].name);
+		FormatEx(item, sizeof(item), "%s - %T", g_CrazyShopItems[i].name, "Shop_Edit", client);
 
 		menu.AddItem(NULL_STRING, item);
 	}
@@ -964,28 +964,28 @@ void CrazyShop_OpenItemSettings(int client, int item)
 	Menu menu = new Menu(Menu_CrazyShop_ItemSettings);
 
 	CrazyShop_DataType type = g_CrazyShopItems[item].type;
-	char valuesString[sizeof(CrazyShop_Item::amountName) + 32];
+	char valuesString[sizeof(CrazyShop_Item::amountName) + 64];
 	switch (type)
 	{
 		case DATATYPE_AMOUNT: FormatEx(valuesString, sizeof(valuesString), "%s: %.2f", g_CrazyShopItems[item].amountName, g_CrazyShopItems[item].amount);
-		case DATATYPE_TIME: FormatEx(valuesString, sizeof(valuesString), "Time: %.2fs", g_CrazyShopItems[item].time);
-		case DATATYPE_BOTH: FormatEx(valuesString, sizeof(valuesString), "%s: %.2f\nTime: %.2fs", g_CrazyShopItems[item].amountName, g_CrazyShopItems[item].amount, g_CrazyShopItems[item].time);
+		case DATATYPE_TIME: FormatEx(valuesString, sizeof(valuesString), "%T", "Shop_TimeValue", client, g_CrazyShopItems[item].time);
+		case DATATYPE_BOTH: FormatEx(valuesString, sizeof(valuesString), "%s: %.2f\n%T", g_CrazyShopItems[item].amountName, g_CrazyShopItems[item].amount, "Shop_TimeValue", client, g_CrazyShopItems[item].time);
 	}
 
-	menu.SetTitle("[CrazyShop] %s - Settings\nPrice: %d\n%s", g_CrazyShopItems[item].name, g_CrazyShopItems[item].price, valuesString);
+	menu.SetTitle("[CrazyShop] %T\n%T\n%s", "FM_MenuSettings", client, g_CrazyShopItems[item].name, "Shop_PriceValue", client, g_CrazyShopItems[item].price, valuesString);
 
-	menu.AddItem(NULL_STRING, "Change Price");
+	FM_AddItemT(menu, client, NULL_STRING, "Shop_ChangePrice");
 
 	if (type == DATATYPE_AMOUNT || type == DATATYPE_BOTH)
 	{
-		char itemText[sizeof(CrazyShop_Item::amountName) + 20];
-		FormatEx(itemText, sizeof(itemText), "Change %s", g_CrazyShopItems[item].amountName);
+		char itemText[sizeof(CrazyShop_Item::amountName) + 48];
+		FormatEx(itemText, sizeof(itemText), "%T", "Shop_ChangeValue", client, g_CrazyShopItems[item].amountName);
 
 		menu.AddItem(NULL_STRING, itemText);
 	}
 
 	if (type == DATATYPE_TIME || type == DATATYPE_BOTH)
-		menu.AddItem(NULL_STRING, "Change Time");
+		FM_AddItemT(menu, client, NULL_STRING, "Shop_ChangeTime");
 
 	menu.ExitButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -1020,7 +1020,7 @@ void CrazyShop_OpenItemAction(int client, int action)
 
 	if (action == 0)
 	{
-		menu.SetTitle("[CrazyShop] %s - Price\nCurrent Price: %d", item.name, item.price);
+		menu.SetTitle("[CrazyShop] %T", "Shop_PriceTitle", client, item.name, item.price);
 
 		for (int i = item.price, count; i <= item.price * 2; i += item.price / 4)
 		{
@@ -1048,7 +1048,7 @@ void CrazyShop_OpenItemAction(int client, int action)
 
 	if (action == 2)
 	{
-		menu.SetTitle("[CrazyShop] %s - Time\nCurrent Time: %.2f", item.name, item.time);
+		menu.SetTitle("[CrazyShop] %T", "Shop_TimeTitle", client, item.name, item.time);
 
 		for (float f = item.time, count; f <= item.time * 2.0; f += item.time / 4.0)
 		{
@@ -1078,7 +1078,7 @@ void CrazyShop_OpenItemAction(int client, int action)
 	{
 		if (item.type == DATATYPE_TIME)
 		{
-			menu.SetTitle("[CrazyShop] %s - Time\nCurrent Time: %.2f", item.name, item.time);
+			menu.SetTitle("[CrazyShop] %T", "Shop_TimeTitle", client, item.name, item.time);
 
 			for (float f = item.time, count; f <= item.time * 2.0; f += item.time / 4.0)
 			{
@@ -1105,7 +1105,7 @@ void CrazyShop_OpenItemAction(int client, int action)
 		}
 		else
 		{
-			menu.SetTitle("[CrazyShop] %s - %s\nCurrent %s: %.2f", item.name, item.amountName, item.amountName, item.amount);
+			menu.SetTitle("[CrazyShop] %T", "Shop_AmountTitle", client, item.name, item.amountName, item.amountName, item.amount);
 
 			for (float f = item.amount, count; f <= item.amount * 2; f += item.amount / 4.0)
 			{
@@ -1180,7 +1180,7 @@ void CrazyShop_UpdateItemData(int client, int item, const char[] key, const char
 	if (!FunModes_LoadKV(kv, filePath))
 	{
 		LogError("[FunModes-CrazyShop] %s", g_sKvError);
-		CPrintToChat(client, "%s Sorry, no settings file was found, Changes will not be saved (Report this to the server manager).", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_NoSettingsFile");
 		delete kv;
 	}
 
@@ -1196,7 +1196,7 @@ void CrazyShop_UpdateItemData(int client, int item, const char[] key, const char
 			FunModes_SaveKV(kv, filePath);
 		}
 		else
-			CPrintToChat(client, "%s Sorry, the item is not in the settings file, changes will not be saved, (Report this to the server manager)", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_ItemNotInFile");
 	}
 
 	delete kv;
@@ -1208,7 +1208,7 @@ void CrazyShop_UpdateItemData(int client, int item, const char[] key, const char
 	else
 		g_CrazyShopItems[item].time = StringToFloat(value);
 
-	CPrintToChat(client, "%s You have successfully changed {olive}%s {lightgreen}of %s {olive}to %s", THIS_MODE_INFO.tag, key, g_CrazyShopItems[item].name, value);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_Changed", key, g_CrazyShopItems[item].name, value);
 }
 
 public Action Cmd_CrazyShopSettings(int client, int args)
@@ -1218,10 +1218,10 @@ public Action Cmd_CrazyShopSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_CrazyShopSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n ");
-	menu.AddItem(NULL_STRING, "Manage Shop Items");
+	FM_AddItemT(menu, client, NULL_STRING, "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n ");
+	FM_AddItemT(menu, client, NULL_STRING, "Shop_ManageItems");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -1258,7 +1258,7 @@ Action Cmd_CrazyShopMenu(int client, int args)
 {
 	if (!THIS_MODE_INFO.isOn)
 	{
-		CReplyToCommand(client, "%s The CrazyShop Mode is currently OFF!", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "Shop_ModeOff");
 		return Plugin_Handled;
 	}
 
@@ -1267,7 +1267,7 @@ Action Cmd_CrazyShopMenu(int client, int args)
 
 	if (g_bCrazyShop_DisableShop)
 	{
-		CReplyToCommand(client, "%s The shop is currently disabled!", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "Shop_Disabled");
 		return Plugin_Handled;
 	}
 
@@ -1279,7 +1279,7 @@ Action Cmd_CrazyShopMyItems(int client, int args)
 {
 	if (!THIS_MODE_INFO.isOn)
 	{
-		CReplyToCommand(client, "%s The CrazyShop Mode is currently OFF!", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "Shop_ModeOff");
 		return Plugin_Handled;
 	}
 
@@ -1297,20 +1297,20 @@ void CrazyShop_OpenMenu(int client)
 
 	Menu menu = new Menu(Menu_CrazyShop);
 
-	menu.SetTitle("[CrazyShop] Items List\nYour credits: %d$", PLAYER_CREDITS(client));
+	menu.SetTitle("[CrazyShop] %T", "Shop_ListTitle", client, PLAYER_CREDITS(client));
 
 	for (int i = 0; i < sizeof(g_CrazyShopItems); i++)
 	{
-		char team[10];
-		team = (g_CrazyShopItems[i].team == 0) ? "Zombies" : "Humans";
+		char team[32];
+		FormatEx(team, sizeof(team), "%T", (g_CrazyShopItems[i].team == 0) ? "Shop_TeamZombies" : "Shop_TeamHumans", client);
 
-		char[] item = new char[sizeof(CrazyShop_Item::name) + strlen(team)];
-		FormatEx(item, sizeof(CrazyShop_Item::name) + strlen(team), "%s - %d$ [%s]%s", g_CrazyShopItems[i].name, g_CrazyShopItems[i].price, team, i == (sizeof(g_CrazyShopItems) - 1) ? "\n " : "");
+		char item[sizeof(CrazyShop_Item::name) + 64];
+		FormatEx(item, sizeof(item), "%s - %d$ [%s]%s", g_CrazyShopItems[i].name, g_CrazyShopItems[i].price, team, i == (sizeof(g_CrazyShopItems) - 1) ? "\n " : "");
 
 		menu.AddItem(NULL_STRING, item, PLAYER_CREDITS(client) >= g_CrazyShopItems[i].price ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 	}
 
-	menu.AddItem(NULL_STRING, "Gift 5 credits", PLAYER_CREDITS(client) >= 5 ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, NULL_STRING, "Shop_Gift", PLAYER_CREDITS(client) >= 5 ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
 	menu.ExitButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -1336,14 +1336,14 @@ int Menu_CrazyShop(Menu menu, MenuAction action, int param1, int param2)
 
 			if (PLAYER_CREDITS(param1) < g_CrazyShopItems[param2].price)
 			{
-				CPrintToChat(param1, "%s You have insufficent credits to buy this item.", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_NoCredits");
 				return -1;
 			}
 
 			PLAYER_CREDITS(param1) -= g_CrazyShopItems[param2].price;
 			PLAYER_ITEM_COUNT(param1, param2) += 1;
-			CPrintToChat(param1, "%s You have successfully bought {olive}%s, {lightgreen}Type !myitems to activate it!", THIS_MODE_INFO.tag, g_CrazyShopItems[param2].name);
-			CPrintToChat(param1, "{lightgreen}You can also press the {olive}FlashLight {lightgreen}button to see your inventory!");
+			CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_Bought", g_CrazyShopItems[param2].name);
+			CPrintToChat(param1, "%t", "Shop_FlashlightHint");
 			CrazyShop_OpenMenu(param1);
 		}
 	}
@@ -1355,7 +1355,7 @@ void CrazyShop_OpenGiftMenu(int client)
 {
 	Menu menu = new Menu(Menu_CrazyShop_Gift);
 
-	menu.SetTitle("[CrazyShop] Select Player to gift 5 credits");
+	menu.SetTitle("[CrazyShop] %T", "Shop_GiftTitle", client);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -1395,7 +1395,7 @@ int Menu_CrazyShop_Gift(Menu menu, MenuAction action, int param1, int param2)
 
 			if (PLAYER_CREDITS(param1) < 5)
 			{
-				CPrintToChat(param1, "%s You do not have 5 credits to gift.", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_GiftNoCredits");
 				return -1;
 			}
 
@@ -1405,14 +1405,14 @@ int Menu_CrazyShop_Gift(Menu menu, MenuAction action, int param1, int param2)
 			int target = GetClientOfUserId(StringToInt(userId));
 			if (!target)
 			{
-				CPrintToChat(param1, "%s Player is no longer available!", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_GiftGone");
 				return -1;
 			}
 
 			PLAYER_CREDITS(target) += 5;
 			PLAYER_CREDITS(param1) -= 5;
-			CPrintToChat(param1, "%s You have gifted {olive}%N {lightgreen}5 credits, you are so generous!", THIS_MODE_INFO.tag, target);
-			CPrintToChat(target, "%s %N {olive}has gifted you 5 credits! What a generous man!", THIS_MODE_INFO.tag, param1);
+			CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_Gifted", target);
+			CPrintToChat(target, "%s %t", THIS_MODE_INFO.tag, "Shop_GotGift", param1);
 		}
 	}
 
@@ -1429,7 +1429,7 @@ void CrazyShop_OpenAvailableItems(int client)
 
 	if (!IsPlayerAlive(client))
 	{
-		CPrintToChat(client, "%s you have to be alive to use this command!", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_AliveCmd");
 		return;
 	}
 
@@ -1443,13 +1443,13 @@ void CrazyShop_OpenAvailableItems(int client)
 			if (menu == null)
 			{
 				menu = new Menu(Menu_AvailableItems);
-				menu.SetTitle("[CrazyShop] Your Available Items!");
+				menu.SetTitle("[CrazyShop] %T", "Shop_MyItemsTitle", client);
 			}
 
 			if (menu)
 			{
 				char item[64];
-				FormatEx(item, sizeof(item), "%s - Activate", g_CrazyShopItems[i].name);
+				FormatEx(item, sizeof(item), "%s - %T", g_CrazyShopItems[i].name, "Shop_Activate", client);
 
 				char data[3];
 				IntToString(i, data, sizeof(data));
@@ -1460,7 +1460,7 @@ void CrazyShop_OpenAvailableItems(int client)
 
 	if (!found)
 	{
-		CPrintToChat(client, "%s You have no available items!", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_NoItems");
 		return;
 	}
 
@@ -1487,13 +1487,13 @@ int Menu_AvailableItems(Menu menu, MenuAction action, int param1, int param2)
 
 			if (PLAYER_ITEM_COUNT(param1, itemNum) <= 0)
 			{
-				CPrintToChat(param1, "%s You do not have this item in your inventory", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_NotInInventory");
 				return 0;
 			}
 
 			if (!IsPlayerAlive(param1))
 			{
-				CPrintToChat(param1, "%s You have to be alive to activate items!", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_AliveActivate");
 				return -1;
 			}
 
@@ -1502,13 +1502,13 @@ int Menu_AvailableItems(Menu menu, MenuAction action, int param1, int param2)
 			bool isZombie = ZR_IsClientZombie(param1);
 			if (item.team == 0 && !isZombie)
 			{
-				CPrintToChat(param1, "%s This item is for zombies only!", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_ZombiesOnly");
 				return -1;
 			}
 
 			if (item.team == 1 && isZombie)
 			{
-				CPrintToChat(param1, "%s This item is for humans only!", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Shop_HumansOnly");
 				return -1;
 			}
 
@@ -1527,7 +1527,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 	if (PLAYER_ITEM_ACTIVE(client, itemNum))
 	{
-		CPrintToChat(client, "%s You cannot activate the same item again unless the old ones' effect ended", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_AlreadyActive");
 		return;
 	}
 
@@ -1542,7 +1542,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			int health = RoundToNearest(item.amount);
 			SetEntityHealth(client, GetClientHealth(client) + health);
 
-			CPrintToChat(client, "%s You have given yourself {olive}%d {lightgreen}more HP", THIS_MODE_INFO.tag, health);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotHP", health);
 		}
 
 		// Infection Protection - Humans
@@ -1564,7 +1564,7 @@ void CrazyShop_Activate(int client, int itemNum)
 		#if defined _KnockbackRestrict_included_
 			if (KR_ClientStatus(client))
 			{
-				CPrintToChat(client, "%s You cannot use this item while you are kbanned!", THIS_MODE_INFO.tag);
+				CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_Kbanned");
 				return;
 			}
 		#endif
@@ -1633,7 +1633,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_UnlimitedAmmo, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You have activated unlimited Ammo, Go Hunt the Zombies!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotAmmo");
 		}
 
 		// Buy a smokegrenade
@@ -1650,7 +1650,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			int extra = given ? 0 : 1;
 			SET_GRENADES_COUNT(client, SMOKEGRENADE, GET_GRENADES_COUNT(client, SMOKEGRENADE) + extra);
 
-			CPrintToChat(client, "%s You have given yourself a smokegrenade! {olive}Freeze the zombies now!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotSmoke");
 		}
 
 		// Slow Beacon
@@ -1665,7 +1665,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_SlowBeacon, userid, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You have activated slow beacon, you can slow down the zombies if they got close to your beacon!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotSlowBeacon");
 		}
 
 		// More Speed - Zombies
@@ -1697,7 +1697,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_KBProtection, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You have activated KB protection, your knockback will be much less now!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotKB");
 		}
 
 		// Lower Gravity - Zombies
@@ -1713,7 +1713,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_LowerGravity, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You have been given lower gravity, use it wisely!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotGravity");
 		}
 
 		// Hurting Machine - Zombies
@@ -1721,7 +1721,7 @@ void CrazyShop_Activate(int client, int itemNum)
 		{
 			if (g_iCrazyShopProps >= 2)
 			{
-				CPrintToChat(client, "%s Please wait until the older hurting machines die!", THIS_MODE_INFO.tag);
+				CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_MachineWait");
 				return;
 			}
 
@@ -1732,7 +1732,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			int prop = CrazyShop_CreateProp(propName);
 			if (prop == -1)
 			{
-				CPrintToChat(client, "%s Failed to activate this item, try again later", THIS_MODE_INFO.tag);
+				CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_ActivateFailed");
 				return;
 			}
 
@@ -1757,7 +1757,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_IgniteImmunity, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You have activated ignite immunity, you won't be on fire for now!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotIgnite");
 		}
 
 		// Invisibility - Zombies
@@ -1775,7 +1775,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_Invisibility, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You are invisibile now, shhh!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_GotInvisible");
 		}
 
 		// Human Pull - Zombies
@@ -1784,7 +1784,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			int target = GetClientAimTarget(client);
 			if (target == -1 || !IsPlayerAlive(target) || !ZR_IsClientHuman(target))
 			{
-				CPrintToChat(client, "%s Canceling the activation of this item, please aim at a human!", THIS_MODE_INFO.tag);
+				CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_AimHuman");
 				return;
 			}
 
@@ -1798,7 +1798,7 @@ void CrazyShop_Activate(int client, int itemNum)
 
 			CreateTimer(item.time, Timer_CrazyShop_Pull, pack, TIMER_FLAG_NO_MAPCHANGE);
 
-			CPrintToChat(client, "%s You are now pulling a human xD", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Shop_Pulling");
 		}
 	}
 

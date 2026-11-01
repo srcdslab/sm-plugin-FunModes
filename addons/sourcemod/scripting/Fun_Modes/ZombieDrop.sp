@@ -133,7 +133,7 @@ public void Event_RoundStart_ZombieDrop()
 {
 	g_fDrop_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Zombie Drop is on: when a {olive}red ring {lightgreen}appears under you, RUN!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ZDrop_Intro");
 }
 
 void ZombieDrop_Wave()
@@ -148,7 +148,7 @@ void ZombieDrop_Wave()
 		GetClientAbsOrigin(list[i], pos);
 
 		DrawRingAt(pos, 110.0, 5.0, float(g_iDrop_Warn), g_iDrop_WarnColor);
-		PrintCenterText(list[i], "ZOMBIE DROP INCOMING - MOVE!");
+		PrintCenterText(list[i], "%t", "ZDrop_Center");
 		EmitAmbientSound(Beacon_Sound, pos, SOUND_FROM_WORLD, SNDLEVEL_NORMAL, _, _, 60);
 
 		DataPack pack;
@@ -158,8 +158,7 @@ void ZombieDrop_Wave()
 	}
 
 	if (drops)
-		CPrintToChatAll("%s {olive}%d {lightgreen}zombie%s dropping in {olive}%d {lightgreen}seconds - watch for the red ring%s!",
-			THIS_MODE_INFO.tag, drops, drops == 1 ? "" : "s", g_iDrop_Warn, drops == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, drops == 1 ? "ZDrop_Warn" : "ZDrop_WarnPlural", drops, g_iDrop_Warn);
 }
 
 Action ZombieDrop_DropTimer(Handle timer, DataPack pack)
@@ -209,7 +208,7 @@ public Action Cmd_ZombieDropToggle(int client, int args)
 {
 	if (!g_bZombieDrop_Enabled)
 	{
-		CReplyToCommand(client, "%s Zombie Drop is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Zombie Drop");
 		return Plugin_Handled;
 	}
 
@@ -217,9 +216,9 @@ public Action Cmd_ZombieDropToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	ZombieDrop_Reset();
 
-	CPrintToChatAll("%s Zombie Drop is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Zombie Drop");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When a {olive}red ring {lightgreen}appears under you, RUN!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ZDrop_Hint");
 
 	return Plugin_Handled;
 }
@@ -232,10 +231,10 @@ public Action Cmd_ZombieDropSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ZombieDropSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Drop now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "ZDrop_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

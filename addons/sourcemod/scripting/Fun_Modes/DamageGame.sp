@@ -203,14 +203,14 @@ public Action Cmd_DamageGameToggle(int client, int args)
 {
 	if (!g_bDamageGame_Enabled)
 	{
-		CReplyToCommand(client, "%s Damage Game mode is currently disabled!", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_DisabledExcl", "Damage Game mode");
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s Damage Game is now {olive}%s.", THIS_MODE_INFO.tag, (THIS_MODE_INFO.isOn) ? "Enabled" : "Disabled");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, (THIS_MODE_INFO.isOn) ? "FM_NowEnabledDot" : "FM_NowDisabledDot", "Damage Game");
 
 	if (THIS_MODE_INFO.isOn)
 	{
@@ -249,12 +249,12 @@ void DamageGame_StartTimers()
 	g_hDamageGameTimer = CreateTimer(g_fDamageGame_TimeInterval, Timer_DamageGame, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 	switch (g_iDamageGame_Mode)
 	{
-		case 0:	CPrintToChatAll("%s Humans with lowest damage dealt to zombies will get damaged every %d seconds!", THIS_MODE_INFO.tag, interval);
-		case 1: CPrintToChatAll("%s Humans who don't shoot zombies for {olive}%d seconds {lightgreen}(repeated) will be damaged", THIS_MODE_INFO.tag, interval);
+		case 0:	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "DG_Lowest", interval);
+		case 1: CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "DG_NoShoot", interval);
 		default:
 		{
-			CPrintToChatAll("%s Humans with lowest damage dealt to zombies will get damaged every %d seconds! (This doesn't include humans who don't defend at all)", THIS_MODE_INFO.tag, interval);
-			CPrintToChatAll("%s Humans who don't shoot zombies for {olive}%d seconds {lightgreen}(repeated) will be damaged", THIS_MODE_INFO.tag, interval);
+			CPrintToChatAll("%s %t %t", THIS_MODE_INFO.tag, "DG_Lowest", interval, "DG_LowestNote");
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "DG_NoShoot", interval);
 		}
 	}
 }
@@ -352,8 +352,8 @@ void DamageGame_DamagePlayer(int client)
 	else
 		SetEntityHealth(client, newHealth);
 
-	CPrintToChat(client, "%s You have been damaged for being a bad defender", THIS_MODE_INFO.tag);
-	CPrintToChatAll("%s %N {olive}got damaged for being a bad defender!", THIS_MODE_INFO.tag, client);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "DG_YouDamaged");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "DG_Damaged", client);
 }
 
 /* DamageGame Settings */
@@ -361,13 +361,11 @@ public void Cmd_DamageGameSettings(int client)
 {
 	Menu menu = new Menu(Menu_DamageGameSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n ");
+	FM_AddItemT(menu, client, NULL_STRING, "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n ");
 
-	char item[20];
-	FormatEx(item, sizeof(item), "%s Damage", g_bDamageGameDisable ? "Enable" : "Disable");
-	menu.AddItem(NULL_STRING, item);
+	FM_AddItemT(menu, client, NULL_STRING, g_bDamageGameDisable ? "DG_MenuEnable" : "DG_MenuDisable");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -182,7 +182,7 @@ public void Event_RoundStart_IceFloor()
 {
 	IceFloor_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Ice Floor is on: sometimes the ground freezes - mind your step!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Ice_Intro");
 }
 
 public void Event_RoundEnd_IceFloor()
@@ -197,8 +197,8 @@ void IceFloor_Start()
 	g_fIce_Ends = GetGameTime() + float(g_iIce_Last);
 	IceFloor_Freeze(true);
 
-	CPrintToChatAll("%s {olive}THE FLOOR IS FROZEN {lightgreen}for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iIce_Last);
-	PrintCenterTextAll("THE FLOOR IS ICE!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Ice_Start", g_iIce_Last);
+	PrintCenterTextAll("%t", "Ice_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 230);
 }
 
@@ -210,7 +210,7 @@ public void OnTick_IceFloor()
 		{
 			g_bIce_Active = false;
 			IceFloor_Freeze(false);
-			PrintCenterTextAll("The ice has melted");
+			PrintCenterTextAll("%t", "Ice_Over");
 		}
 
 		return;
@@ -224,7 +224,7 @@ public Action Cmd_IceFloorToggle(int client, int args)
 {
 	if (!g_bIceFloor_Enabled)
 	{
-		CReplyToCommand(client, "%s Ice Floor is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Ice Floor");
 		return Plugin_Handled;
 	}
 
@@ -232,9 +232,9 @@ public Action Cmd_IceFloorToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	IceFloor_Reset();
 
-	CPrintToChatAll("%s Ice Floor is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Ice Floor");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Sometimes the ground freezes - mind your step!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Ice_Hint");
 
 	return Plugin_Handled;
 }
@@ -247,10 +247,10 @@ public Action Cmd_IceFloorSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_IceFloorSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Freeze the floor now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bIce_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Ice_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bIce_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

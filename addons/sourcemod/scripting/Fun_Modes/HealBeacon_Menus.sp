@@ -13,7 +13,7 @@ int g_iClientMenuUserId[MAXPLAYERS + 1] = { -1, ... };
 stock void HealBeacon_DisplayMainMenu(int client)
 {
 	Menu menu = new Menu(MainMenu_Handler);
-	menu.SetTitle("HealBeacon Settings");
+	menu.SetTitle("%T", "HealBeacon_MenuTitle", client);
 
 	if (g_aHBPlayers)
 	{
@@ -33,17 +33,17 @@ stock void HealBeacon_DisplayMainMenu(int client)
 		}
 	
 		if (count <= 0)
-			menu.AddItem("", "None", ITEMDRAW_DISABLED);
+			FM_AddItemT(menu, client, "", "HealBeacon_MenuNone", ITEMDRAW_DISABLED);
 	}
 
-	menu.AddItem("choose", "Choose a carrier...");
+	FM_AddItemT(menu, client, "choose", "HealBeacon_MenuChoose");
 
-	char line[48];
-	FormatEx(line, sizeof(line), "Clear the chosen carriers (%d)", g_aHB_Chosen.Length);
+	char line[96];
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuClear", client, g_aHB_Chosen.Length);
 	menu.AddItem("clear", line, g_aHB_Chosen.Length ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
-	menu.AddItem("option2", "Change Heal Beacon Settings");
-	menu.AddItem("option3", "Show Cvars");
+	FM_AddItemT(menu, client, "option2", "HealBeacon_MenuSettings");
+	FM_AddItemT(menu, client, "option3", "FM_MenuShowCvars");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -53,21 +53,22 @@ stock void HealBeacon_DisplayMainMenu(int client)
 void HealBeacon_ChooseMenu(int client)
 {
 	Menu menu = new Menu(HealBeacon_ChooseMenu_Handler);
-	menu.SetTitle("Choose a heal beacon carrier\nKept every round until they leave\nPick a chosen one again to undo\n ");
+	menu.SetTitle("%T\n ", "HealBeacon_ChooseTitle", client);
 
-	char info[12], line[64];
+	char info[12], line[96], chosen[32];
+	FormatEx(chosen, sizeof(chosen), " [%T]", "VIPMode_TagChosen", client);
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || IsClientSourceTV(i))
 			continue;
 
 		IntToString(GetClientUserId(i), info, sizeof(info));
-		FormatEx(line, sizeof(line), "%N%s%s", i, HealBeacon_IsChosen(i) ? " [CHOSEN]" : "", g_BeaconPlayersData[i].hasHealBeacon ? " [BEACON]" : "");
+		FormatEx(line, sizeof(line), "%N%s%s", i, HealBeacon_IsChosen(i) ? chosen : "", g_BeaconPlayersData[i].hasHealBeacon ? " [BEACON]" : "");
 		menu.AddItem(info, line);
 	}
 
 	if (!menu.ItemCount)
-		menu.AddItem("", "Nobody on the server", ITEMDRAW_DISABLED);
+		FM_AddItemT(menu, client, "", "VIPMode_MenuNobody", ITEMDRAW_DISABLED);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -95,7 +96,7 @@ public int HealBeacon_ChooseMenu_Handler(Menu menu, MenuAction action, int param
 			if (target)
 				HealBeacon_ToggleChosen(param1, target);
 			else
-				CPrintToChat(param1, "%s That player left.", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "VIPMode_PlayerLeft");
 
 			HealBeacon_ChooseMenu(param1);
 		}
@@ -129,7 +130,7 @@ public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2
 			else if (strcmp(buffer, "clear") == 0)
 			{
 				g_aHB_Chosen.Clear();
-				CPrintToChatAll("%s The chosen heal beacon carriers were cleared.", THIS_MODE_INFO.tag);
+				CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Cleared");
 				LogAction(param1, -1, "\"%L\" cleared the chosen heal beacon carriers", param1);
 				HealBeacon_DisplayMainMenu(param1);
 				return 0;
@@ -170,15 +171,13 @@ public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2
 stock void HealBeacon_DisplaySettingsMenu(int client)
 {
 	Menu menu = new Menu(SettingsMenu_Handler);
-	char title[64];
-	Format(title, sizeof(title), "Change Heal Beacon Settings");
-	menu.SetTitle(title);
+	menu.SetTitle("%T", "HealBeacon_MenuSettings", client);
 
-	menu.AddItem("0", "Change Heal Beacon Damage");
-	menu.AddItem("1", "Change Heal Beacon Heal Per second");
-	menu.AddItem("2", "Change The first pick timer");
-	menu.AddItem("3", "Toggle better damage mode");
-	menu.AddItem("4", "Change Heal Beacon Default Color");
+	FM_AddItemT(menu, client, "0", "HealBeacon_MenuDamage");
+	FM_AddItemT(menu, client, "1", "HealBeacon_MenuHeal");
+	FM_AddItemT(menu, client, "2", "HealBeacon_MenuTimer");
+	FM_AddItemT(menu, client, "3", "HealBeacon_MenuBetterDamage");
+	FM_AddItemT(menu, client, "4", "HealBeacon_MenuColor");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -219,12 +218,12 @@ public int SettingsMenu_Handler(Menu menu, MenuAction action, int param1, int pa
 					if (g_bIsBetterDamageModeOn)
 					{
 						g_bIsBetterDamageModeOn = false;
-						CPrintToChat(param1, "%s Better Damage Mode is now {olive}OFF!", THIS_MODE_INFO.tag);
+						CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_BetterDamageOff");
 					}
 					else
 					{
 						g_bIsBetterDamageModeOn = true;
-						CPrintToChat(param1, "%s Better Damage Mode is now {olive}ON!", THIS_MODE_INFO.tag);
+						CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_BetterDamageOn");
 					}
 				}
 				case 4:
@@ -243,7 +242,7 @@ stock void HealBeacon_DisplayBeaconDamageMenu(int client)
 {
 	Menu menu = new Menu(BeaconDamageMenu_Handler);
 	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Damage\nYou can also change the cvar sm_beacon_damage\nincase you didnt find the good\ndamage in the list\nCurrent HealBeacon Damage: %.2f", g_fHB_BeaconDamage);
+	Format(title, sizeof(title), "%T", "HealBeacon_DamageTitle", client, g_fHB_BeaconDamage);
 	menu.SetTitle(title);
 
 	menu.AddItem("1", "1");
@@ -291,7 +290,7 @@ stock void HealBeacon_DisplayBeaconHealMenu(int client)
 {
 	Menu menu = new Menu(BeaconHealMenu_Handler);
 	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Heal per second\nYou can also change the cvar sm_beacon_heal\nincase you didnt find the good\nheal in the list\nCurrent HealBeacon Heal: %d", g_iHB_BeaconHeal);
+	Format(title, sizeof(title), "%T", "HealBeacon_HealTitle", client, g_iHB_BeaconHeal);
 	menu.SetTitle(title);
 
 	for (int i = 1; i <= 7; i++)
@@ -339,7 +338,7 @@ stock void HealBeacon_DisplayBeaconTimerMenu(int client)
 {
 	Menu menu = new Menu(BeaconTimerMenu_Handler);
 	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Timer\nIt means how many seconds it will start\npicking random players for healbeacon\nafter round start");
+	Format(title, sizeof(title), "%T", "HealBeacon_TimerTitle", client);
 	menu.SetTitle(title);
 
 	menu.AddItem("10", "10");
@@ -402,7 +401,7 @@ stock void HealBeacon_DisplayBeaconDefaultColorMenu(int client)
 	}
 
 	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Default Color\nDefault Color: %s", colorName);
+	Format(title, sizeof(title), "%T", "HealBeacon_ColorTitle", client, colorName);
 	menu.SetTitle(title);
 
 	for (int i = 0; i < sizeof(g_ColorsList); i++)
@@ -445,7 +444,7 @@ public int BeaconDefaultColorMenu_Handler(Menu menu, MenuAction action, int para
 			g_ColorDefault[2] = StringToInt(buffers[2]);
 			g_ColorDefault[3] = 255;
 
-			CPrintToChat(param1, "%s You have changed the Default Beacon Color to {%s}%s.", THIS_MODE_INFO.tag, myColor.name, myColor.name);
+			CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_DefaultColorChange", myColor.name, myColor.name);
 			HealBeacon_DisplayBeaconDefaultColorMenu(param1);
 		}
 	}
@@ -459,24 +458,20 @@ stock void HealBeacon_DisplayActionsMenu(int client, int random)
 	Menu menu = new Menu(ActionsMenu_Handler);
 
 	g_iClientMenuUserId[client] = GetClientUserId(random);
-	char title[64], buffer[32];
-	Format(title, sizeof(title), "Do an Action on %N", random);
+	char title[128], buffer[32];
+	Format(title, sizeof(title), "%T", "HealBeacon_ActionsTitle", client, random);
 	menu.SetTitle(title);
 
 	Format(buffer, sizeof(buffer), "%d", GetClientUserId(random));
 
-	menu.AddItem("", "Repick randomly");
-	menu.AddItem("", "Change Beacon Color");
-	menu.AddItem("", "Change beacon radius and distance");
-
-	char light[32];
-	g_BeaconPlayersData[random].hasNeon ? Format(light, sizeof(light), "Disable Light on the player") : Format(light, sizeof(light), "Enable Light on the player");
-	menu.AddItem("", light);
-
-	menu.AddItem("", "Teleport to player");
-	menu.AddItem("", "Bring Player");
-	menu.AddItem("", "Remove Heal beacon");
-	menu.AddItem("", "Slay Player");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActRepick");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActColor");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActDistance");
+	FM_AddItemT(menu, client, "", g_BeaconPlayersData[random].hasNeon ? "HealBeacon_ActLightOff" : "HealBeacon_ActLightOn");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActTeleport");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActBring");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActRemove");
+	FM_AddItemT(menu, client, "", "HealBeacon_ActSlay");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -589,8 +584,8 @@ stock void HealBeacon_DisplayColorsMenu(int client)
 	if (!random)
 		return;
 
-	char title[64];
-	Format(title, sizeof(title), "Change beacon and neon color on %N", random);
+	char title[128];
+	Format(title, sizeof(title), "%T", "HealBeacon_ColorOnTitle", client, random);
 	menu.SetTitle(title);
 
 	for (int i = 0; i < sizeof(g_ColorsList); i++)
@@ -670,8 +665,8 @@ stock void HealBeacon_DisplayBeaconDistanceMenu(int client)
 	if (!random)
 		return;
 
-	char title[64];
-	Format(title, sizeof(title), "Change beacon radius and distance on %N", random);
+	char title[128];
+	Format(title, sizeof(title), "%T", "HealBeacon_DistanceOnTitle", client, random);
 	menu.SetTitle(title);
 
 	menu.AddItem("200", "200");
@@ -681,7 +676,7 @@ stock void HealBeacon_DisplayBeaconDistanceMenu(int client)
 	menu.AddItem("1000", "1000");
 	menu.AddItem("1500", "1500");
 
-	menu.AddItem("Empty", "These are the available distances please type sm_beacon_distance <Player> <your number> instead", ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "Empty", "HealBeacon_DistanceHint", ITEMDRAW_DISABLED);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

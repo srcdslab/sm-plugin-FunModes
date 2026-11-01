@@ -165,7 +165,7 @@ public void Event_RoundStart_Shockwave()
 {
 	Shockwave_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Shockwaves are on: when the blue ring comes, {olive}JUMP {lightgreen}over it!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Shockwave_Intro");
 }
 
 public void OnTick_Shockwave()
@@ -193,7 +193,7 @@ void Shockwave_Fire()
 	// Warning: a shrinking ring at the centre
 	DrawRingAt(g_fShockwave_Center, 80.0, 10.0, SHOCKWAVE_WARN, g_iShockwave_Color, 12.0);
 	DrawBeamDown(g_fShockwave_Center, 600.0, SHOCKWAVE_WARN, 10.0, g_iShockwave_Color);
-	CPrintToChatAll("%s {olive}SHOCKWAVE! {lightgreen}Jump when it reaches you!", THIS_MODE_INFO.tag);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Shockwave_Start");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 70);
 }
 
@@ -237,7 +237,7 @@ public void OnCheck_Shockwave(bool zombiesNow)
 		if (!(GetEntityFlags(i) & FL_ONGROUND))
 			continue;
 
-		PrintCenterText(i, "You didn't jump the shockwave!");
+		PrintCenterText(i, "%t", "Shockwave_Missed");
 		ShovePlayer(i, 0.0, 0.0, 280.0);
 		HurtPlayer(i, g_iShockwave_Damage);
 	}
@@ -251,7 +251,7 @@ public Action Cmd_ShockwaveToggle(int client, int args)
 {
 	if (!g_bShockwave_Enabled)
 	{
-		CReplyToCommand(client, "%s Shockwave is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Shockwave");
 		return Plugin_Handled;
 	}
 
@@ -259,9 +259,9 @@ public Action Cmd_ShockwaveToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Shockwave_Reset();
 
-	CPrintToChatAll("%s Shockwave is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Shockwave");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When the blue ring comes, {olive}JUMP {lightgreen}over it!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Shockwave_Hint");
 
 	return Plugin_Handled;
 }
@@ -274,10 +274,10 @@ public Action Cmd_ShockwaveSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ShockwaveSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Shockwave now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bShockwave_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Shockwave_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bShockwave_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

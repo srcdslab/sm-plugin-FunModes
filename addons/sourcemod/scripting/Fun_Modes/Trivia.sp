@@ -324,13 +324,13 @@ public void Event_RoundStart_Trivia()
 {
 	Trivia_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Trivia is on: when a question pops up, {olive}type the answer in chat{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_Intro");
 }
 
 public void Event_RoundEnd_Trivia()
 {
 	if (THIS_MODE_INFO.isOn && g_bTrivia_Active)
-		CPrintToChatAll("%s Round over - the answer was: {olive}%s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_RoundOver", g_Trivia_Cur.answers);
 
 	Trivia_Reset();
 }
@@ -348,7 +348,7 @@ void Trivia_Ask(int admin)
 	if (!g_aTrivia.Length && !Trivia_Load())
 	{
 		if (admin)
-			CPrintToChat(admin, "%s No questions loaded - check addons/sourcemod/%s.", THIS_MODE_INFO.tag, TRIVIA_CONFIG);
+			CPrintToChat(admin, "%s %t", THIS_MODE_INFO.tag, "Trivia_NoQuestions", TRIVIA_CONFIG);
 
 		LogError("[FunModes-Trivia] No questions in %s", TRIVIA_CONFIG);
 		g_fTrivia_Next = GetGameTime() + float(g_iTrivia_Every);
@@ -369,16 +369,16 @@ void Trivia_Ask(int admin)
 	g_iTrivia_Placed = 0;
 	g_sTrivia_Results[0] = '\0';
 
-	CPrintToChatAll("%s {olive}%s {lightgreen}(type the answer in chat - %d s)", THIS_MODE_INFO.tag, g_Trivia_Cur.question, g_iTrivia_Time);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_Ask", g_Trivia_Cur.question, g_iTrivia_Time);
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 130);
 }
 
 void Trivia_Finish()
 {
 	if (!g_iTrivia_Placed)
-		CPrintToChatAll("%s Time's up! Nobody got it. The answer was: {olive}%s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_Nobody", g_Trivia_Cur.answers);
 	else
-		CPrintToChatAll("%s The answer was: {olive}%s {lightgreen}- %s", THIS_MODE_INFO.tag, g_Trivia_Cur.answers, g_sTrivia_Results);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_Answer", g_Trivia_Cur.answers, g_sTrivia_Results);
 
 	Trivia_Reset();
 	g_fTrivia_Next = GetGameTime() + float(g_iTrivia_Every);
@@ -428,13 +428,13 @@ public void OnClientSayCommand_Trivia(int client, const char[] text, Action &res
 	{
 		char reward[32];
 		Trivia_Reward(client, reward, sizeof(reward));
-		CPrintToChat(client, "%s {olive}Correct! {lightgreen}(#%d, %.1f s)%s", THIS_MODE_INFO.tag, g_iTrivia_Placed, took, reward);
+		CPrintToChat(client, "%s %t%s", THIS_MODE_INFO.tag, "Trivia_Correct", g_iTrivia_Placed, took, reward);
 
 		if (g_iTrivia_Placed <= 5)
 			Format(g_sTrivia_Results, sizeof(g_sTrivia_Results), "%s%s%N (%.1f s)", g_sTrivia_Results, g_iTrivia_Placed == 1 ? "" : ", ", client, took);
 	}
 	else
-		CPrintToChat(client, "%s Correct - but the winners are already in.", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Trivia_TooLate");
 
 	if (g_iTrivia_Winners < 64 && g_iTrivia_Placed >= g_iTrivia_Winners)
 		Trivia_Finish();
@@ -469,7 +469,7 @@ public void OnTick_Trivia()
 
 		char hint[128];
 		Trivia_HintText(g_Trivia_Cur.answers, hint, sizeof(hint));
-		CPrintToChatAll("%s Hint: {olive}%s", THIS_MODE_INFO.tag, hint);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_Hint", hint);
 	}
 
 	int left = RoundToCeil(g_fTrivia_Ends - now);
@@ -479,7 +479,7 @@ public void OnTick_Trivia()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_TRIVIA, 1.1, 64, 224, 160, 255, 0, 0.0, 0.0, 0.0);
-		ShowModeHud(i, g_hTrivia_Hud, "%s\n(%d s - type the answer in chat)", g_Trivia_Cur.question, left);
+		ShowModeHud(i, g_hTrivia_Hud, "%s\n%t", g_Trivia_Cur.question, "Trivia_HudTime", left);
 	}
 }
 
@@ -487,7 +487,7 @@ public Action Cmd_TriviaToggle(int client, int args)
 {
 	if (!g_bTrivia_Enabled)
 	{
-		CReplyToCommand(client, "%s Trivia is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Trivia");
 		return Plugin_Handled;
 	}
 
@@ -495,9 +495,9 @@ public Action Cmd_TriviaToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Trivia_Reset();
 
-	CPrintToChatAll("%s Trivia is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Trivia");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When a question pops up, {olive}type the answer in chat{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Trivia_HintOn");
 
 	return Plugin_Handled;
 }
@@ -510,11 +510,11 @@ public Action Cmd_TriviaSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_TriviaSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Ask a question now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("reload", "Reload the questions");
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Trivia_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "reload", "Trivia_MenuReload");
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -547,7 +547,7 @@ int Menu_TriviaSettings(Menu menu, MenuAction action, int param1, int param2)
 			}
 			else if (strcmp(info, "reload") == 0)
 			{
-				CPrintToChat(param1, "%s Loaded {olive}%d {lightgreen}questions.", THIS_MODE_INFO.tag, Trivia_Load());
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "Trivia_Loaded", Trivia_Load());
 				Cmd_TriviaSettings(param1, 0);
 			}
 			else

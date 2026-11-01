@@ -236,10 +236,10 @@ public void Event_RoundStart_RandomWeapons()
 
 		char set[64];
 		RandomWeapons_SetName(g_iRW_SharedPrim, g_iRW_SharedSec, set, sizeof(set));
-		CPrintToChatAll("%s This round everyone gets: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RW_ThisRound", set);
 	}
 	else
-		CPrintToChatAll("%s Random Weapons is on: everyone gets their own random set.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RW_Intro");
 }
 
 public void Event_PlayerSpawn_RandomWeapons(int client)
@@ -353,7 +353,7 @@ void RandomWeapons_Give(int client, int prim, int sec, bool tell)
 	{
 		char set[64];
 		RandomWeapons_SetName(prim, sec, set, sizeof(set));
-		CPrintToChat(client, "%s Your weapons: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "RW_Yours", set);
 	}
 }
 
@@ -387,7 +387,7 @@ void RandomWeapons_GiveAll()
 
 		char set[64];
 		RandomWeapons_SetName(g_iRW_SharedPrim, g_iRW_SharedSec, set, sizeof(set));
-		CPrintToChatAll("%s Everyone gets: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RW_Everyone", set);
 	}
 
 	for (int i = 1; i <= MaxClients; i++)
@@ -411,7 +411,7 @@ public void OnBuyCommand_RandomWeapons(int client, const char[] weapon, Action &
 		|| strcmp(weapon, "primammo", false) == 0 || strcmp(weapon, "secammo", false) == 0)
 		return;
 
-	CPrintToChat(client, "%s You keep your random weapons - only kevlar and HE grenades can be bought.", THIS_MODE_INFO.tag);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "RW_NoBuy");
 	result = Plugin_Handled;
 }
 
@@ -440,20 +440,20 @@ Action Cmd_RandomWeaponsGun(int client, int args)
 {
 	if (!client || !IsHumanAlive(client))
 	{
-		CReplyToCommand(client, "%s You have to be an alive human for this.", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RW_AliveHuman");
 		return Plugin_Handled;
 	}
 
 	if (!THIS_MODE_INFO.isOn)
 	{
-		CReplyToCommand(client, "%s Random Weapons is not on.", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RW_NotOn");
 		return Plugin_Handled;
 	}
 
 	float now = GetGameTime();
 	if (now < g_fRW_GunCooldown[client])
 	{
-		CReplyToCommand(client, "%s Wait {olive}%d {lightgreen}more seconds.", THIS_MODE_INFO.tag, RoundToCeil(g_fRW_GunCooldown[client] - now));
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RW_Wait", RoundToCeil(g_fRW_GunCooldown[client] - now));
 		return Plugin_Handled;
 	}
 
@@ -471,7 +471,7 @@ public Action Cmd_RandomWeaponsToggle(int client, int args)
 {
 	if (!g_bRandomWeapons_Enabled)
 	{
-		CReplyToCommand(client, "%s Random Weapons is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Random Weapons");
 		return Plugin_Handled;
 	}
 
@@ -479,9 +479,9 @@ public Action Cmd_RandomWeaponsToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	RandomWeapons_Reset();
 
-	CPrintToChatAll("%s Random Weapons is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Random Weapons");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Everyone gets random weapons!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RW_Hint");
 
 	RandomWeapons_OnToggle(THIS_MODE_INFO.isOn);
 
@@ -496,10 +496,10 @@ public Action Cmd_RandomWeaponsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_RandomWeaponsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("reroll", "Reroll everyone's weapons now", (THIS_MODE_INFO.isOn) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "reroll", "RW_MenuReroll", (THIS_MODE_INFO.isOn) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

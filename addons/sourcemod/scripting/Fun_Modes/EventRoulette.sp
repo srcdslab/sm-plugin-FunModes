@@ -270,9 +270,9 @@ void EventRoulette_Spin(bool roundStart = false)
 	}
 
 	if (g_sRoulette_ThisRound[0])
-		CPrintToChatAll("%s The roulette picked: {olive}%s", THIS_MODE_INFO.tag, g_sRoulette_ThisRound);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Roulette_Picked", g_sRoulette_ThisRound);
 	else
-		CPrintToChatAll("%s No mode left to pick in the roulette.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Roulette_NoMode");
 
 	EventRoulette_PlanShuffle();
 }
@@ -299,7 +299,7 @@ public void OnTick_EventRoulette()
 
 	int left = RoundToCeil(g_fRoulette_NextShuffle - GetGameTime());
 	if (left > 0 && left <= 3)
-		PrintCenterTextAll("Event shuffle in %d...", left);
+		PrintCenterTextAll("%t", "Roulette_Countdown", left);
 
 	if (left <= 0)
 		EventRoulette_Spin();
@@ -345,7 +345,7 @@ void EventRoulette_SavePool()
 void EventRoulette_PoolMenu(int client, int firstItem)
 {
 	Menu menu = new Menu(Menu_EventRoulettePool);
-	menu.SetTitle("%s - Modes the roulette can pick", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "Roulette_PoolTitle", client, THIS_MODE_INFO.name);
 
 	char index[4], line[64];
 	for (int i = 0; i < g_iLastModeIndex; i++)
@@ -395,7 +395,7 @@ public Action Cmd_EventRouletteToggle(int client, int args)
 {
 	if (!g_bEventRoulette_Enabled)
 	{
-		CReplyToCommand(client, "%s Event Roulette is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Event Roulette");
 		return Plugin_Handled;
 	}
 
@@ -403,9 +403,9 @@ public Action Cmd_EventRouletteToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	EventRoulette_Reset();
 
-	CPrintToChatAll("%s Event Roulette is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Event Roulette");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Random modes every round!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Roulette_Hint");
 
 	EventRoulette_OnToggle(THIS_MODE_INFO.isOn);
 
@@ -420,11 +420,11 @@ public Action Cmd_EventRouletteSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_EventRouletteSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("spin", "Spin again now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("pool", "Modes in the roulette...");
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "spin", "Roulette_MenuSpin", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "pool", "Roulette_MenuPool");
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

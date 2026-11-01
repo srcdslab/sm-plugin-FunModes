@@ -137,7 +137,7 @@ public void Event_RoundStart_LastStand()
 {
 	LastStand_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Last Stand is on: when only {olive}%d {lightgreen}human%s remain, they get a power boost!", THIS_MODE_INFO.tag, g_iLastStand_At, g_iLastStand_At == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iLastStand_At == 1 ? "LastStand_Intro" : "LastStand_IntroPlural", g_iLastStand_At);
 }
 
 void LastStand_Trigger()
@@ -157,15 +157,25 @@ void LastStand_Trigger()
 			SetEntityHealth(i, GetClientHealth(i) + g_iLastStand_Health);
 	}
 
-	char bonus[64];
-	if (g_iLastStand_Health > 0)
-		FormatEx(bonus, sizeof(bonus), "+%d HP", g_iLastStand_Health);
+	char bonus[96], speed[64];
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsFakeClient(i))
+			continue;
 
-	if (g_fLastStand_Speed > 1.001)
-		Format(bonus, sizeof(bonus), "%s%sx%.2f speed", bonus, bonus[0] ? ", " : "", g_fLastStand_Speed);
+		bonus[0] = '\0';
+		if (g_iLastStand_Health > 0)
+			FormatEx(bonus, sizeof(bonus), "+%d HP", g_iLastStand_Health);
 
-	CPrintToChatAll("%s Only {olive}%d {lightgreen}human%s left - {olive}LAST STAND!%s%s", THIS_MODE_INFO.tag, count, count == 1 ? "" : "s", bonus[0] ? " " : "", bonus);
-	PrintCenterTextAll("LAST STAND!");
+		if (g_fLastStand_Speed > 1.001)
+		{
+			FormatEx(speed, sizeof(speed), "%T", "LastStand_Speed", i, g_fLastStand_Speed);
+			Format(bonus, sizeof(bonus), "%s%s%s", bonus, bonus[0] ? ", " : "", speed);
+		}
+
+		CPrintToChat(i, "%s %t%s%s", THIS_MODE_INFO.tag, count == 1 ? "LastStand_Start" : "LastStand_StartPlural", count, bonus[0] ? " " : "", bonus);
+	}
+	PrintCenterTextAll("%t", "LastStand_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 200);
 }
 
@@ -212,7 +222,7 @@ public Action Cmd_LastStandToggle(int client, int args)
 {
 	if (!g_bLastStand_Enabled)
 	{
-		CReplyToCommand(client, "%s Last Stand is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Last Stand");
 		return Plugin_Handled;
 	}
 
@@ -220,9 +230,9 @@ public Action Cmd_LastStandToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	LastStand_Reset();
 
-	CPrintToChatAll("%s Last Stand is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Last Stand");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When only a few humans remain, they get a {olive}power boost{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "LastStand_Hint");
 
 	return Plugin_Handled;
 }
@@ -235,10 +245,10 @@ public Action Cmd_LastStandSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_LastStandSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Trigger it now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bLastStand_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "LastStand_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bLastStand_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

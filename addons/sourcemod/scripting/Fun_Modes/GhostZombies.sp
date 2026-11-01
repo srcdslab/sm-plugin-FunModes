@@ -202,7 +202,7 @@ public Action Cmd_GhostZombiesToggle(int client, int args)
 {
 	if (!g_bGhostZombies_Enabled)
 	{
-		CReplyToCommand(client, "%s Ghost Zombies is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Ghost Zombies");
 		return Plugin_Handled;
 	}
 
@@ -210,9 +210,9 @@ public Action Cmd_GhostZombiesToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	GhostZombies_Reset();
 
-	CPrintToChatAll("%s Ghost Zombies is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Ghost Zombies");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s The zombies are now {olive}ghosts{lightgreen}...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Ghost_Hint");
 
 	return Plugin_Handled;
 }
@@ -225,9 +225,9 @@ public Action Cmd_GhostZombiesSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_GhostZombiesSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

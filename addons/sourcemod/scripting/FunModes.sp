@@ -398,7 +398,7 @@ Action Cmd_FunModes(int client, int args)
 	Menu menu = new Menu(Menu_MainModes);
 	menu.SetTitle("FunModes\n ");
 
-	char index[6], line[64], name[48];
+	char index[6], line[96], name[48];
 
 	// Modes that don't belong to a category (the Event Roulette) come first
 	for (int i = 0; i < g_iLastModeIndex; i++)
@@ -430,14 +430,18 @@ Action Cmd_FunModes(int client, int args)
 
 		FormatEx(index, sizeof(index), "c%d", cat);
 		if (on)
-			FormatEx(line, sizeof(line), "%s  (%d on)", g_sCategoryNames[cat], on);
+		{
+			char catName[64];
+			FormatEx(catName, sizeof(catName), "%T", g_sCategoryNames[cat], client);
+			FormatEx(line, sizeof(line), "%T", "FM_MenuCategoryOn", client, catName, on);
+		}
 		else
-			FormatEx(line, sizeof(line), "%s", g_sCategoryNames[cat]);
+			FormatEx(line, sizeof(line), "%T", g_sCategoryNames[cat], client);
 
 		menu.AddItem(index, line);
 	}
 
-	menu.AddItem("t", FunModes_AnyModeOn() ? "Admin tools (stop all)" : "Admin tools");
+	FM_AddItemT(menu, client, "t", FunModes_AnyModeOn() ? "FM_MenuToolsStop" : "FM_MenuTools");
 
 	// Everything on one page, like the eventmodes menu
 	if (menu.ItemCount <= 9)
@@ -475,9 +479,9 @@ int Menu_MainModes(Menu menu, MenuAction action, int param1, int param2)
 void DisplayToolsMenu(int client)
 {
 	Menu menu = new Menu(Menu_Tools);
-	menu.SetTitle("FunModes - Admin tools\nSettings are saved as soon as they change\n ");
+	menu.SetTitle("FunModes - %T\n ", "FM_ToolsTitle", client);
 
-	menu.AddItem("stop", "Stop all modes", FunModes_AnyModeOn() ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "stop", "FM_StopAll", FunModes_AnyModeOn() ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -516,7 +520,7 @@ void FunModes_StopAll(int client)
 	for (int i = 0; i < g_iLastModeIndex; i++)
 		FunModes_SetModeState(i, false, client);
 
-	CPrintToChatAll("{gold}[FunModes]{lightgreen} {olive}%N {lightgreen}stopped all the modes.", client);
+	CPrintToChatAll("{gold}[FunModes]{lightgreen} %t", "FM_StoppedAll", client);
 	LogAction(client, -1, "\"%L\" stopped all the funmodes", client);
 }
 
@@ -525,7 +529,7 @@ void DisplayCategory(int client, int cat)
 	g_iMenuCategory[client] = cat;
 
 	Menu menu = new Menu(Menu_Category);
-	menu.SetTitle("FunModes - %s\n ", g_sCategoryNames[cat]);
+	menu.SetTitle("FunModes - %T\n ", g_sCategoryNames[cat], client);
 
 	char index[4], line[64], name[48];
 	for (int i = 0; i < g_iLastModeIndex; i++)
@@ -739,7 +743,7 @@ void FunModes_CvarLine(FM_ConVar cvar, bool isEnable, char[] line, int maxlen)
 
 	if (isEnable)
 	{
-		FormatEx(line, maxlen, "Allowed on this server: %s", value);
+		FormatEx(line, maxlen, "%t", "FM_AllowedOnServer", value);
 		return;
 	}
 
@@ -794,12 +798,12 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 	bool isOn = g_ModesInfo[modeIndex].isOn;
 	menu.SetTitle("%s - %s\n ", name, isOn ? "ON" : "OFF");
 
-	char info[12], line[96];
+	char info[12], line[128];
 	FormatEx(info, sizeof(info), "t%d", modeIndex);
 	if (enabled)
-		FormatEx(line, sizeof(line), "Turn %s %s", name, isOn ? "OFF" : "ON");
+		FormatEx(line, sizeof(line), "%T", isOn ? "FM_TurnOff" : "FM_TurnOn", client, name);
 	else
-		FormatEx(line, sizeof(line), "Turn %s ON (not allowed, see below)", name);
+		FormatEx(line, sizeof(line), "%T", "FM_TurnOnNotAllowed", client, name);
 
 	menu.AddItem(info, line, enabled ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
@@ -816,6 +820,7 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 			if (isEnable != (pass == 1))
 				continue;
 
+			SetGlobalTransTarget(client);
 			FunModes_CvarLine(cvar, isEnable, line, sizeof(line));
 			FormatEx(info, sizeof(info), "c%d:%d", modeIndex, i);
 
@@ -826,7 +831,7 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 	}
 
 	FormatEx(info, sizeof(info), "s%d", modeIndex);
-	menu.AddItem(info, "More options...");
+	FM_AddItemT(menu, client, info, "FM_MoreOptions");
 
 	menu.ExitBackButton = true;
 	menu.DisplayAt(client, firstItem, MENU_TIME_FOREVER);
@@ -863,7 +868,7 @@ void FunModes_StepCvar(int client, int modeIndex, int cvarIndex)
 	// Just to avoid some random sourcemod bug...
 	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue, sizeof(FM_ConVar::currentValue), value);
 
-	CPrintToChat(client, "{gold}[FunModes]{lightgreen} You have changed {olive}%s {lightgreen}value to {olive}%s.", cvar.name, value);
+	CPrintToChat(client, "{gold}[FunModes]{lightgreen} %t", "FM_CvarChanged", cvar.name, value);
 }
 
 int Menu_DisplayConVars(Menu menu, MenuAction action, int param1, int param2)
@@ -929,7 +934,7 @@ void ShowCvarsInfo(int client, ModeInfo info)
 
 	Menu menu = new Menu(Menu_CvarsInfo);
 
-	menu.SetTitle("%s - ConVars List", info.name);
+	menu.SetTitle("%T", "FM_CvarsListTitle", client, info.name);
 
 	for (int i = 0; i < sizeof(ModeInfo::cvars); i++)
 	{
@@ -1044,7 +1049,7 @@ int Menu_ShowCvarInfo(Menu menu, MenuAction action, int param1, int param2)
 			// Just to avoid some random sourcemod bug...
 			strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue, sizeof(FM_ConVar::currentValue), dataEx[2]);
 
-			CPrintToChat(param1, "{gold}[FunModes]{lightgreen} You have changed {olive}%s {lightgreen}value to {olive}%s.", cvar.name, dataEx[2]);
+			CPrintToChat(param1, "{gold}[FunModes]{lightgreen} %t", "FM_CvarChanged", cvar.name, dataEx[2]);
 
 			ShowCvarInfo(param1, cvar);
 		}
@@ -1069,7 +1074,7 @@ Action Cmd_FunModesCvars(int client, int args)
 {
 	if (args < 1)
 	{
-		CReplyToCommand(client, "[FunModes] Usage: sm_fmcvar <cvar> <value>");
+		CReplyToCommand(client, "[FunModes] %t", "FM_Usage", "sm_fmcvar <cvar> <value>");
 		return Plugin_Handled;
 	}
 
@@ -1099,13 +1104,13 @@ Action Cmd_FunModesCvars(int client, int args)
 
 	if (!exists)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Cannot find the specified cvar.");
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FM_CvarNotFound");
 		return Plugin_Handled;
 	}
 
 	if (args < 2)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %s value is: {olive}%s", cvar.name, cvar.currentValue);
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FM_CvarValue", cvar.name, cvar.currentValue);
 		return Plugin_Handled;
 	}
 
@@ -1117,7 +1122,7 @@ Action Cmd_FunModesCvars(int client, int args)
 	int modeIndex = cvar.modeIndex;
 
 	g_ModesInfo[modeIndex].cvars[cvarIndex] = cvar;
-	CReplyToCommand(client, "{gold}[FunModes]{lightgreen} changed %s value to: {olive}%s", cvar.name, cvar.currentValue);
+	CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FM_CvarSet", cvar.name, cvar.currentValue);
 
 	return Plugin_Handled;
 }
@@ -1375,7 +1380,7 @@ Action Cmd_FunModesState(int client, int args)
 		if (client)
 			Cmd_FunModes(client, 0);
 		else
-			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off] | sm_fm list | sm_fm stop");
+			ReplyToCommand(client, "[FunModes] %t", "FM_Usage", "sm_fm <mode> [on|off] | sm_fm list | sm_fm stop");
 
 		return Plugin_Handled;
 	}
@@ -1413,7 +1418,7 @@ Action Cmd_FunModesState(int client, int args)
 	int modeIndex = FunModes_FindMode(arg);
 	if (modeIndex == -1)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Unknown mode {olive}%s{lightgreen}, type sm_fm list", arg);
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FM_UnknownMode", arg);
 		return Plugin_Handled;
 	}
 
@@ -1428,13 +1433,13 @@ Action Cmd_FunModesState(int client, int args)
 			on = false;
 		else
 		{
-			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off]");
+			ReplyToCommand(client, "[FunModes] %t", "FM_Usage", "sm_fm <mode> [on|off]");
 			return Plugin_Handled;
 		}
 	}
 
 	if (!FunModes_SetModeState(modeIndex, on, client))
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Couldn't turn {olive}%s {lightgreen}%s.", g_ModesInfo[modeIndex].name, on ? "on" : "off");
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", on ? "FM_CouldntTurnOn" : "FM_CouldntTurnOff", g_ModesInfo[modeIndex].name);
 	else
 		LogAction(client, -1, "\"%L\" turned the funmode %s %s", client, g_ModesInfo[modeIndex].name, on ? "on" : "off");
 

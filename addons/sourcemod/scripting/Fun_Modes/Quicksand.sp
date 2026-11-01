@@ -177,7 +177,7 @@ public void Event_RoundStart_Quicksand()
 {
 	Quicksand_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Quicksand is on: avoid the {olive}brown patches{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_Intro");
 }
 
 bool Quicksand_IsInside(int client)
@@ -214,7 +214,7 @@ void Quicksand_Spawn()
 	}
 
 	if (made)
-		CPrintToChatAll("%s {olive}Quicksand! {lightgreen}Get out of the brown patches!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_Start");
 }
 
 public void OnCheck_Quicksand(bool zombiesNow)
@@ -239,7 +239,7 @@ public void OnTick_Quicksand()
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && !IsFakeClient(i) && Quicksand_IsInside(i))
-			PrintCenterText(i, "QUICKSAND! Get out!");
+			PrintCenterText(i, "%t", "Quicksand_Center");
 	}
 
 	if (HazardDue(g_fQuicksand_Next, g_iQuicksand_Every))
@@ -250,7 +250,7 @@ public Action Cmd_QuicksandToggle(int client, int args)
 {
 	if (!g_bQuicksand_Enabled)
 	{
-		CReplyToCommand(client, "%s Quicksand is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Quicksand");
 		return Plugin_Handled;
 	}
 
@@ -258,9 +258,9 @@ public Action Cmd_QuicksandToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Quicksand_Reset();
 
-	CPrintToChatAll("%s Quicksand is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Quicksand");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Avoid the {olive}brown patches{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_Hint");
 
 	return Plugin_Handled;
 }
@@ -273,10 +273,10 @@ public Action Cmd_QuicksandSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_QuicksandSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Quicksand now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Quicksand_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

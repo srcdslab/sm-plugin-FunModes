@@ -179,7 +179,7 @@ public void Event_RoundStart_ToxicGas()
 {
 	ToxicGas_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Toxic Gas is on: stay out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_Intro");
 }
 
 void ToxicGas_Release()
@@ -201,7 +201,7 @@ void ToxicGas_Release()
 
 	if (made)
 	{
-		CPrintToChatAll("%s Toxic gas is leaking - get out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_Start");
 		EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 55);
 	}
 }
@@ -264,7 +264,7 @@ public Action Cmd_ToxicGasToggle(int client, int args)
 {
 	if (!g_bToxicGas_Enabled)
 	{
-		CReplyToCommand(client, "%s Toxic Gas is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Toxic Gas");
 		return Plugin_Handled;
 	}
 
@@ -272,9 +272,9 @@ public Action Cmd_ToxicGasToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	ToxicGas_Reset();
 
-	CPrintToChatAll("%s Toxic Gas is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Toxic Gas");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Stay out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_Hint");
 
 	return Plugin_Handled;
 }
@@ -287,10 +287,10 @@ public Action Cmd_ToxicGasSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ToxicGasSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Release gas now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "ToxicGas_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

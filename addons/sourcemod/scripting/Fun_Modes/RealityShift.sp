@@ -213,7 +213,7 @@ public Action Cmd_RealityShiftToggle(int client, int args)
 {
     if (!g_bRealityShift_Enabled)
     {
-        CReplyToCommand(client, "%s RealityShift Mode is currently Disabled", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "RealityShift Mode");
         return Plugin_Handled;
     }
 
@@ -227,9 +227,10 @@ public Action Cmd_RealityShiftToggle(int client, int args)
     THIS_MODE_INFO.byRoulette = false;
 
     CPrintToChatAll(
-        "%s RealityShift Mode is now %s!",
+        "%s %t",
         THIS_MODE_INFO.tag,
-        THIS_MODE_INFO.isOn ? "On" : "Off"
+        THIS_MODE_INFO.isOn ? "FM_NowOnPlain" : "FM_NowOffPlain",
+        "RealityShift Mode"
     );
 
     if (THIS_MODE_INFO.isOn)
@@ -247,23 +248,26 @@ public Action Cmd_RealityShiftToggle(int client, int args)
         );
 
         CPrintToChatAll(
-            "%s Each human will be swapped with another one!",
-            THIS_MODE_INFO.tag
+            "%s %t",
+            THIS_MODE_INFO.tag,
+            "RS_Intro"
         );
 
         if (g_iRealityShift_Mode == 0)
         {
             CPrintToChatAll(
-                "%s The positions will be swapped randomly.",
-                THIS_MODE_INFO.tag
+                "%s %t",
+                THIS_MODE_INFO.tag,
+                "RS_Random"
             );
         }
 
         int interval = RoundToNearest(g_fRealityShift_TimerInterval);
 
         CPrintToChatAll(
-            "%s Positions will be swapped every {olive}%d seconds!",
+            "%s %t",
             THIS_MODE_INFO.tag,
+            "RS_Every",
             interval
         );
 
@@ -292,10 +296,10 @@ public Action Cmd_RealityShiftSettings(int client, int args)
 
     Menu menu = new Menu(Menu_RealityShiftSettings);
 
-    menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+    menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-    menu.AddItem("now", "Swap positions now", (THIS_MODE_INFO.isOn && !g_bRoundEnd && g_hRealityShiftCountdown == null) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-    menu.AddItem("cvars", "Show Cvars\n");
+    FM_AddItemT(menu, client, "now", "RS_MenuNow", (THIS_MODE_INFO.isOn && !g_bRoundEnd && g_hRealityShiftCountdown == null) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+    FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
     menu.ExitBackButton = true;
 
@@ -407,7 +411,7 @@ Action RealityShift_CountdownTimer(Handle timer)
 
 void RealityShift_CountdownTick()
 {
-    PrintCenterTextAll("Positions swap in %d...", g_iRealityShiftCountdown);
+    PrintCenterTextAll("%t", "RS_Countdown", g_iRealityShiftCountdown);
     EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 100 + 20 * (g_iRealityShift_Warn - g_iRealityShiftCountdown));
     g_iRealityShiftCountdown--;
 }
@@ -532,15 +536,17 @@ void RealityShift_AssignPlayers(bool saveOnly = false, bool random = true)
 
             CPrintToChat(
                 client,
-                "%s You will swap with {olive}%N {lightgreen} all round!",
+                "%s %t",
                 THIS_MODE_INFO.tag,
+                "RS_Assigned",
                 assignedTo
             );
 
             CPrintToChat(
                 assignedTo,
-                "%s You will swap with {olive}%N {lightgreen} all round!",
+                "%s %t",
                 THIS_MODE_INFO.tag,
+                "RS_Assigned",
                 client
             );
         }
@@ -596,15 +602,17 @@ void RealityShift_SwapPositions(int client, int assignedTo)
 
     CPrintToChat(
         client,
-        "%s You swapped positions with {olive}%N",
+        "%s %t",
         THIS_MODE_INFO.tag,
+        "RS_Swapped",
         assignedTo
     );
 
     CPrintToChat(
         assignedTo,
-        "%s You swapped positions with {olive}%N",
+        "%s %t",
         THIS_MODE_INFO.tag,
+        "RS_Swapped",
         client
     );
 

@@ -170,7 +170,7 @@ public void Event_RoundStart_Airstrike()
 {
 	g_fAirstrike_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Airstrikes are on: when the siren sounds, {olive}scatter{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Airstrike_Intro");
 }
 
 public void OnTick_Airstrike()
@@ -186,8 +186,8 @@ void Airstrike_Call()
 	if (!count)
 		return;
 
-	CPrintToChatAll("%s {olive}AIRSTRIKE INCOMING {lightgreen}in {olive}%d {lightgreen}seconds - SCATTER!", THIS_MODE_INFO.tag, g_iAirstrike_Warn);
-	PrintCenterTextAll("AIRSTRIKE INCOMING!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Airstrike_Start", g_iAirstrike_Warn);
+	PrintCenterTextAll("%t", "Airstrike_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 50);
 
 	// Aim now (where the humans are), the bombs fall one by one after the warning
@@ -226,7 +226,7 @@ public Action Cmd_AirstrikeToggle(int client, int args)
 {
 	if (!g_bAirstrike_Enabled)
 	{
-		CReplyToCommand(client, "%s Airstrike is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Airstrike");
 		return Plugin_Handled;
 	}
 
@@ -234,9 +234,9 @@ public Action Cmd_AirstrikeToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Airstrike_Reset();
 
-	CPrintToChatAll("%s Airstrike is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Airstrike");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When the siren sounds, {olive}scatter{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Airstrike_Hint");
 
 	return Plugin_Handled;
 }
@@ -249,10 +249,10 @@ public Action Cmd_AirstrikeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_AirstrikeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Call an airstrike now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Airstrike_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -160,7 +160,7 @@ public void Event_RoundStart_Lightning()
 {
 	g_fLightning_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Lightning Strikes are on: when you see a {olive}red ring {lightgreen}under you, MOVE!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_Intro");
 }
 
 public void OnTick_Lightning()
@@ -198,7 +198,7 @@ void Lightning_Wave()
 		// A ring the size of the blast that shrinks to the centre as the bolt comes
 		DrawRingAt(pos, g_fLightning_Radius, 5.0, LIGHTNING_WARN_TIME, g_iLightning_WarnColor, 6.0);
 		EmitAmbientSound(Beacon_Sound, pos, SOUND_FROM_WORLD, SNDLEVEL_NORMAL, _, _, 70);
-		PrintCenterText(target, "LIGHTNING! MOVE!");
+		PrintCenterText(target, "%t", "Lightning_Center");
 
 		DataPack pack;
 		CreateDataTimer(LIGHTNING_WARN_TIME, Lightning_StrikeTimer, pack, TIMER_FLAG_NO_MAPCHANGE);
@@ -254,7 +254,7 @@ void Lightning_Strike(const float pos[3])
 			continue;
 
 		if (GetClientHealth(i) - g_iLightning_Damage <= 0)
-			CPrintToChatAll("%s {olive}%N {lightgreen}was struck by lightning!", THIS_MODE_INFO.tag, i);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_Struck", i);
 
 		HurtPlayer(i, g_iLightning_Damage);
 	}
@@ -264,7 +264,7 @@ public Action Cmd_LightningToggle(int client, int args)
 {
 	if (!g_bLightning_Enabled)
 	{
-		CReplyToCommand(client, "%s Lightning Strikes is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Lightning Strikes");
 		return Plugin_Handled;
 	}
 
@@ -272,9 +272,9 @@ public Action Cmd_LightningToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Lightning_Reset();
 
-	CPrintToChatAll("%s Lightning Strikes is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Lightning Strikes");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When you see a {olive}red ring {lightgreen}under you, MOVE!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_Hint");
 
 	return Plugin_Handled;
 }
@@ -287,10 +287,10 @@ public Action Cmd_LightningSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_LightningSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Lightning now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Lightning_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

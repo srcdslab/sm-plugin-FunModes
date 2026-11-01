@@ -146,7 +146,7 @@ public void OnMapEnd_WindGusts()
 	WindGusts_Reset();
 }
 
-char g_sWind_LevelNames[][] = { "Breeze", "Wind", "Strong wind", "Storm", "Hurricane" };
+char g_sWind_LevelNames[][] = { "Wind_Level_Breeze", "Wind_Level_Wind", "Wind_Level_Strong", "Wind_Level_Storm", "Wind_Level_Hurricane" };   // phrase names
 float g_fWind_LevelPush[] = { 15.0, 30.0, 50.0, 80.0, 120.0 };   // speed added every 0.2 s
 
 bool g_bWind_Active;
@@ -171,7 +171,7 @@ public void Event_RoundStart_WindGusts()
 {
 	WindGusts_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Wind is on: hold on tight when the storm comes!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Wind_Intro");
 }
 
 int WindGusts_Level()
@@ -187,8 +187,16 @@ void WindGusts_Start()
 
 	if (g_iWind_Every > 0)
 	{
-		CPrintToChatAll("%s {olive}%s {lightgreen}is blowing for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_sWind_LevelNames[WindGusts_Level()], g_iWind_Last);
-		PrintCenterTextAll("WIND!");
+		char level[64];
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (!IsClientInGame(i) || IsFakeClient(i))
+				continue;
+
+			FormatEx(level, sizeof(level), "%T", g_sWind_LevelNames[WindGusts_Level()], i);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Wind_Start", level, g_iWind_Last);
+		}
+		PrintCenterTextAll("%t", "Wind_Center");
 	}
 
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 90);
@@ -197,7 +205,7 @@ void WindGusts_Start()
 /* Compass name for the way the wind pushes (Source: +x east, +y north) */
 void WindGusts_Direction(char[] buffer, int maxlen)
 {
-	static const char names[][] = { "east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east" };
+	static const char names[][] = { "Wind_Dir_E", "Wind_Dir_NE", "Wind_Dir_N", "Wind_Dir_NW", "Wind_Dir_W", "Wind_Dir_SW", "Wind_Dir_S", "Wind_Dir_SE" };   // phrase names
 
 	int sector = RoundToNearest(g_fWind_Angle / (3.14159 / 4.0)) % 8;
 	if (sector < 0)
@@ -238,7 +246,7 @@ public void OnTick_WindGusts()
 	else if (g_bWind_Active && GetGameTime() >= g_fWind_Ends)
 	{
 		g_bWind_Active = false;
-		PrintCenterTextAll("The wind dies down");
+		PrintCenterTextAll("%t", "Wind_Over");
 	}
 	else if (!g_bWind_Active && HazardDue(g_fWind_Next, g_iWind_Every))
 		WindGusts_Start();
@@ -246,7 +254,7 @@ public void OnTick_WindGusts()
 	if (!g_bWind_Active)
 		return;
 
-	char dir[16];
+	char dir[32];
 	WindGusts_Direction(dir, sizeof(dir));
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -254,7 +262,10 @@ public void OnTick_WindGusts()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_WIND, 1.1, 200, 230, 230, 255, 0, 0.0, 0.0, 0.0);
-		ShowModeHud(i, g_hWind_Hud, "%s blowing %s", g_sWind_LevelNames[WindGusts_Level()], dir);
+		char level[64], dirName[64];
+		FormatEx(level, sizeof(level), "%T", g_sWind_LevelNames[WindGusts_Level()], i);
+		FormatEx(dirName, sizeof(dirName), "%T", dir, i);
+		ShowModeHud(i, g_hWind_Hud, "%t", "Wind_Hud", level, dirName);
 	}
 }
 
@@ -262,7 +273,7 @@ public Action Cmd_WindGustsToggle(int client, int args)
 {
 	if (!g_bWindGusts_Enabled)
 	{
-		CReplyToCommand(client, "%s Wind Gusts is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Wind Gusts");
 		return Plugin_Handled;
 	}
 
@@ -270,9 +281,9 @@ public Action Cmd_WindGustsToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	WindGusts_Reset();
 
-	CPrintToChatAll("%s Wind Gusts is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Wind Gusts");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hold on tight when the storm comes!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Wind_Hint");
 
 	return Plugin_Handled;
 }
@@ -285,10 +296,10 @@ public Action Cmd_WindGustsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_WindGustsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Wind now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bWind_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Wind_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bWind_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

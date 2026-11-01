@@ -212,7 +212,7 @@ public void Event_RoundStart_Earthquake()
 {
 	Earthquake_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Earthquakes are on: watch your footing on the narrow paths!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quake_Intro");
 }
 
 int Earthquake_Level(int value, int count)
@@ -248,7 +248,7 @@ void Earthquake_Start()
 		if (amp > 0.0 && (HazardHits(i, g_bQuake_Everyone) || !IsPlayerAlive(i) || g_bQuake_Everyone))
 			Earthquake_SendShake(i, amp, frequency, float(g_iQuake_Last));
 
-		PrintCenterText(i, "EARTHQUAKE!");
+		PrintCenterText(i, "%t", "Quake_Center");
 	}
 
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 30);
@@ -302,7 +302,7 @@ public Action Cmd_EarthquakeToggle(int client, int args)
 {
 	if (!g_bEarthquake_Enabled)
 	{
-		CReplyToCommand(client, "%s Earthquake is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Earthquake");
 		return Plugin_Handled;
 	}
 
@@ -310,9 +310,9 @@ public Action Cmd_EarthquakeToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Earthquake_Reset();
 
-	CPrintToChatAll("%s Earthquake is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Earthquake");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Watch your footing on the narrow paths!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quake_Hint");
 
 	Earthquake_OnToggle(THIS_MODE_INFO.isOn);
 
@@ -327,10 +327,10 @@ public Action Cmd_EarthquakeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_EarthquakeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Earthquake now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bQuake_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Quake_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bQuake_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -738,3 +738,10 @@ stock void ShowModeHud(int client, Handle sync, const char[] format, any ...)
 
 	ShowSyncHudText(client, sync, "%s", text);
 }
+
+stock void FM_AddItemT(Menu menu, int client, const char[] info, const char[] phrase, int style = ITEMDRAW_DEFAULT, const char[] suffix = "")
+{
+	char display[192];
+	FormatEx(display, sizeof(display), "%T%s", phrase, client, suffix);
+	menu.AddItem(info, display, style);
+}

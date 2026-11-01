@@ -149,7 +149,7 @@ public void Event_RoundStart_MagnetPull()
 {
 	MagnetPull_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Magnet is on: sometimes something pulls you towards {olive}%s{lightgreen}...", THIS_MODE_INFO.tag, g_iMagnet_Target == 0 ? "the zombies" : "each other");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iMagnet_Target == 0 ? "Magnet_IntroZombies" : "Magnet_IntroEachOther");
 }
 
 /* The middle point of the zombies or the humans, false if nobody's there */
@@ -186,8 +186,8 @@ void MagnetPull_Start()
 	g_bMagnet_Active = true;
 	g_fMagnet_Ends = GetGameTime() + float(g_iMagnet_Last);
 
-	CPrintToChatAll("%s {olive}MAGNETIC PULSE! {lightgreen}You're being pulled towards {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, g_iMagnet_Target == 0 ? "the zombies" : "each other");
-	PrintCenterTextAll("MAGNETIC PULL!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iMagnet_Target == 0 ? "Magnet_StartZombies" : "Magnet_StartEachOther");
+	PrintCenterTextAll("%t", "Magnet_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 75);
 }
 
@@ -237,7 +237,7 @@ public Action Cmd_MagnetPullToggle(int client, int args)
 {
 	if (!g_bMagnetPull_Enabled)
 	{
-		CReplyToCommand(client, "%s Magnet Pull is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Magnet Pull");
 		return Plugin_Handled;
 	}
 
@@ -245,9 +245,9 @@ public Action Cmd_MagnetPullToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	MagnetPull_Reset();
 
-	CPrintToChatAll("%s Magnet Pull is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Magnet Pull");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Sometimes something pulls you...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Magnet_Hint");
 
 	return Plugin_Handled;
 }
@@ -260,10 +260,10 @@ public Action Cmd_MagnetPullSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_MagnetPullSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Magnetic pulse now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bMagnet_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Magnet_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bMagnet_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

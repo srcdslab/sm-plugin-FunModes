@@ -140,27 +140,28 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 {
 	if (!g_bDoubleJump_Enabled)
 	{
-		CReplyToCommand(client, "%s DoubleJump disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "DJ_Disabled");
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll(
-		"%s DoubleJump is now %s",
-		THIS_MODE_INFO.tag,
-		THIS_MODE_INFO.isOn ? "Enabled" : "Disabled"
-	);
-
-	if (THIS_MODE_INFO.isOn)
+	char state[32], humans[32], zombies[32];
+	for (int i = 1; i <= MaxClients; i++)
 	{
-		CPrintToChatAll(
-			"%s Humans: %s | Zombies: %s",
-			THIS_MODE_INFO.tag,
-			g_bDoubleJump_Humans ? "Enabled" : "Disabled",
-			g_bDoubleJump_Zombies ? "Enabled" : "Disabled"
-		);
+		if (!IsClientInGame(i) || IsFakeClient(i))
+			continue;
+
+		FormatEx(state, sizeof(state), "%T", THIS_MODE_INFO.isOn ? "FM_WordEnabled" : "FM_WordDisabled", i);
+		CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "DJ_NowState", state);
+
+		if (THIS_MODE_INFO.isOn)
+		{
+			FormatEx(humans, sizeof(humans), "%T", g_bDoubleJump_Humans ? "FM_WordEnabled" : "FM_WordDisabled", i);
+			FormatEx(zombies, sizeof(zombies), "%T", g_bDoubleJump_Zombies ? "FM_WordEnabled" : "FM_WordDisabled", i);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "DJ_Status", humans, zombies);
+		}
 	}
 
 	return Plugin_Handled;
@@ -217,9 +218,9 @@ public Action Cmd_DoubleJumpSettings(int client, int args)
 {
 	Menu menu = new Menu(Menu_DoubleJumpSettings);
 
-	menu.SetTitle("%s Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars");
+	FM_AddItemT(menu, client, NULL_STRING, "FM_MenuShowCvars", ITEMDRAW_DEFAULT);
 
 	menu.ExitBackButton = true;
 

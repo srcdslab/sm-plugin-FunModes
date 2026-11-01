@@ -171,7 +171,7 @@ public void Event_RoundStart_Nuke()
 {
 	Nuke_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Nuke Countdown is on: when the siren sounds, get to the {olive}green bunker{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Nuke_Intro");
 }
 
 void Nuke_Launch()
@@ -185,8 +185,8 @@ void Nuke_Launch()
 	g_bNuke_Active = true;
 	g_bNuke_DoneThisRound = true;
 
-	CPrintToChatAll("%s {olive}NUCLEAR STRIKE IN %d SECONDS! {lightgreen}Get to the green bunker near {olive}%N{lightgreen}!", THIS_MODE_INFO.tag, g_iNuke_Countdown, list[0]);
-	PrintCenterTextAll("NUCLEAR STRIKE IN %d SECONDS!", g_iNuke_Countdown);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Nuke_Start", g_iNuke_Countdown, list[0]);
+	PrintCenterTextAll("%t", "Nuke_Center", g_iNuke_Countdown);
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 40);
 }
 
@@ -216,7 +216,7 @@ void Nuke_Detonate()
 	}
 
 	EmitSoundToAll(Explode_Sound, _, _, _, _, _, 40);
-	CPrintToChatAll("%s {olive}BOOM! %d {lightgreen}player%s caught outside the bunker.", THIS_MODE_INFO.tag, hit, hit == 1 ? " was" : "s were");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, hit == 1 ? "Nuke_Boom" : "Nuke_BoomPlural", hit);
 }
 
 public void OnTick_Nuke()
@@ -249,7 +249,7 @@ public void OnTick_Nuke()
 			}
 
 			SetHudTextParams(-1.0, HUD_Y_NUKE, 1.1, safe ? 64 : 255, 255, 64, 255, 0, 0.0, 0.0, 0.0);
-			ShowModeHud(i, g_hNuke_Hud, "NUCLEAR STRIKE IN %d\n%s", left, safe ? "You're in the bunker" : "GET TO THE GREEN BUNKER!");
+			ShowModeHud(i, g_hNuke_Hud, "%t\n%t", "Nuke_Hud", left, safe ? "Nuke_HudSafe" : "Nuke_HudGo");
 		}
 
 		return;
@@ -275,7 +275,7 @@ public Action Cmd_NukeToggle(int client, int args)
 {
 	if (!g_bNuke_Enabled)
 	{
-		CReplyToCommand(client, "%s Nuke Countdown is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Nuke Countdown");
 		return Plugin_Handled;
 	}
 
@@ -283,9 +283,9 @@ public Action Cmd_NukeToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Nuke_Reset();
 
-	CPrintToChatAll("%s Nuke Countdown is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Nuke Countdown");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When the siren sounds, get to the {olive}green bunker{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Nuke_Hint");
 
 	return Plugin_Handled;
 }
@@ -298,10 +298,10 @@ public Action Cmd_NukeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_NukeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Launch the nuke now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bNuke_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Nuke_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bNuke_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

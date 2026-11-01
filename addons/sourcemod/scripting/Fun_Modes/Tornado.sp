@@ -176,7 +176,7 @@ public void Event_RoundStart_Tornado()
 {
 	Tornado_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Tornadoes are on: if you see one, {olive}RUN {lightgreen}the other way!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Tornado_Intro");
 }
 
 void Tornado_Spawn()
@@ -195,8 +195,8 @@ void Tornado_Spawn()
 	g_fTornado_Ends = GetGameTime() + float(g_iTornado_Last);
 	g_bTornado_Active = true;
 
-	CPrintToChatAll("%s A {olive}TORNADO {lightgreen}is forming near {olive}%N{lightgreen}!", THIS_MODE_INFO.tag, list[0]);
-	PrintCenterTextAll("TORNADO!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Tornado_Start", list[0]);
+	PrintCenterTextAll("%t", "Tornado_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 45);
 }
 
@@ -209,7 +209,7 @@ public void OnCheck_Tornado(bool zombiesNow)
 	if (now >= g_fTornado_Ends)
 	{
 		g_bTornado_Active = false;
-		PrintCenterTextAll("The tornado is gone");
+		PrintCenterTextAll("%t", "Tornado_Over");
 		return;
 	}
 
@@ -292,7 +292,7 @@ public Action Cmd_TornadoToggle(int client, int args)
 {
 	if (!g_bTornado_Enabled)
 	{
-		CReplyToCommand(client, "%s Tornado is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Tornado");
 		return Plugin_Handled;
 	}
 
@@ -300,9 +300,9 @@ public Action Cmd_TornadoToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Tornado_Reset();
 
-	CPrintToChatAll("%s Tornado is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Tornado");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s If you see one, {olive}RUN {lightgreen}the other way!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Tornado_Hint");
 
 	return Plugin_Handled;
 }
@@ -315,10 +315,10 @@ public Action Cmd_TornadoSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_TornadoSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Tornado now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bTornado_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Tornado_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bTornado_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

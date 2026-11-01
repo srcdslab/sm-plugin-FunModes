@@ -115,14 +115,14 @@ public Action Cmd_SampleToggle(int client, int args)
 {
 	if (!g_bSample_Enabled)
 	{
-		CReplyToCommand(client, "%s Sample Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Sample Mode");
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s Sample Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOnPlain" : "FM_NowOffPlain", "Sample Mode");
 
 	return Plugin_Handled;
 }
@@ -135,9 +135,9 @@ public Action Cmd_SampleSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_SampleSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	FM_AddItemT(menu, client, NULL_STRING, "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

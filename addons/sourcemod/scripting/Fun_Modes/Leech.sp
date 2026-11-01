@@ -202,7 +202,7 @@ public void Event_RoundStart_Leech()
 {
 	Leech_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Leech is on: keep shooting zombies or your health {olive}drains away{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Leech_Intro");
 }
 
 void Leech_PlayerHurt(Event event, const char[] name, bool dontBroadcast)
@@ -258,7 +258,7 @@ void Leech_PunishWorst()
 	int hurt = g_iLeech_WorstCount < count ? g_iLeech_WorstCount : count - 1;
 	for (int i = 0; i < hurt; i++)
 	{
-		CPrintToChatAll("%s {olive}%N {lightgreen}got hurt for being a bad defender ({olive}%d {lightgreen}damage)!", THIS_MODE_INFO.tag, list[i], g_iLeech_Dealt[list[i]]);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Leech_BadDefender", list[i], g_iLeech_Dealt[list[i]]);
 		HurtPlayer(list[i], g_iLeech_WorstDamage);
 	}
 
@@ -292,7 +292,7 @@ public void OnTick_Leech()
 					continue;
 
 				SetHudTextParams(-1.0, HUD_Y_LEECH, 1.1, 255, 200, 80, 255, 0, 0.0, 0.0, 0.0);
-				ShowModeHud(i, g_hLeech_Hud, "Worst defenders get hurt in %d s - your damage: %d", left, g_iLeech_Dealt[i]);
+				ShowModeHud(i, g_hLeech_Hud, "%t", "Leech_HudWorst", left, g_iLeech_Dealt[i]);
 			}
 
 			return;
@@ -309,9 +309,9 @@ public void OnTick_Leech()
 		{
 			SetHudTextParams(-1.0, HUD_Y_LEECH, 1.1, feeding ? 120 : 255, feeding ? 255 : 80, feeding ? 120 : 80, 255, 0, 0.0, 0.0, 0.0);
 			if (feeding)
-				ShowModeHud(i, g_hLeech_Hud, "Leech: fed (%d s)", RoundToCeil(float(g_iLeech_Grace) - (now - g_fLeech_LastHit[i])));
+				ShowModeHud(i, g_hLeech_Hud, "%t", "Leech_HudFed", RoundToCeil(float(g_iLeech_Grace) - (now - g_fLeech_LastHit[i])));
 			else
-				ShowModeHud(i, g_hLeech_Hud, "LEECH: hurt a zombie to stop the drain (-%d HP/s)", g_iLeech_Drain);
+				ShowModeHud(i, g_hLeech_Hud, "%t", "Leech_HudDrain", g_iLeech_Drain);
 		}
 
 		if (!feeding)
@@ -323,7 +323,7 @@ public Action Cmd_LeechToggle(int client, int args)
 {
 	if (!g_bLeech_Enabled)
 	{
-		CReplyToCommand(client, "%s Leech is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Leech");
 		return Plugin_Handled;
 	}
 
@@ -331,9 +331,9 @@ public Action Cmd_LeechToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Leech_Reset();
 
-	CPrintToChatAll("%s Leech is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Leech");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Keep shooting zombies or your health {olive}drains away{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Leech_Hint");
 
 	return Plugin_Handled;
 }
@@ -346,9 +346,9 @@ public Action Cmd_LeechSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_LeechSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -352,13 +352,13 @@ public Action Cmd_RLGLToggle(int client, int args)
 
 	if (!g_bRLGL_Enabled)
 	{
-		CReplyToCommand(client, "%s RLGL mode is currently disabled!", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_DisabledExcl", "RLGL mode");
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
-	CPrintToChatAll("%s Red Light Green Light is now {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "Enabled" : "Disabled");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowEnabledDot" : "FM_NowDisabledDot", "Red Light Green Light");
 
 	RLGL_Stop();
 
@@ -403,7 +403,6 @@ Action RLGL_Warning_Timer(Handle timer)
 	}
 
 	char sMessage[256];
-	FormatEx(sMessage, sizeof(sMessage), "Warning: Red Light is coming in %d seconds, Do not move after that", (RoundToNearest(g_fRLGL_WarningTime) - g_iRLGLTimePassed));
 
 	char numStr[3];
 	IntToString(RoundToNearest(g_fRLGL_WarningTime) - g_iRLGLTimePassed, numStr, sizeof(numStr));
@@ -422,6 +421,7 @@ Action RLGL_Warning_Timer(Handle timer)
 		if (!IsClientInGame(i))
 			continue;
 
+		FormatEx(sMessage, sizeof(sMessage), "%T", "RLGL_Warning", i, (RoundToNearest(g_fRLGL_WarningTime) - g_iRLGLTimePassed));
 		SendHudText(i, sMessage, _, 0, HUD_Y_RLGL, g_hRLGL_Hud);
 		if (playSnd)
 			EmitSoundToClient(i, sndPath);
@@ -480,7 +480,9 @@ Action RLGL_Detect_Timer(Handle timer)
 		if (buttons & RLGL_MOVE_KEYS)
 		{
 			SDKHooks_TakeDamage(i, 0, 0, g_fRLGL_Damage);
-			SendHudText(i, "STOP MOVING ITS A RED LIGHT!!!", _, 1, HUD_Y_RLGL, g_hRLGL_Hud);
+			char hudMsg[128];
+			FormatEx(hudMsg, sizeof(hudMsg), "%T", "RLGL_HudRed", i);
+			SendHudText(i, hudMsg, _, 1, HUD_Y_RLGL, g_hRLGL_Hud);
 		}
 	}
 
@@ -503,7 +505,9 @@ Action RLGL_Detect_Time_Timer(Handle timer)
 		if (!IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) != CS_TEAM_CT)
 			continue;
 
-		SendHudText(i, "YOU CAN MOVE NOW, ITS A GREEN LIGHT!", _, 2, HUD_Y_RLGL, g_hRLGL_Hud);
+		char hudMsg[128];
+		FormatEx(hudMsg, sizeof(hudMsg), "%T", "RLGL_HudGreen", i);
+		SendHudText(i, hudMsg, _, 2, HUD_Y_RLGL, g_hRLGL_Hud);
 	}
 
 	return Plugin_Continue;
@@ -524,7 +528,7 @@ public void SetZombiesSpeed(float val)
 			continue;
 
 		SetSpeedMult(i, THIS_MODE_INDEX, val);
-		CPrintToChat(i, "%s Red light: zombies are slowed to {olive}%.2fx{lightgreen}!", THIS_MODE_INFO.tag, val);
+		CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "RLGL_Slowed", val);
 	}
 }
 
@@ -549,9 +553,9 @@ public Action Cmd_RLGLSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_RLGLSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	FM_AddItemT(menu, client, NULL_STRING, "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

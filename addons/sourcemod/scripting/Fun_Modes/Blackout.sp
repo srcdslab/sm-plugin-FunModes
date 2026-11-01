@@ -166,7 +166,7 @@ public void Event_RoundStart_Blackout()
 {
 	g_fBlackout_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Blackouts are on: your screen might go dark at the worst moment...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_Intro");
 }
 
 void Blackout_Hit()
@@ -197,16 +197,16 @@ void Blackout_Hit()
 		if (white)
 		{
 			EmitSoundToClient(client, BLACKOUT_FLASH_SOUND);
-			PrintCenterText(client, "FLASHBANGED!");
+			PrintCenterText(client, "%t", "Blackout_Flashed");
 		}
 		else
-			PrintCenterText(client, "BLACKOUT!");
+			PrintCenterText(client, "%t", "Blackout_Center");
 	}
 
 	if (hits > 0 && hits < count)
-		CPrintToChatAll("%s {olive}%d {lightgreen}player%s lost their sight!", THIS_MODE_INFO.tag, hits, hits == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, hits == 1 ? "Blackout_Hits" : "Blackout_HitsPlural", hits);
 	else if (hits > 0)
-		CPrintToChatAll("%s Everyone lost their sight!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_Everyone");
 }
 
 public void OnTick_Blackout()
@@ -219,7 +219,7 @@ public Action Cmd_BlackoutToggle(int client, int args)
 {
 	if (!g_bBlackout_Enabled)
 	{
-		CReplyToCommand(client, "%s Blackout is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FM_Disabled", "Blackout");
 		return Plugin_Handled;
 	}
 
@@ -227,9 +227,9 @@ public Action Cmd_BlackoutToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Blackout_Reset();
 
-	CPrintToChatAll("%s Blackout is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FM_NowOn" : "FM_NowOff", "Blackout");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Your screen might go dark at the worst moment...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_Hint");
 
 	return Plugin_Handled;
 }
@@ -242,10 +242,10 @@ public Action Cmd_BlackoutSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_BlackoutSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FM_MenuSettings", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Blackout now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	FM_AddItemT(menu, client, "now", "Blackout_MenuNow", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FM_AddItemT(menu, client, "cvars", "FM_MenuShowCvars", ITEMDRAW_DEFAULT, "\n");
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
