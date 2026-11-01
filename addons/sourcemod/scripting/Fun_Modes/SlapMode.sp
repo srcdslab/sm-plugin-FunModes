@@ -108,18 +108,18 @@ public Action Cmd_SlapModeToggle(int client, int args)
 {
 	if (!g_bSlapModeEnabled)
 	{
-		CReplyToCommand(client, "%s SlapMode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s SlapMode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
 	if (THIS_MODE_INFO.isOn)
 	{
-		CPrintToChatAll("%s Random CTs will be slapped every %.2f seconds", THIS_MODE_INFO.tag, g_fSlapModeInterval);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "SlapMode_Info", g_fSlapModeInterval);
 
 		delete g_hSlapModeTimer;
 		g_hSlapModeTimer = CreateTimer(
@@ -140,7 +140,10 @@ public Action Cmd_SlapModeToggle(int client, int args)
 Action Timer_SlapMode(Handle timer)
 {
 	if (!THIS_MODE_INFO.isOn)
+	{
+		g_hSlapModeTimer = null;
 		return Plugin_Stop;
+	}
 
 	int players[MAXPLAYERS + 1];
 	int count;
@@ -164,7 +167,7 @@ Action Timer_SlapMode(Handle timer)
 		SlapPlayer(client);
 		SlapPlayer(client);
 
-		CPrintToChatAll("%s %N has been slapped", THIS_MODE_INFO.tag, client);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "SlapMode_Slapped", client);
 	}
 
 	return Plugin_Continue;
@@ -177,8 +180,10 @@ public Action Cmd_SlapModeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_SlapModeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
+	char buffer[64];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

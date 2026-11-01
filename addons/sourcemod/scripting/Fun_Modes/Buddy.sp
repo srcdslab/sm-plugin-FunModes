@@ -148,7 +148,7 @@ public void Event_RoundStart_Buddy()
 {
 	Buddy_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Buddy System is on: you get a buddy when the zombies come - {olive}keep them alive{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Buddy_RoundStart");
 }
 
 void Buddy_Pair()
@@ -164,17 +164,17 @@ void Buddy_Pair()
 		g_iBuddy[a] = GetClientUserId(b);
 		g_iBuddy[b] = GetClientUserId(a);
 
-		CPrintToChat(a, "%s Your buddy is {olive}%N{lightgreen}. If they fall, %s", THIS_MODE_INFO.tag, b, g_bBuddy_Die ? "so do you!" : "you start bleeding!");
-		CPrintToChat(b, "%s Your buddy is {olive}%N{lightgreen}. If they fall, %s", THIS_MODE_INFO.tag, a, g_bBuddy_Die ? "so do you!" : "you start bleeding!");
+		CPrintToChat(a, "%s %t", THIS_MODE_INFO.tag, g_bBuddy_Die ? "Buddy_YourBuddyDie" : "Buddy_YourBuddyBleed", b);
+		CPrintToChat(b, "%s %t", THIS_MODE_INFO.tag, g_bBuddy_Die ? "Buddy_YourBuddyDie" : "Buddy_YourBuddyBleed", a);
 	}
 
 	if (count % 2 == 1)
 	{
 		g_bBuddy_Solo[list[count - 1]] = true;
-		CPrintToChat(list[count - 1], "%s Odd one out - you're on your own this round.", THIS_MODE_INFO.tag);
+		CPrintToChat(list[count - 1], "%s %t", THIS_MODE_INFO.tag, "Buddy_OddOneOut");
 	}
 
-	CPrintToChatAll("%s Buddies are paired! %s", THIS_MODE_INFO.tag, g_bBuddy_Die ? "If your buddy falls, you fall with them." : "If your buddy falls, you bleed.");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_bBuddy_Die ? "Buddy_PairedDie" : "Buddy_PairedBleed");
 }
 
 public void OnCheck_Buddy(bool zombiesNow)
@@ -201,17 +201,17 @@ public void OnCheck_Buddy(bool zombiesNow)
 		{
 			// Left the server: not the buddy's fault
 			g_bBuddy_Solo[i] = true;
-			CPrintToChat(i, "%s Your buddy left the server - you're on your own now.", THIS_MODE_INFO.tag);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Buddy_Left");
 		}
 		else if (g_bBuddy_Die)
 		{
-			CPrintToChatAll("%s {olive}%N {lightgreen}fell, and takes their buddy {olive}%N {lightgreen}with them!", THIS_MODE_INFO.tag, buddy, i);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Buddy_FellTogether", buddy, i);
 			ForcePlayerSuicide(i);
 		}
 		else
 		{
 			g_bBuddy_Bleeding[i] = true;
-			CPrintToChat(i, "%s Your buddy {olive}%N {lightgreen}fell - you're bleeding {olive}%d HP/s{lightgreen}!", THIS_MODE_INFO.tag, buddy, g_iBuddy_Bleed);
+			CPrintToChat(i, "%s %t", THIS_MODE_INFO.tag, "Buddy_FellBleeding", buddy, g_iBuddy_Bleed);
 		}
 	}
 }
@@ -233,7 +233,7 @@ public void OnTick_Buddy()
 			if (!IsFakeClient(i))
 			{
 				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
-				ShowModeHud(i, g_hBuddy_Hud, "YOUR BUDDY FELL - BLEEDING %d HP/s", g_iBuddy_Bleed);
+				ShowModeHud(i, g_hBuddy_Hud, "%T", "Buddy_HudBleeding", i, g_iBuddy_Bleed);
 			}
 
 			continue;
@@ -256,18 +256,18 @@ public void OnTick_Buddy()
 			if (far)
 			{
 				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
-				ShowModeHud(i, g_hBuddy_Hud, "TOO FAR FROM YOUR BUDDY %N (%d) - GET BACK! -%d HP/s", buddy, dist, g_iBuddy_Bleed);
+				ShowModeHud(i, g_hBuddy_Hud, "%T", "Buddy_HudTooFar", i, buddy, dist, g_iBuddy_Bleed);
 			}
 			else
 			{
 				SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
-				ShowModeHud(i, g_hBuddy_Hud, "Buddy: %N (%d units away)", buddy, dist);
+				ShowModeHud(i, g_hBuddy_Hud, "%T", "Buddy_HudNear", i, buddy, dist);
 			}
 		}
 		else if (g_bBuddy_Solo[i] && !IsFakeClient(i))
 		{
 			SetHudTextParams(-1.0, HUD_Y_BUDDY, 1.1, 64, 192, 255, 255, 0, 0.0, 0.0, 0.0);
-			ShowModeHud(i, g_hBuddy_Hud, "No buddy - you're on your own");
+			ShowModeHud(i, g_hBuddy_Hud, "%T", "Buddy_HudSolo", i);
 		}
 	}
 }
@@ -276,7 +276,7 @@ public Action Cmd_BuddyToggle(int client, int args)
 {
 	if (!g_bBuddy_Enabled)
 	{
-		CReplyToCommand(client, "%s Buddy System is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Buddy System");
 		return Plugin_Handled;
 	}
 
@@ -284,9 +284,9 @@ public Action Cmd_BuddyToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Buddy_Reset();
 
-	CPrintToChatAll("%s Buddy System is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Buddy System");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s You get a buddy when the zombies come - {olive}keep them alive{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Buddy_Info");
 
 	return Plugin_Handled;
 }
@@ -299,10 +299,13 @@ public Action Cmd_BuddySettings(int client, int args)
 
 	Menu menu = new Menu(Menu_BuddySettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("pair", "Make new pairs now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Buddy_MenuPairNow", client);
+	menu.AddItem("pair", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

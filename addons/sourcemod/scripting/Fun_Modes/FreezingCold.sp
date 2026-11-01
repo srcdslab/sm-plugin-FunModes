@@ -166,7 +166,7 @@ public void Event_RoundStart_FreezingCold()
 {
 	FreezingCold_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Freezing Cold is on: when the cold snap comes, {olive}huddle {lightgreen}with other humans!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FreezingCold_RoundStart");
 }
 
 void FreezingCold_Start()
@@ -174,9 +174,9 @@ void FreezingCold_Start()
 	g_bCold_Active = true;
 	g_fCold_Ends = GetGameTime() + float(g_iCold_Last);
 
-	CPrintToChatAll("%s A {olive}COLD SNAP {lightgreen}hits! Stay within {olive}%d {lightgreen}units of {olive}%d {lightgreen}other human%s to keep warm.",
-		THIS_MODE_INFO.tag, RoundToNearest(g_fCold_Huddle), g_iCold_Need, g_iCold_Need == 1 ? "" : "s");
-	PrintCenterTextAll("COLD SNAP! HUDDLE UP!");
+	CPrintToChatAll("%s %t",
+		THIS_MODE_INFO.tag, g_iCold_Need == 1 ? "FreezingCold_SnapOne" : "FreezingCold_SnapMany", RoundToNearest(g_fCold_Huddle), g_iCold_Need);
+	PrintCenterTextAll("%t", "FreezingCold_CenterSnap");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 80);
 }
 
@@ -213,7 +213,7 @@ public void OnTick_FreezingCold()
 	else if (GetGameTime() >= g_fCold_Ends)
 	{
 		g_bCold_Active = false;
-		CPrintToChatAll("%s The cold snap is over.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FreezingCold_Over");
 		return;
 	}
 
@@ -231,10 +231,10 @@ public void OnTick_FreezingCold()
 		{
 			SetHudTextParams(-1.0, HUD_Y_COLD, 1.1, warm ? 255 : 120, 200, 255, 255, 0, 0.0, 0.0, 0.0);
 			if (warm)
-				ShowModeHud(i, g_hCold_Hud, "Warm - %d human%s close by", near, near == 1 ? "" : "s");
+				ShowModeHud(i, g_hCold_Hud, "%T", near == 1 ? "FreezingCold_HudWarmOne" : "FreezingCold_HudWarmMany", i, near);
 			else
 			{
-				ShowModeHud(i, g_hCold_Hud, "FREEZING! Get close to %d other human%s (-%d HP/s)", g_iCold_Need, g_iCold_Need == 1 ? "" : "s", g_iCold_Damage);
+				ShowModeHud(i, g_hCold_Hud, "%T", g_iCold_Need == 1 ? "FreezingCold_HudFreezingOne" : "FreezingCold_HudFreezingMany", i, g_iCold_Need, g_iCold_Damage);
 				ScreenTint(i, 160, 220, 255, 60, 0.3, 0.6);
 			}
 		}
@@ -248,7 +248,7 @@ public Action Cmd_FreezingColdToggle(int client, int args)
 {
 	if (!g_bFreezingCold_Enabled)
 	{
-		CReplyToCommand(client, "%s Freezing Cold is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Freezing Cold");
 		return Plugin_Handled;
 	}
 
@@ -256,9 +256,9 @@ public Action Cmd_FreezingColdToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	FreezingCold_Reset();
 
-	CPrintToChatAll("%s Freezing Cold is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Freezing Cold");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When the cold snap comes, {olive}huddle {lightgreen}with other humans!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FreezingCold_Info");
 
 	return Plugin_Handled;
 }
@@ -271,10 +271,13 @@ public Action Cmd_FreezingColdSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_FreezingColdSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Cold snap now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bCold_Active && g_iCold_Every > 0) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "FreezingCold_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bCold_Active && g_iCold_Every > 0) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -10,11 +10,24 @@
 
 int g_iClientMenuUserId[MAXPLAYERS + 1] = { -1, ... };
 
+/* The color names shown to the players (phrases), in the order of g_ColorsList */
+static const char g_sHBColorPhrases[][] =
+{
+	"HealBeacon_ColorWhite",
+	"HealBeacon_ColorRed",
+	"HealBeacon_ColorLime",
+	"HealBeacon_ColorBlue",
+	"HealBeacon_ColorYellow",
+	"HealBeacon_ColorCyan",
+	"HealBeacon_ColorGold"
+};
+
 stock void HealBeacon_DisplayMainMenu(int client)
 {
 	Menu menu = new Menu(MainMenu_Handler);
-	menu.SetTitle("HealBeacon Settings");
+	menu.SetTitle("%T", "HealBeacon_MenuTitle", client);
 
+	char line[128];
 	if (g_aHBPlayers)
 	{
 		int count = 0;
@@ -33,17 +46,22 @@ stock void HealBeacon_DisplayMainMenu(int client)
 		}
 	
 		if (count <= 0)
-			menu.AddItem("", "None", ITEMDRAW_DISABLED);
+		{
+			FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuNone", client);
+			menu.AddItem("", line, ITEMDRAW_DISABLED);
+		}
 	}
 
-	menu.AddItem("choose", "Choose a carrier...");
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuChoose", client);
+	menu.AddItem("choose", line);
 
-	char line[48];
-	FormatEx(line, sizeof(line), "Clear the chosen carriers (%d)", g_aHB_Chosen.Length);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuClearChosen", client, g_aHB_Chosen.Length);
 	menu.AddItem("clear", line, g_aHB_Chosen.Length ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
-	menu.AddItem("option2", "Change Heal Beacon Settings");
-	menu.AddItem("option3", "Show Cvars");
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuSettings", client);
+	menu.AddItem("option2", line);
+	FormatEx(line, sizeof(line), "%T", "FunModes_ShowCvars", client);
+	menu.AddItem("option3", line);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -53,21 +71,26 @@ stock void HealBeacon_DisplayMainMenu(int client)
 void HealBeacon_ChooseMenu(int client)
 {
 	Menu menu = new Menu(HealBeacon_ChooseMenu_Handler);
-	menu.SetTitle("Choose a heal beacon carrier\nKept every round until they leave\nPick a chosen one again to undo\n ");
+	menu.SetTitle("%T\n ", "HealBeacon_ChooseTitle", client);
 
-	char info[12], line[64];
+	char info[12], line[128], chosen[32], beacon[32];
+	FormatEx(chosen, sizeof(chosen), " %T", "FunModes_TagChosen", client);
+	FormatEx(beacon, sizeof(beacon), " %T", "HealBeacon_TagBeacon", client);
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || IsClientSourceTV(i))
 			continue;
 
 		IntToString(GetClientUserId(i), info, sizeof(info));
-		FormatEx(line, sizeof(line), "%N%s%s", i, HealBeacon_IsChosen(i) ? " [CHOSEN]" : "", g_BeaconPlayersData[i].hasHealBeacon ? " [BEACON]" : "");
+		FormatEx(line, sizeof(line), "%N%s%s", i, HealBeacon_IsChosen(i) ? chosen : "", g_BeaconPlayersData[i].hasHealBeacon ? beacon : "");
 		menu.AddItem(info, line);
 	}
 
 	if (!menu.ItemCount)
-		menu.AddItem("", "Nobody on the server", ITEMDRAW_DISABLED);
+	{
+		FormatEx(line, sizeof(line), "%T", "FunModes_NobodyOnServer", client);
+		menu.AddItem("", line, ITEMDRAW_DISABLED);
+	}
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -95,7 +118,7 @@ public int HealBeacon_ChooseMenu_Handler(Menu menu, MenuAction action, int param
 			if (target)
 				HealBeacon_ToggleChosen(param1, target);
 			else
-				CPrintToChat(param1, "%s That player left.", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "FunModes_PlayerLeft");
 
 			HealBeacon_ChooseMenu(param1);
 		}
@@ -129,7 +152,7 @@ public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2
 			else if (strcmp(buffer, "clear") == 0)
 			{
 				g_aHB_Chosen.Clear();
-				CPrintToChatAll("%s The chosen heal beacon carriers were cleared.", THIS_MODE_INFO.tag);
+				CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_ChosenCleared");
 				LogAction(param1, -1, "\"%L\" cleared the chosen heal beacon carriers", param1);
 				HealBeacon_DisplayMainMenu(param1);
 				return 0;
@@ -170,15 +193,21 @@ public int MainMenu_Handler(Menu menu, MenuAction action, int param1, int param2
 stock void HealBeacon_DisplaySettingsMenu(int client)
 {
 	Menu menu = new Menu(SettingsMenu_Handler);
-	char title[64];
-	Format(title, sizeof(title), "Change Heal Beacon Settings");
+	char title[128];
+	Format(title, sizeof(title), "%T", "HealBeacon_MenuSettings", client);
 	menu.SetTitle(title);
 
-	menu.AddItem("0", "Change Heal Beacon Damage");
-	menu.AddItem("1", "Change Heal Beacon Heal Per second");
-	menu.AddItem("2", "Change The first pick timer");
-	menu.AddItem("3", "Toggle better damage mode");
-	menu.AddItem("4", "Change Heal Beacon Default Color");
+	char line[128];
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuDamage", client);
+	menu.AddItem("0", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuHeal", client);
+	menu.AddItem("1", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuTimer", client);
+	menu.AddItem("2", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuBetterDamage", client);
+	menu.AddItem("3", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuDefaultColor", client);
+	menu.AddItem("4", line);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -219,12 +248,12 @@ public int SettingsMenu_Handler(Menu menu, MenuAction action, int param1, int pa
 					if (g_bIsBetterDamageModeOn)
 					{
 						g_bIsBetterDamageModeOn = false;
-						CPrintToChat(param1, "%s Better Damage Mode is now {olive}OFF!", THIS_MODE_INFO.tag);
+						CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_BetterDamageOff");
 					}
 					else
 					{
 						g_bIsBetterDamageModeOn = true;
-						CPrintToChat(param1, "%s Better Damage Mode is now {olive}ON!", THIS_MODE_INFO.tag);
+						CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_BetterDamageOn");
 					}
 				}
 				case 4:
@@ -242,8 +271,8 @@ public int SettingsMenu_Handler(Menu menu, MenuAction action, int param1, int pa
 stock void HealBeacon_DisplayBeaconDamageMenu(int client)
 {
 	Menu menu = new Menu(BeaconDamageMenu_Handler);
-	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Damage\nYou can also change the cvar sm_beacon_damage\nincase you didnt find the good\ndamage in the list\nCurrent HealBeacon Damage: %.2f", g_fHB_BeaconDamage);
+	char title[512];
+	Format(title, sizeof(title), "%T", "HealBeacon_DamageTitle", client, g_fHB_BeaconDamage);
 	menu.SetTitle(title);
 
 	menu.AddItem("1", "1");
@@ -278,7 +307,7 @@ public int BeaconDamageMenu_Handler(Menu menu, MenuAction action, int param1, in
 
 			_FUNMODES_CVAR_SET_VALUE(THIS_MODE_INFO.index, HB_CONVAR_BEACON_DAMAGE, Float, float(num));
 
-			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DamageChange", param1, num);
+			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DamageChange", param1, float(num));
 			HealBeacon_DisplayBeaconDamageMenu(param1);
 		}
 	}
@@ -290,8 +319,8 @@ public int BeaconDamageMenu_Handler(Menu menu, MenuAction action, int param1, in
 stock void HealBeacon_DisplayBeaconHealMenu(int client)
 {
 	Menu menu = new Menu(BeaconHealMenu_Handler);
-	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Heal per second\nYou can also change the cvar sm_beacon_heal\nincase you didnt find the good\nheal in the list\nCurrent HealBeacon Heal: %d", g_iHB_BeaconHeal);
+	char title[512];
+	Format(title, sizeof(title), "%T", "HealBeacon_HealTitle", client, g_iHB_BeaconHeal);
 	menu.SetTitle(title);
 
 	for (int i = 1; i <= 7; i++)
@@ -338,8 +367,8 @@ public int BeaconHealMenu_Handler(Menu menu, MenuAction action, int param1, int 
 stock void HealBeacon_DisplayBeaconTimerMenu(int client)
 {
 	Menu menu = new Menu(BeaconTimerMenu_Handler);
-	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Timer\nIt means how many seconds it will start\npicking random players for healbeacon\nafter round start");
+	char title[512];
+	Format(title, sizeof(title), "%T", "HealBeacon_TimerTitle", client);
 	menu.SetTitle(title);
 
 	menu.AddItem("10", "10");
@@ -396,20 +425,21 @@ stock void HealBeacon_DisplayBeaconDefaultColorMenu(int client)
 
 		if (StringToInt(buffers[0]) == g_ColorDefault[0] && StringToInt(buffers[1]) == g_ColorDefault[1]
 		&& StringToInt(buffers[2]) == g_ColorDefault[2] && 255 == g_ColorDefault[3]) {
-			Format(colorName, sizeof(colorName), g_ColorsList[i].name);
+			FormatEx(colorName, sizeof(colorName), "%T", g_sHBColorPhrases[i], client);
 			break;
 		}
 	}
 
 	char title[256];
-	Format(title, sizeof(title), "Change Heal Beacon Default Color\nDefault Color: %s", colorName);
+	Format(title, sizeof(title), "%T", "HealBeacon_DefaultColorTitle", client, colorName);
 	menu.SetTitle(title);
 
 	for (int i = 0; i < sizeof(g_ColorsList); i++)
 	{
 		char index[3];
 		IntToString(i, index, sizeof(index));
-		menu.AddItem(index, g_ColorsList[i].name);
+		FormatEx(colorName, sizeof(colorName), "%T", g_sHBColorPhrases[i], client);
+		menu.AddItem(index, colorName);
 	}
 
 	menu.ExitBackButton = true;
@@ -445,7 +475,9 @@ public int BeaconDefaultColorMenu_Handler(Menu menu, MenuAction action, int para
 			g_ColorDefault[2] = StringToInt(buffers[2]);
 			g_ColorDefault[3] = 255;
 
-			CPrintToChat(param1, "%s You have changed the Default Beacon Color to {%s}%s.", THIS_MODE_INFO.tag, myColor.name, myColor.name);
+			char colorName[32];
+			FormatEx(colorName, sizeof(colorName), "%T", g_sHBColorPhrases[index], param1);
+			CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_DefaultColorChange", myColor.name, colorName);
 			HealBeacon_DisplayBeaconDefaultColorMenu(param1);
 		}
 	}
@@ -459,24 +491,32 @@ stock void HealBeacon_DisplayActionsMenu(int client, int random)
 	Menu menu = new Menu(ActionsMenu_Handler);
 
 	g_iClientMenuUserId[client] = GetClientUserId(random);
-	char title[64], buffer[32];
-	Format(title, sizeof(title), "Do an Action on %N", random);
+	char title[128], buffer[32];
+	Format(title, sizeof(title), "%T", "HealBeacon_ActionsTitle", client, random);
 	menu.SetTitle(title);
 
 	Format(buffer, sizeof(buffer), "%d", GetClientUserId(random));
 
-	menu.AddItem("", "Repick randomly");
-	menu.AddItem("", "Change Beacon Color");
-	menu.AddItem("", "Change beacon radius and distance");
+	char line[128];
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuRepick", client);
+	menu.AddItem("", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuColor", client);
+	menu.AddItem("", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuDistance", client);
+	menu.AddItem("", line);
 
-	char light[32];
-	g_BeaconPlayersData[random].hasNeon ? Format(light, sizeof(light), "Disable Light on the player") : Format(light, sizeof(light), "Enable Light on the player");
+	char light[128];
+	Format(light, sizeof(light), "%T", g_BeaconPlayersData[random].hasNeon ? "HealBeacon_MenuLightOff" : "HealBeacon_MenuLightOn", client);
 	menu.AddItem("", light);
 
-	menu.AddItem("", "Teleport to player");
-	menu.AddItem("", "Bring Player");
-	menu.AddItem("", "Remove Heal beacon");
-	menu.AddItem("", "Slay Player");
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuTeleport", client);
+	menu.AddItem("", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuBring", client);
+	menu.AddItem("", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuRemove", client);
+	menu.AddItem("", line);
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuSlay", client);
+	menu.AddItem("", line);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -589,15 +629,16 @@ stock void HealBeacon_DisplayColorsMenu(int client)
 	if (!random)
 		return;
 
-	char title[64];
-	Format(title, sizeof(title), "Change beacon and neon color on %N", random);
+	char title[128];
+	Format(title, sizeof(title), "%T", "HealBeacon_ColorsTitle", client, random);
 	menu.SetTitle(title);
 
 	for (int i = 0; i < sizeof(g_ColorsList); i++)
 	{
-		char index[3];
+		char index[3], colorName[32];
 		IntToString(i, index, sizeof(index));
-		menu.AddItem(index, g_ColorsList[i].name);
+		FormatEx(colorName, sizeof(colorName), "%T", g_sHBColorPhrases[i], client);
+		menu.AddItem(index, colorName);
 	}
 
 	menu.ExitBackButton = true;
@@ -654,7 +695,9 @@ public int ColorsMenu_Handler(Menu menu, MenuAction action, int param1, int para
 
 			g_BeaconPlayersData[random].SetColor(color);
 
-			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_ColorChange", param1, random, myColor.name, myColor.name);
+			char colorName[32];
+			FormatEx(colorName, sizeof(colorName), "%T", g_sHBColorPhrases[index], param1);
+			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_ColorChange", param1, random, myColor.name, colorName);
 			LogAction(param1, random, "[FunModes-HealBeacon] \"%L\" changed Beacon and Neon colors of \"%L\" to \"%s\"", param1, random, myColor.name);
 			HealBeacon_DisplayColorsMenu(param1);
 		}
@@ -670,8 +713,8 @@ stock void HealBeacon_DisplayBeaconDistanceMenu(int client)
 	if (!random)
 		return;
 
-	char title[64];
-	Format(title, sizeof(title), "Change beacon radius and distance on %N", random);
+	char title[128];
+	Format(title, sizeof(title), "%T", "HealBeacon_DistanceTitle", client, random);
 	menu.SetTitle(title);
 
 	menu.AddItem("200", "200");
@@ -681,7 +724,9 @@ stock void HealBeacon_DisplayBeaconDistanceMenu(int client)
 	menu.AddItem("1000", "1000");
 	menu.AddItem("1500", "1500");
 
-	menu.AddItem("Empty", "These are the available distances please type sm_beacon_distance <Player> <your number> instead", ITEMDRAW_DISABLED);
+	char line[256];
+	FormatEx(line, sizeof(line), "%T", "HealBeacon_MenuDistanceHint", client);
+	menu.AddItem("Empty", line, ITEMDRAW_DISABLED);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -726,7 +771,7 @@ public int BeaconDistanceMenu_Handler(Menu menu, MenuAction action, int param1, 
 			int distance = StringToInt(info);
 			g_BeaconPlayersData[random].distance = float(distance);
 
-			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DistanceChange", param1, random, distance);
+			CPrintToChat(param1, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DistanceChange", param1, random, float(distance));
 			LogAction(param1, random, "[FunModes-HealBeacon] \"%L\" changed Beacon Distance of \"%L\" to \"%d\"", param1, random, distance);
 			HealBeacon_DisplayBeaconDistanceMenu(param1);
 		}

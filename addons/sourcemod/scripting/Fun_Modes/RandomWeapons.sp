@@ -15,6 +15,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "RandomWeapons"
+#define RW_DISPLAY_NAME "Random Weapons"
 
 static int g_iRandomWeaponsIndex = -1;
 
@@ -236,10 +237,10 @@ public void Event_RoundStart_RandomWeapons()
 
 		char set[64];
 		RandomWeapons_SetName(g_iRW_SharedPrim, g_iRW_SharedSec, set, sizeof(set));
-		CPrintToChatAll("%s This round everyone gets: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RandomWeapons_RoundShared", set);
 	}
 	else
-		CPrintToChatAll("%s Random Weapons is on: everyone gets their own random set.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RandomWeapons_RoundOwn");
 }
 
 public void Event_PlayerSpawn_RandomWeapons(int client)
@@ -353,7 +354,7 @@ void RandomWeapons_Give(int client, int prim, int sec, bool tell)
 	{
 		char set[64];
 		RandomWeapons_SetName(prim, sec, set, sizeof(set));
-		CPrintToChat(client, "%s Your weapons: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "RandomWeapons_Yours", set);
 	}
 }
 
@@ -387,7 +388,7 @@ void RandomWeapons_GiveAll()
 
 		char set[64];
 		RandomWeapons_SetName(g_iRW_SharedPrim, g_iRW_SharedSec, set, sizeof(set));
-		CPrintToChatAll("%s Everyone gets: {olive}%s", THIS_MODE_INFO.tag, set);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RandomWeapons_EveryoneGets", set);
 	}
 
 	for (int i = 1; i <= MaxClients; i++)
@@ -411,7 +412,7 @@ public void OnBuyCommand_RandomWeapons(int client, const char[] weapon, Action &
 		|| strcmp(weapon, "primammo", false) == 0 || strcmp(weapon, "secammo", false) == 0)
 		return;
 
-	CPrintToChat(client, "%s You keep your random weapons - only kevlar and HE grenades can be bought.", THIS_MODE_INFO.tag);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "RandomWeapons_BuyLocked");
 	result = Plugin_Handled;
 }
 
@@ -440,20 +441,20 @@ Action Cmd_RandomWeaponsGun(int client, int args)
 {
 	if (!client || !IsHumanAlive(client))
 	{
-		CReplyToCommand(client, "%s You have to be an alive human for this.", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RandomWeapons_MustBeAlive");
 		return Plugin_Handled;
 	}
 
 	if (!THIS_MODE_INFO.isOn)
 	{
-		CReplyToCommand(client, "%s Random Weapons is not on.", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RandomWeapons_NotOn");
 		return Plugin_Handled;
 	}
 
 	float now = GetGameTime();
 	if (now < g_fRW_GunCooldown[client])
 	{
-		CReplyToCommand(client, "%s Wait {olive}%d {lightgreen}more seconds.", THIS_MODE_INFO.tag, RoundToCeil(g_fRW_GunCooldown[client] - now));
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "RandomWeapons_Wait", RoundToCeil(g_fRW_GunCooldown[client] - now));
 		return Plugin_Handled;
 	}
 
@@ -471,7 +472,7 @@ public Action Cmd_RandomWeaponsToggle(int client, int args)
 {
 	if (!g_bRandomWeapons_Enabled)
 	{
-		CReplyToCommand(client, "%s Random Weapons is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", RW_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -479,9 +480,9 @@ public Action Cmd_RandomWeaponsToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	RandomWeapons_Reset();
 
-	CPrintToChatAll("%s Random Weapons is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", RW_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Everyone gets random weapons!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "RandomWeapons_Info");
 
 	RandomWeapons_OnToggle(THIS_MODE_INFO.isOn);
 
@@ -496,10 +497,13 @@ public Action Cmd_RandomWeaponsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_RandomWeaponsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, RW_DISPLAY_NAME);
 
-	menu.AddItem("reroll", "Reroll everyone's weapons now", (THIS_MODE_INFO.isOn) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "RandomWeapons_MenuReroll", client);
+	menu.AddItem("reroll", buffer, (THIS_MODE_INFO.isOn) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

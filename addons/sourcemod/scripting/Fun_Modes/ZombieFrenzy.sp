@@ -14,6 +14,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "ZombieFrenzy"
+#define FRENZY_DISPLAY_NAME "Zombie Frenzy"
 
 static int g_iZombieFrenzyIndex = -1;
 
@@ -137,7 +138,7 @@ public void Event_RoundStart_ZombieFrenzy()
 {
 	ZombieFrenzy_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Zombie Frenzy is on: when the screen flashes red, the zombies get {olive}FAST{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ZombieFrenzy_RoundInfo");
 }
 
 void ZombieFrenzy_Start()
@@ -151,8 +152,8 @@ void ZombieFrenzy_Start()
 			ScreenTint(i, 255, 0, 0, 90, 0.3, 1.0);
 	}
 
-	CPrintToChatAll("%s {olive}THE ZOMBIES ARE IN A FRENZY {lightgreen}for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iFrenzy_Last);
-	PrintCenterTextAll("ZOMBIE FRENZY!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ZombieFrenzy_Started", g_iFrenzy_Last);
+	PrintCenterTextAll("%t", "ZombieFrenzy_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 35);
 }
 
@@ -172,7 +173,7 @@ public void OnTick_ZombieFrenzy()
 		if (GetGameTime() >= g_fFrenzy_Ends)
 		{
 			g_bFrenzy_Active = false;
-			PrintCenterTextAll("The frenzy is over");
+			PrintCenterTextAll("%t", "ZombieFrenzy_Over");
 			return;
 		}
 
@@ -193,7 +194,7 @@ public Action Cmd_ZombieFrenzyToggle(int client, int args)
 {
 	if (!g_bZombieFrenzy_Enabled)
 	{
-		CReplyToCommand(client, "%s Zombie Frenzy is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", FRENZY_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -201,9 +202,9 @@ public Action Cmd_ZombieFrenzyToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	ZombieFrenzy_Reset();
 
-	CPrintToChatAll("%s Zombie Frenzy is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", FRENZY_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When the screen flashes red, the zombies get {olive}FAST{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ZombieFrenzy_Info");
 
 	return Plugin_Handled;
 }
@@ -216,10 +217,13 @@ public Action Cmd_ZombieFrenzySettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ZombieFrenzySettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, FRENZY_DISPLAY_NAME);
 
-	menu.AddItem("now", "Frenzy now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bFrenzy_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "ZombieFrenzy_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bFrenzy_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

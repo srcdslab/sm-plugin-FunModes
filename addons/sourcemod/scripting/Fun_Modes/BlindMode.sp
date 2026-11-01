@@ -175,7 +175,7 @@ public Action Cmd_BlindModeToggle(int client, int args)
 {
 	if (!g_bBlindMode_Enabled)
 	{
-		CReplyToCommand(client, "%s BlindMode Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -183,15 +183,15 @@ public Action Cmd_BlindModeToggle(int client, int args)
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s BlindMode Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
 
-		CPrintToChatAll("%s Zombies will get a {olive}flashbang {lightgreen}that can blind humans.", THIS_MODE_INFO.tag);
-		CPrintToChatAll("%s %.0f%% of the zombies team will get the {olive}flashbang {lightgreen}every %.2f seconds", THIS_MODE_INFO.tag,
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "BlindMode_Info");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "BlindMode_InfoEvery",
 																	g_fBlindMode_Percentage,
 																	g_fBlindMode_TimerInterval
 		);
@@ -214,9 +214,11 @@ public Action Cmd_BlindModeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_BlindModeSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -326,11 +328,11 @@ Action Timer_BlindMode(Handle timer)
 			SET_GRENADES_COUNT(zombie, FLASHBANG, GET_GRENADES_COUNT(zombie, FLASHBANG) + 1);
 		}
 
-		CPrintToChat(zombie, "%s You have been granted a FlashBang!!!\nBlind some humans.", THIS_MODE_INFO.tag);
+		CPrintToChat(zombie, "%s %t", THIS_MODE_INFO.tag, "BlindMode_Granted");
 		enough++;
 	} while (enough <= neededZombies);
 	
-	CPrintToChatAll("%s %d zombies have been granted a Blind grenade (Flashbang), watch out humans!", THIS_MODE_INFO.tag, neededZombies);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "BlindMode_GrantedAll", neededZombies);
 	return Plugin_Continue;
 }
 
@@ -347,7 +349,7 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 		return Plugin_Stop;
 	
 	int owner = GetEntPropEnt(entity, Prop_Data, "m_hOwnerEntity");
-	if (!owner)
+	if (owner < 1 || owner > MaxClients)
 		return Plugin_Stop;
 	
 	if (!IsPlayerAlive(owner) || !ZR_IsClientZombie(owner))

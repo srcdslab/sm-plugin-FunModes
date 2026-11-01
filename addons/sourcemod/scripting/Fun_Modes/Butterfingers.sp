@@ -131,7 +131,7 @@ public void Event_RoundStart_Butterfingers()
 {
 	g_fButter_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Butterfingers is on: hold on to your gun!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Butterfingers_RoundStart");
 }
 
 /* True if the player dropped something */
@@ -156,7 +156,7 @@ bool Butterfingers_Drop(int client)
 		return false;
 
 	CS_DropWeapon(client, weapon, true);
-	PrintCenterText(client, "BUTTERFINGERS! You dropped your gun!");
+	PrintCenterText(client, "%t", "Butterfingers_CenterDropped");
 	return true;
 }
 
@@ -173,7 +173,7 @@ void Butterfingers_Wave()
 	}
 
 	if (dropped)
-		CPrintToChatAll("%s {olive}%d {lightgreen}human%s dropped their gun!", THIS_MODE_INFO.tag, dropped, dropped == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, dropped == 1 ? "Butterfingers_DroppedOne" : "Butterfingers_DroppedMany", dropped);
 }
 
 public void OnTick_Butterfingers()
@@ -186,7 +186,7 @@ public Action Cmd_ButterfingersToggle(int client, int args)
 {
 	if (!g_bButterfingers_Enabled)
 	{
-		CReplyToCommand(client, "%s Butterfingers is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -194,9 +194,9 @@ public Action Cmd_ButterfingersToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Butterfingers_Reset();
 
-	CPrintToChatAll("%s Butterfingers is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hold on to your gun!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Butterfingers_Info");
 
 	return Plugin_Handled;
 }
@@ -209,10 +209,13 @@ public Action Cmd_ButterfingersSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ButterfingersSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Drop guns now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Butterfingers_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

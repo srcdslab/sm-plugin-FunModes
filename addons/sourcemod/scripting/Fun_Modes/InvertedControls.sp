@@ -15,6 +15,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "IC"
+#define IC_DISPLAY_NAME "Inverted Controls"
 
 static int g_iICIndex = -1;
 
@@ -219,7 +220,7 @@ public void Event_RoundStart_IC()
 {
 	IC_Clear();
 	if (THIS_MODE_INFO.isOn && g_iIC_Mode == IC_MODE_BURSTS)
-		CPrintToChatAll("%s Inverted Controls is on: sometimes forward means backwards...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "InvertedControls_RoundInfo");
 }
 
 /* Flips the movement for the players under the effect */
@@ -284,9 +285,9 @@ void IC_Start()
 	}
 
 	if (g_iIC_Who == IC_WHO_ONE)
-		CPrintToChatAll("%s {olive}%N{lightgreen}'s controls are inverted for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, list[0], g_iIC_Last);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "InvertedControls_OnePlayer", list[0], g_iIC_Last);
 	else
-		CPrintToChatAll("%s Controls inverted for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iIC_Last);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "InvertedControls_Everyone", g_iIC_Last);
 
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 50);
 	IC_ShowHud();
@@ -297,7 +298,7 @@ void IC_End()
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (g_bIC_Flipped[i] && IsClientInGame(i))
-			PrintCenterText(i, "Controls back to normal");
+			PrintCenterText(i, "%t", "InvertedControls_BackToNormal");
 	}
 
 	IC_Clear();
@@ -313,7 +314,7 @@ void IC_ShowHud()
 			continue;
 
 		SetHudTextParams(-1.0, HUD_Y_IC, 1.2, 192, 96, 255, 255, 0, 0.0, 0.0, 0.0);
-		ShowModeHud(i, g_hIC_Hud, "CONTROLS INVERTED! (%d)", left > 0 ? left : 0);
+		ShowModeHud(i, g_hIC_Hud, "%T", "InvertedControls_Hud", i, left > 0 ? left : 0);
 	}
 }
 
@@ -344,7 +345,7 @@ public Action Cmd_ICToggle(int client, int args)
 {
 	if (!g_bIC_Enabled)
 	{
-		CReplyToCommand(client, "%s Inverted Controls is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", IC_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -355,7 +356,7 @@ public Action Cmd_ICToggle(int client, int args)
 	if (THIS_MODE_INFO.isOn && g_iIC_Mode == IC_MODE_ALWAYS)
 		IC_Accelerate(true);
 
-	CPrintToChatAll("%s Inverted Controls is now {olive}%s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", IC_DISPLAY_NAME);
 	return Plugin_Handled;
 }
 
@@ -367,10 +368,13 @@ public Action Cmd_ICSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ICSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, IC_DISPLAY_NAME);
 
-	menu.AddItem("now", "Invert the controls now", (THIS_MODE_INFO.isOn && g_bRoundLive && g_iIC_Mode == IC_MODE_BURSTS && !g_bIC_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "InvertedControls_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive && g_iIC_Mode == IC_MODE_BURSTS && !g_bIC_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

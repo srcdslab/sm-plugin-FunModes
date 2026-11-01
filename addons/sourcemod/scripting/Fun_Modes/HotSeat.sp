@@ -33,6 +33,8 @@ static int g_iHotSeatIndex = -1;
 #define HOTSEAT_CONVAR_HUMANS  6
 #define HOTSEAT_CONVAR_TOGGLE  7
 
+#define HOTSEAT_SHOWN_NAME "Hot Seat"   // the mode's name in chat
+
 int g_iHotSeat_Every;
 int g_iHotSeat_Time;
 int g_iHotSeat_Source;
@@ -240,7 +242,7 @@ public void Event_RoundStart_HotSeat()
 {
 	HotSeat_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hot Seat is on: if a {olive}TRUE / FALSE {lightgreen}menu pops up, answer fast!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotSeat_RoundStart");
 }
 
 /* A sum that's right half the time: "7 x 8 = 56" (true) or "7 x 8 = 54" (false) */
@@ -330,13 +332,17 @@ void HotSeat_Ask()
 		g_bHotSeat_Pending[client] = true;
 
 		Menu menu = new Menu(Menu_HotSeatQuestion);
-		menu.SetTitle("HOT SEAT! (%d s)\n \n%s\n ", g_iHotSeat_Time, g_sHotSeat_Text[client]);
-		menu.AddItem("t", "TRUE");
-		menu.AddItem("f", "FALSE");
+		menu.SetTitle("%T\n \n%s\n ", "HotSeat_MenuTitle", client, g_iHotSeat_Time, g_sHotSeat_Text[client]);
+
+		char line[64];
+		FormatEx(line, sizeof(line), "%T", "HotSeat_True", client);
+		menu.AddItem("t", line);
+		FormatEx(line, sizeof(line), "%T", "HotSeat_False", client);
+		menu.AddItem("f", line);
 		menu.ExitButton = false;
 		menu.Display(client, g_iHotSeat_Time);
 
-		CPrintToChatAll("%s {olive}%N {lightgreen}is in the {olive}HOT SEAT{lightgreen}: \"%s\" TRUE or FALSE?", THIS_MODE_INFO.tag, client, g_sHotSeat_Text[client]);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotSeat_InSeat", client, g_sHotSeat_Text[client]);
 	}
 
 	if (picked)
@@ -352,8 +358,6 @@ void HotSeat_Result(int client, int said)
 	g_bHotSeat_Pending[client] = false;
 
 	bool right = said != -1 && (said == 1) == g_bHotSeat_Answer[client];
-	char answer[8];
-	strcopy(answer, sizeof(answer), g_bHotSeat_Answer[client] ? "TRUE" : "FALSE");
 
 	if (right)
 	{
@@ -362,17 +366,17 @@ void HotSeat_Result(int client, int said)
 			SetEntityHealth(client, GetClientHealth(client) + heal);
 
 		if (heal > 0)
-			CPrintToChatAll("%s {olive}%N {lightgreen}said %s - {olive}RIGHT! {lightgreen}(+%d HP)", THIS_MODE_INFO.tag, client, answer, heal);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_bHotSeat_Answer[client] ? "HotSeat_RightTrueHP" : "HotSeat_RightFalseHP", client, heal);
 		else
-			CPrintToChatAll("%s {olive}%N {lightgreen}said %s - {olive}RIGHT!", THIS_MODE_INFO.tag, client, answer);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_bHotSeat_Answer[client] ? "HotSeat_RightTrue" : "HotSeat_RightFalse", client);
 
 		return;
 	}
 
 	if (said == -1)
-		CPrintToChatAll("%s {olive}%N {lightgreen}didn't answer in time! It was {olive}%s{lightgreen}.", THIS_MODE_INFO.tag, client, answer);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_bHotSeat_Answer[client] ? "HotSeat_TimeUpTrue" : "HotSeat_TimeUpFalse", client);
 	else
-		CPrintToChatAll("%s {olive}%N {lightgreen}said %s - {red}WRONG!", THIS_MODE_INFO.tag, client, said == 1 ? "TRUE" : "FALSE");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, said == 1 ? "HotSeat_WrongTrue" : "HotSeat_WrongFalse", client);
 
 	if (IsPlayerAlive(client))
 		HurtPlayer(client, g_iHotSeat_Penalty);
@@ -420,7 +424,7 @@ public Action Cmd_HotSeatToggle(int client, int args)
 {
 	if (!g_bHotSeat_Enabled)
 	{
-		CReplyToCommand(client, "%s Hot Seat is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", HOTSEAT_SHOWN_NAME);
 		return Plugin_Handled;
 	}
 
@@ -428,9 +432,9 @@ public Action Cmd_HotSeatToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	HotSeat_Reset();
 
-	CPrintToChatAll("%s Hot Seat is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", HOTSEAT_SHOWN_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s If a {olive}TRUE / FALSE {lightgreen}menu pops up, answer fast!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotSeat_Hint");
 
 	return Plugin_Handled;
 }
@@ -443,11 +447,15 @@ public Action Cmd_HotSeatSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_HotSeatSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Put someone in the hot seat now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("reload", "Reload the statements");
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "HotSeat_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T", "HotSeat_MenuReload", client);
+	menu.AddItem("reload", buffer);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -479,7 +487,7 @@ int Menu_HotSeatSettings(Menu menu, MenuAction action, int param1, int param2)
 			}
 			else if (strcmp(info, "reload") == 0)
 			{
-				CPrintToChat(param1, "%s Loaded {olive}%d {lightgreen}statements.", THIS_MODE_INFO.tag, HotSeat_Load());
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "HotSeat_Loaded", HotSeat_Load());
 				Cmd_HotSeatSettings(param1, 0);
 			}
 			else

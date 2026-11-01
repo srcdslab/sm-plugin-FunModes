@@ -277,7 +277,7 @@ public void OnClientDisconnect_HealBeacon(int client)
     RemoveBeacon(-1, client);
 
     if (!g_bUnloading)
-        CPrintToChatAll("%s {olive}%N {lightgreen}disconnected with HealBeacon.", THIS_MODE_INFO.tag, client);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Disconnected", client);
 }
 
 public void Event_RoundStart_HealBeacon()
@@ -303,7 +303,7 @@ public void Event_PlayerDeath_HealBeacon(int client)
         return;
 
     RemoveBeacon(-1, client);
-    CPrintToChatAll("%s {olive}%N {lightgreen}died with HealBeacon.", THIS_MODE_INFO.tag, client);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Died", client);
     HealBeacon_CarrierLost(client);
 }
 
@@ -313,7 +313,7 @@ public void ZR_OnClientInfected_HealBeacon(int client)
         return;
 
     RemoveBeacon(-1, client);
-    CPrintToChatAll("%s {olive}%N {lightgreen}got infected with HealBeacon.", THIS_MODE_INFO.tag, client);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Infected", client);
     HealBeacon_CarrierLost(client);
 }
 
@@ -326,7 +326,7 @@ void HealBeacon_CarrierLost(int lost)
 
     if (g_iHB_OnLost == HB_LOST_SLAY)
     {
-        CPrintToChatAll("%s A heal beacon carrier has fallen, {olive}all humans are slain{lightgreen}!", THIS_MODE_INFO.tag);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_CarrierFallen");
         SlayAllHumans();
         return;
     }
@@ -383,7 +383,7 @@ public void Event_PlayerTeam_HealBeacon(Event event)
     if (team == CS_TEAM_SPECTATOR || team == CS_TEAM_NONE)
     {
         RemoveBeacon(-1, client);
-        CPrintToChatAll("%s {olive}%N {lightgreen}moved to spectator team with HealBeacon.", THIS_MODE_INFO.tag, client);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Spectator", client);
     }
 }
 
@@ -485,12 +485,12 @@ bool HealBeacon_ToggleChosen(int admin, int target)
 {
     if (!ChosenListToggle(g_aHB_Chosen, target))
     {
-        CPrintToChatAll("%s {olive}%N {lightgreen}is no longer a chosen heal beacon carrier.", THIS_MODE_INFO.tag, target);
+        CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_NoLongerChosen", target);
         LogAction(admin, target, "\"%L\" removed \"%L\" from the chosen heal beacon carriers", admin, target);
         return false;
     }
 
-    CPrintToChatAll("%s {olive}%N {lightgreen}gets a heal beacon every round until they leave, and can't be a mother zombie.", THIS_MODE_INFO.tag, target);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_Chosen", target);
     LogAction(admin, target, "\"%L\" chose \"%L\" as heal beacon carrier", admin, target);
 
     // The beacons are already out this round: theirs comes right now
@@ -521,7 +521,7 @@ public Action Cmd_HealBeaconChoose(int client, int args)
 {
     if (args < 1)
     {
-        CReplyToCommand(client, "%s Usage: sm_healbeacon_choose <player>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageChoose");
         return Plugin_Handled;
     }
 
@@ -779,7 +779,7 @@ public void RemoveNeon(int client)
 public void AddNewBeacon(int client, int target)
 {
     SetHealBeaconToClient(target);
-    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AddAnnounce", target);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HealBeacon_AnnounceAdmin", target, client);
 }
 
 public void RemoveBeacon(int client, int target)
@@ -851,7 +851,7 @@ public Action Cmd_HealBeaconToggle(int client, int args)
 {
     if (!g_bHealBeacon_Enabled)
     {
-        CReplyToCommand(client, "%s Healbeacon is currently disabled!", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
         return Plugin_Handled;
     }
 
@@ -861,10 +861,7 @@ public Action Cmd_HealBeaconToggle(int client, int args)
 
         HealBeacon_DeleteAllTimers();
 
-        if (!client)
-            ReplyToCommand(client, "%s HealBeacon Mode is now OFF!", THIS_MODE_INFO.tag);
-        else
-            CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_Disabled", client);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_Disabled");
     }
     else
     {
@@ -876,10 +873,7 @@ public Action Cmd_HealBeaconToggle(int client, int args)
         delete g_aHBPlayers;
         g_aHBPlayers = new ArrayList(ByteCountToCells(32));
 
-        if (!client)
-            ReplyToCommand(client, "%s HealBeacon Mode is now ON!", THIS_MODE_INFO.tag);
-        else
-            CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_Enabled", client);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_Enabled");
 
         // Starts in this round, no round restart: the carriers are picked after the usual delay
         if (g_bRoundLive && !g_bRoundEnd)
@@ -914,7 +908,7 @@ Action Cmd_HealBeaconDistance(int client, int args)
 
     if (args < 2)
     {
-        CReplyToCommand(client, "%s Usage: sm_beacon_distance <healBeacon Player> <distance>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageDistance");
         return Plugin_Handled;
     }
 
@@ -944,7 +938,7 @@ Action Cmd_HealBeaconDistance(int client, int args)
 
     g_BeaconPlayersData[target].distance = distance;
     CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DistanceChange", client, target, distance);
-    LogAction(client, target, "[FunModes-HealBeacon] \"%L\" changed Beacon Distance of \"%L\" to \"%d\"", client, target, distance);
+    LogAction(client, target, "[FunModes-HealBeacon] \"%L\" changed Beacon Distance of \"%L\" to \"%.2f\"", client, target, distance);
     return Plugin_Handled;
 }
 
@@ -958,7 +952,7 @@ Action Cmd_HealBeaconReplace(int client, int args)
 
     if (args < 2)
     {
-        CReplyToCommand(client, "%s Usage: sm_replacebeacon <healBeacon Player> <player>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageReplace");
         return Plugin_Handled;
     }
 
@@ -1001,7 +995,7 @@ Action Cmd_HealBeaconAddNew(int client, int args)
 
     if (args < 1)
     {
-        CReplyToCommand(client, "%s Usage: sm_addnewbeacon <player>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageAddNew");
         return Plugin_Handled;
     }
 
@@ -1036,7 +1030,7 @@ Action Cmd_HealBeaconRemove(int client, int args)
 
     if (args < 1)
     {
-        CReplyToCommand(client, "%s Usage: sm_removebeacon <player>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageRemove");
         return Plugin_Handled;
     }
 
@@ -1067,7 +1061,7 @@ Action Cmd_HealBeaconCheckDistance(int client, int args)
 
     if (args < 1)
     {
-        CReplyToCommand(client, "%s Usage: sm_checkdistance <player>", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_UsageCheckDistance");
         return Plugin_Handled;
     }
 
@@ -1088,7 +1082,7 @@ Action Cmd_HealBeaconCheckDistance(int client, int args)
     }
 
     float distance = GetDistanceBetween(client, target);
-    CReplyToCommand(client, "%s Distance between you and %N is: {olive}%.2f.", THIS_MODE_INFO.tag, target, distance);
+    CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "HealBeacon_CheckDistance", target, distance);
     return Plugin_Handled;
 }
 
