@@ -296,7 +296,7 @@ public void Event_PlayerDeath_VIPMode(int client)
 
 	if (g_bDiedFromLaser[client])
 	{
-		CPrintToChatAll("%s %T", THIS_MODE_INFO.tag, "VIPMode_VIPDeathLaser", client, client);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_VIPDeathLaser", client);
 		RemoveClientVIP(client, false);
 		g_bDiedFromLaser[client] = false;
 		return;
@@ -458,7 +458,8 @@ void RemoveClientVIP(int client, bool kill, const char[] translation = "")
 	g_bIsVIP[client] = false;
 	delete g_hVIPBeaconTimer[client];
 	
-	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, translation, client);
+	if (translation[0])
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, translation, client);
 	
 	if (kill && GetCurrentVIPsCount() == 0 && g_bVIP_Replace)
 	{
