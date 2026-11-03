@@ -140,10 +140,7 @@ public Action Cmd_SlapModeToggle(int client, int args)
 Action Timer_SlapMode(Handle timer)
 {
 	if (!THIS_MODE_INFO.isOn)
-	{
-		g_hSlapModeTimer = null;
 		return Plugin_Stop;
-	}
 
 	int players[MAXPLAYERS + 1];
 	int count;

@@ -290,7 +290,7 @@ void PullGame_ToggleTimer(bool toggle)
 
 Action Timer_PullGame(Handle timer)
 {
-	if (!THIS_MODE_INFO.isOn || g_bRoundEnd || !g_bMotherZombie)
+	if (g_bRoundEnd || !g_bMotherZombie)
 	{
 		g_hPullGameTimer = null;
 		return Plugin_Stop;

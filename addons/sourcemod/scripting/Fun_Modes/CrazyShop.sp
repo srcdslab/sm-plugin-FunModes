@@ -364,9 +364,6 @@ public void OnClientDisconnect_CrazyShop(int client)
 	bool loaded = PLAYER_LOADED(client);
 	PLAYER_LOADED(client) = false;
 
-	// ... and starts without the items that were still running
-	CrazyShop_EndItems(client);
-
 	if (!THIS_MODE_INFO.isOn)
 		return;
 
@@ -384,35 +381,6 @@ public void OnClientDisconnect_CrazyShop(int client)
 		CrazyShop_DB_SavePlayer(client);
 
 	PLAYER_RESET(client);
-}
-
-/* Ends the items still running for this player, and what they did to the others */
-void CrazyShop_EndItems(int client)
-{
-	// The human this zombie is pulling gets their speed back
-	int target = PLAYER_TEMP_VAR(client, grabbedTarget);
-	if (target > 0 && target <= MaxClients && IsClientInGame(target))
-	{
-		PLAYER_ITEM_ACTIVE(target, 1) = false;
-		PLAYER_TEMP_VAR(target, infectionProtect) = false;
-		SetEntPropFloat(target, Prop_Send, "m_flMaxspeed", PLAYER_TEMP_VAR(client, originalTargetMaxSpeed));
-	}
-
-	// Slowed by a slow beacon
-	if (PLAYER_TEMP_VAR(client, gotSlowed) && PLAYER_TEMP_VAR(client, originalSpeed) > 0.0 && IsClientInGame(client))
-		SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", PLAYER_TEMP_VAR(client, originalSpeed));
-
-	bool slowBeacon = PLAYER_ITEM_ACTIVE(client, 6);
-	for (int i = 0; i < ITEMS_COUNT; i++)
-		PLAYER_ITEM_ACTIVE(client, i) = false;
-
-	// This also kills the slow beacon's repeat timer ...
-	PLAYER_RESET_TEMP_VARS(client);
-	PLAYER_TEMP_VAR(client, originalWeapon)[0] = '\0';
-
-	// ... so the zombies it slowed get their speed back here
-	if (slowBeacon)
-		CrazyShop_ResetSpeed();
 }
 
 public void Event_RoundStart_CrazyShop()
@@ -1596,7 +1564,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_InfectionProtection, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_InfectionProtection, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
 
 		// Super Weapon - Humans
@@ -1642,7 +1610,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_SuperWeapon, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_SuperWeapon, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
 
 		// Laser Protection - Humans
@@ -1655,7 +1623,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_LaserProtection, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_LaserProtection, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
 
 		// Unlimited Ammo - Humans
@@ -1672,7 +1640,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_UnlimitedAmmo, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_UnlimitedAmmo, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_UnlimitedAmmo");
 		}
@@ -1723,7 +1691,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(itemNum);
 			pack.WriteFloat(originalSpeed);
 
-			CreateTimer(item.time, Timer_CrazyShop_MoreSpeed, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_MoreSpeed, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
 
 		// KB Protection - Zombies
@@ -1736,7 +1704,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_KBProtection, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_KBProtection, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_KBProtection");
 		}
@@ -1752,7 +1720,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_LowerGravity, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_LowerGravity, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_LowerGravity");
 		}
@@ -1766,7 +1734,7 @@ void CrazyShop_Activate(int client, int itemNum)
 				return;
 			}
 
-			int userid = GetClientUserId(client);
+			int userid = GetClientOfUserId(client);
 			char propName[64];
 			FormatEx(propName, sizeof(propName), "%d_FM_PROP_%d_%d", RoundToNearest(item.amount), userid, GetGameTime());
 
@@ -1783,7 +1751,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(userid);
 			pack.WriteCell(EntIndexToEntRef(prop));
 
-			CreateTimer(item.time, Timer_CrazyShop_HurtingMachine, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_HurtingMachine, pack, TIMER_FLAG_NO_MAPCHANGE);
 		}
 
 		// Ignite Immunity - Zombies
@@ -1796,7 +1764,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_IgniteImmunity, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_IgniteImmunity, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_IgniteImmunity");
 		}
@@ -1814,7 +1782,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_Invisibility, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_Invisibility, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_Invisible");
 		}
@@ -1837,7 +1805,7 @@ void CrazyShop_Activate(int client, int itemNum)
 			pack.WriteCell(GetClientUserId(client));
 			pack.WriteCell(itemNum);
 
-			CreateTimer(item.time, Timer_CrazyShop_Pull, pack, TIMER_FLAG_NO_MAPCHANGE | TIMER_DATA_HNDL_CLOSE);
+			CreateTimer(item.time, Timer_CrazyShop_Pull, pack, TIMER_FLAG_NO_MAPCHANGE);
 
 			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "CrazyShop_Pulling");
 		}
@@ -1858,9 +1826,13 @@ Action Timer_CrazyShop_InfectionProtection(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_TEMP_VAR(client, infectionProtect) = false;
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
@@ -1874,9 +1846,13 @@ Action Timer_CrazyShop_SuperWeapon(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_TEMP_VAR(client, superWeaponName)[0] = '\0';
 	PLAYER_TEMP_VAR(client, superWeapon) = false;
@@ -1904,9 +1880,13 @@ Action Timer_CrazyShop_LaserProtection(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 
 	PLAYER_TEMP_VAR(client, laserProtect) = false;
@@ -1920,9 +1900,13 @@ Action Timer_CrazyShop_UnlimitedAmmo(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	PLAYER_TEMP_VAR(client, unlimitedAmmo) = false;
@@ -2034,13 +2018,18 @@ Action Timer_CrazyShop_MoreSpeed(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
 	float speed = pack.ReadFloat();
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	SetEntProp(client, Prop_Send, "m_iProgressBarDuration", 0);
+
+	delete pack;
 
 	if (!THIS_MODE_INFO.isOn || g_bRoundEnd)
 		return Plugin_Stop;
@@ -2055,9 +2044,13 @@ Action Timer_CrazyShop_KBProtection(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_TEMP_VAR(client, kbProtect) = false;
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
@@ -2071,9 +2064,13 @@ Action Timer_CrazyShop_LowerGravity(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	SetEntityGravity(client, 1.0);
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
@@ -2087,9 +2084,13 @@ Action Timer_CrazyShop_IgniteImmunity(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	PLAYER_TEMP_VAR(client, igniteImmunity) = false;
@@ -2103,9 +2104,13 @@ Action Timer_CrazyShop_Invisibility(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 
@@ -2120,9 +2125,13 @@ Action Timer_CrazyShop_Pull(Handle timer, DataPack pack)
 	pack.Reset();
 	int client = GetClientOfUserId(pack.ReadCell());
 	if (!client)
+	{
+		delete pack;
 		return Plugin_Stop;
+	}
 
 	int itemNum = pack.ReadCell();
+	delete pack;
 
 	PLAYER_ITEM_ACTIVE(client, itemNum) = false;
 	int target = PLAYER_TEMP_VAR(client, grabbedTarget);
@@ -2151,15 +2160,11 @@ void CrazyShop_StartGrab(int client, int target)
 	PLAYER_TEMP_VAR(client, originalTargetMaxSpeed) = GetEntPropFloat(target, Prop_Send, "m_flMaxspeed");
 	SetEntPropFloat(target, Prop_Send, "m_flMaxspeed", 0.01);
 
-	CreateTimer(0.05, CrazyShop_Timer_Grabbing, GetClientUserId(client), TIMER_REPEAT);
+	CreateTimer(0.05, CrazyShop_Timer_Grabbing, client, TIMER_REPEAT);
 }
 
-Action CrazyShop_Timer_Grabbing(Handle timer, int userid)
+Action CrazyShop_Timer_Grabbing(Handle timer, int client)
 {
-	int client = GetClientOfUserId(userid);
-	if (!client)
-		return Plugin_Stop;
-
 	int itemNum = 13;
 	if (!PLAYER_ITEM_ACTIVE(client, itemNum))
 		return Plugin_Stop;
@@ -2204,6 +2209,8 @@ Action Timer_CrazyShop_HurtingMachine(Handle timer, DataPack pack)
 
 	int client = GetClientOfUserId(pack.ReadCell());
 	int prop = EntRefToEntIndex(pack.ReadCell());
+
+	delete pack;
 
 	g_iCrazyShopProps--;
 
