@@ -471,7 +471,7 @@ Action MathGame_TimerRepeat(Handle timer, int time)
 		FormatEx(thisMsg, sizeof(thisMsg), "[MathGame] %T\n", "MathGame_HudTimeLeft", i, left);
 
 		if (g_bMathGameHasQuestion[i])
-			FormatEx(thisMsg, sizeof(thisMsg), "%s\n[ %s ]", thisMsg, g_sMathGameQuestion[i]);
+			Format(thisMsg, sizeof(thisMsg), "%s\n[ %s ]", thisMsg, g_sMathGameQuestion[i]);
 
 		SendHudText(i, thisMsg, _, _, HUD_Y_MATHGAME, g_hMathGame_Hud);
 	}
