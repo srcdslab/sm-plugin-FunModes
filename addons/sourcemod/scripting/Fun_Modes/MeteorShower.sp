@@ -14,6 +14,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "MeteorShower"
+#define METEOR_DISPLAY_NAME "Meteor Shower"
 
 static int g_iMeteorShowerIndex = -1;
 
@@ -170,7 +171,7 @@ public void Event_RoundStart_MeteorShower()
 {
 	g_fMeteor_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Meteor Shower is on: look up and watch for {olive}orange rings{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MeteorShower_RoundInfo");
 }
 
 public void OnTick_MeteorShower()
@@ -202,7 +203,7 @@ void MeteorShower_Wave()
 		pack.WriteFloatArray(pos, 3);
 	}
 
-	CPrintToChatAll("%s {olive}METEORS INCOMING!", THIS_MODE_INFO.tag);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MeteorShower_Incoming");
 }
 
 Action MeteorShower_HitTimer(Handle timer, DataPack pack)
@@ -223,7 +224,7 @@ public Action Cmd_MeteorShowerToggle(int client, int args)
 {
 	if (!g_bMeteorShower_Enabled)
 	{
-		CReplyToCommand(client, "%s Meteor Shower is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", METEOR_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -231,9 +232,9 @@ public Action Cmd_MeteorShowerToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	MeteorShower_Reset();
 
-	CPrintToChatAll("%s Meteor Shower is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", METEOR_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Look up and watch for {olive}orange rings{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MeteorShower_Info");
 
 	return Plugin_Handled;
 }
@@ -246,10 +247,13 @@ public Action Cmd_MeteorShowerSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_MeteorShowerSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, METEOR_DISPLAY_NAME);
 
-	menu.AddItem("now", "Meteors now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "MeteorShower_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

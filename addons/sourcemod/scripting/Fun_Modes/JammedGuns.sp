@@ -14,6 +14,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "JammedGuns"
+#define JAM_DISPLAY_NAME "Jammed Guns"
 
 static int g_iJammedGunsIndex = -1;
 
@@ -134,7 +135,7 @@ public void Event_RoundStart_JammedGuns()
 {
 	JammedGuns_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Jammed Guns is on: your gun might stop working at the worst moment!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "JammedGuns_RoundInfo");
 }
 
 /* Strips the fire buttons while jammed */
@@ -159,7 +160,7 @@ void JammedGuns_Jam(int client)
 		SetEntPropFloat(weapon, Prop_Send, "m_flNextSecondaryAttack", until);
 	}
 
-	PrintCenterText(client, "YOUR GUN JAMMED!");
+	PrintCenterText(client, "%t", "JammedGuns_Center");
 }
 
 void JammedGuns_Wave()
@@ -172,9 +173,9 @@ void JammedGuns_Wave()
 		JammedGuns_Jam(list[i]);
 
 	if (count >= humans && humans > 0)
-		CPrintToChatAll("%s Everyone's guns jammed for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iJam_Last);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "JammedGuns_AllJammed", g_iJam_Last);
 	else if (count > 0)
-		CPrintToChatAll("%s {olive}%d {lightgreen}gun%s jammed for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, count, count == 1 ? "" : "s", g_iJam_Last);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, count == 1 ? "JammedGuns_OneJammed" : "JammedGuns_SomeJammed", count, g_iJam_Last);
 }
 
 public void OnTick_JammedGuns()
@@ -187,7 +188,7 @@ public Action Cmd_JammedGunsToggle(int client, int args)
 {
 	if (!g_bJammedGuns_Enabled)
 	{
-		CReplyToCommand(client, "%s Jammed Guns is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", JAM_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -195,9 +196,9 @@ public Action Cmd_JammedGunsToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	JammedGuns_Reset();
 
-	CPrintToChatAll("%s Jammed Guns is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", JAM_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Your gun might stop working at the worst moment!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "JammedGuns_Info");
 
 	return Plugin_Handled;
 }
@@ -210,10 +211,13 @@ public Action Cmd_JammedGunsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_JammedGunsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, JAM_DISPLAY_NAME);
 
-	menu.AddItem("now", "Jam guns now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "JammedGuns_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -27,7 +27,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly, Hobbitten",
 	description = "bunch of fun modes for ze mode",
-	version = "3.1.2",
+	version = "3.1.3",
 	url = "https://nide.gg"
 }
 
@@ -398,7 +398,7 @@ Action Cmd_FunModes(int client, int args)
 	Menu menu = new Menu(Menu_MainModes);
 	menu.SetTitle("FunModes\n ");
 
-	char index[6], line[64], name[48];
+	char index[6], line[128], name[48];
 
 	// Modes that don't belong to a category (the Event Roulette) come first
 	for (int i = 0; i < g_iLastModeIndex; i++)
@@ -408,7 +408,7 @@ Action Cmd_FunModes(int client, int args)
 
 		FunModes_DisplayName(i, name, sizeof(name));
 		FormatEx(index, sizeof(index), "m%d", i);
-		FormatEx(line, sizeof(line), "%s [%s]", name, g_ModesInfo[i].isOn ? "ON" : "OFF");
+		FormatEx(line, sizeof(line), "%T", g_ModesInfo[i].isOn ? "FunModes_MenuModeOn" : "FunModes_MenuModeOff", client, name);
 		menu.AddItem(index, line);
 	}
 
@@ -429,15 +429,15 @@ Action Cmd_FunModes(int client, int args)
 			continue;
 
 		FormatEx(index, sizeof(index), "c%d", cat);
+		FormatEx(line, sizeof(line), "%T", g_sCategoryNames[cat], client);
 		if (on)
-			FormatEx(line, sizeof(line), "%s  (%d on)", g_sCategoryNames[cat], on);
-		else
-			FormatEx(line, sizeof(line), "%s", g_sCategoryNames[cat]);
+			Format(line, sizeof(line), "%T", "FunModes_CategoryCount", client, line, on);
 
 		menu.AddItem(index, line);
 	}
 
-	menu.AddItem("t", FunModes_AnyModeOn() ? "Admin tools (stop all)" : "Admin tools");
+	FormatEx(line, sizeof(line), "%T", FunModes_AnyModeOn() ? "FunModes_AdminToolsStopAll" : "FunModes_AdminTools", client);
+	menu.AddItem("t", line);
 
 	// Everything on one page, like the eventmodes menu
 	if (menu.ItemCount <= 9)
@@ -475,9 +475,11 @@ int Menu_MainModes(Menu menu, MenuAction action, int param1, int param2)
 void DisplayToolsMenu(int client)
 {
 	Menu menu = new Menu(Menu_Tools);
-	menu.SetTitle("FunModes - Admin tools\nSettings are saved as soon as they change\n ");
+	menu.SetTitle("FunModes - %T\n%T\n ", "FunModes_AdminTools", client, "FunModes_AdminToolsInfo", client);
 
-	menu.AddItem("stop", "Stop all modes", FunModes_AnyModeOn() ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	char line[128];
+	FormatEx(line, sizeof(line), "%T", "FunModes_StopAllModes", client);
+	menu.AddItem("stop", line, FunModes_AnyModeOn() ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -516,7 +518,7 @@ void FunModes_StopAll(int client)
 	for (int i = 0; i < g_iLastModeIndex; i++)
 		FunModes_SetModeState(i, false, client);
 
-	CPrintToChatAll("{gold}[FunModes]{lightgreen} {olive}%N {lightgreen}stopped all the modes.", client);
+	CPrintToChatAll("{gold}[FunModes]{lightgreen} %t", "FunModes_StoppedAll", client);
 	LogAction(client, -1, "\"%L\" stopped all the funmodes", client);
 }
 
@@ -525,9 +527,9 @@ void DisplayCategory(int client, int cat)
 	g_iMenuCategory[client] = cat;
 
 	Menu menu = new Menu(Menu_Category);
-	menu.SetTitle("FunModes - %s\n ", g_sCategoryNames[cat]);
+	menu.SetTitle("FunModes - %T\n ", g_sCategoryNames[cat], client);
 
-	char index[4], line[64], name[48];
+	char index[4], line[128], name[48];
 	for (int i = 0; i < g_iLastModeIndex; i++)
 	{
 		if (g_ModesInfo[i].category != view_as<FM_Category>(cat))
@@ -535,7 +537,7 @@ void DisplayCategory(int client, int cat)
 
 		FunModes_DisplayName(i, name, sizeof(name));
 		IntToString(i, index, sizeof(index));
-		FormatEx(line, sizeof(line), "%s [%s]", name, g_ModesInfo[i].isOn ? "ON" : "OFF");
+		FormatEx(line, sizeof(line), "%T", g_ModesInfo[i].isOn ? "FunModes_MenuModeOn" : "FunModes_MenuModeOff", client, name);
 		menu.AddItem(index, line);
 	}
 
@@ -567,159 +569,170 @@ int Menu_Category(Menu menu, MenuAction action, int param1, int param2)
 	return 0;
 }
 
-/* Short menu labels for the settings whose description is too long or unclear for a menu line,
-   as "cvar|label" or "cvar|label|value=name;value=name" when the values stand for choices */
-static const char g_sCvarLabels[][] =
+/* Short menu labels (phrases) for the settings whose description is too long or unclear for a menu line, as { cvar, phrase } */
+static const char g_sCvarLabels[][][] =
 {
-	"sm_blindmode_time_interval|Seconds between two flashbangs",
-	"sm_blindmode_percentage|Zombies who get a flashbang (%)",
-	"sm_blindmode_max_distance|Blinding range of a flashbang",
-	"sm_blindmode_blind_time|Seconds the humans stay blind",
-	"sm_boss_delay|Seconds before the boss rises",
-	"sm_buddy_bleed|Bleeding damage per second",
-	"sm_buddy_max_distance|Bleed when further from your buddy than|0=Off",
-	"sm_chaosweapons_timer_interval|Seconds between two weapon picks",
-	"sm_chaosweapons_countdown|Countdown before a pick (s)",
-	"sm_crazyshop_damage|Damage to earn credits",
-	"sm_crazyshop_credits|Credits per reward",
-	"sm_crazyshop_savecredits|Keep credits between maps",
-	"sm_crazyshop_disable_shop|Close the !crazyshop menu",
-	"sm_damagegame_time_interval|Seconds between two checks",
-	"sm_damagegame_damage|Damage for not shooting zombies",
-	"sm_damagegame_mode|Who gets hurt|0=Worst defenders;1=Not defending for a while;2=Both",
-	"sm_doublejump_boost|Mid-air jump boost",
-	"sm_doublejump_humans|Humans can double jump",
-	"sm_doublejump_zombies|Zombies can double jump",
-	"sm_roulette_norepeat|No repeats from the last pick",
-	"sm_roulette_shuffle_min|Pick again after at least (s)|0=Off, once a round",
-	"sm_roulette_shuffle_max|Pick again after at most (s)|0=Off",
-	"sm_fog_announce|Announce fog changes in chat",
-	"sm_fog_interval|Re-apply the fog every (s)",
-	"sm_fog_preset|Preset when turned on",
-	"sm_cold_huddle|Huddle range to keep warm",
-	"sm_gungame_pistols_damage|Damage to level up: pistols",
-	"sm_gungame_shotguns_damage|Damage to level up: shotguns",
-	"sm_gungame_smgs_damage|Damage to level up: SMGs",
-	"sm_gungame_rifles_damage|Damage to level up: rifles",
-	"sm_gungame_m249_damage|Damage to finish: M249",
-	"sm_gungame_hegrenades_reward|Grenades for finishing a cycle",
-	"sm_gungame_speed_reward|Seconds of the speed reward",
-	"sm_gungame_scale|Damage needed, multiplier",
-	"sm_gungame_hud|Show weapon and damage left",
-	"sm_beacon_timer|Seconds before the carriers are picked",
-	"sm_beacon_alert_timer|Warning before outside damage (s)",
-	"sm_beacon_damage|Damage per second outside the beacon",
-	"sm_beacon_heal|Heal per second inside the beacon",
-	"sm_healbeacon_randoms|Beacon carriers",
-	"sm_healbeacon_distance|Beacon radius",
-	"sm_healbeacon_on_lost|When a carrier is lost|0=The beacon is gone;1=A random human gets it;2=All humans are slain",
-	"sm_hero_delay|Seconds before the hero is picked",
-	"sm_hotseat_humans_only|Only living humans",
-	"sm_ic_mode|Inverted|0=Everyone, all the time;1=Random bursts",
-	"sm_ic_every|Bursts: seconds between two",
-	"sm_ic_last|Bursts: seconds each lasts",
-	"sm_ic_who|Bursts: who|0=All humans;1=Half the humans;2=One random human;3=Everyone",
-	"sm_leech_worst_count|Worst defenders hurt each time",
-	"sm_mathgame_easy_time|Seconds to answer: easy",
-	"sm_mathgame_medium_time|Seconds to answer: medium",
-	"sm_mathgame_hard_time|Seconds to answer: hard",
-	"sm_mathgame_easy_damage|Damage for no answer: easy",
-	"sm_mathgame_medium_damage|Damage for no answer: medium",
-	"sm_mathgame_hard_damage|Damage for no answer: hard",
-	"sm_mathgame_time_delay|Seconds between two questions",
-	"sm_mathgame_reward|Reward for a right answer|0=Nothing;1=+25 HP;2=+50 HP;3=HE grenade",
-	"sm_pullgame_timer_interval|Seconds between two pull rounds",
-	"sm_pullgame_speed|Pull speed",
-	"sm_pullgame_pull_time|Seconds a pull lasts",
-	"sm_pullgame_humans_count|Humans who can pull",
-	"sm_pullgame_zombies_count|Zombies who can pull",
-	"sm_rw_lock|Lock other guns once given",
-	"sm_realityshift_timer_interval|Seconds between two swaps",
-	"sm_realityshift_mode|Swaps|0=Random;1=Fixed pairs each round",
-	"sm_realityshift_pairs|Random swaps: pairs each time|0=Everyone",
-	"sm_realityshift_warn|Countdown before a swap (s)|0=None",
-	"sm_rlgl_time_between_damage|Check for movement every (s)",
-	"sm_rlgl_freeze_time|Seconds a red light lasts",
-	"sm_rlgl_time_between_redlights_min|Seconds between red lights: min",
-	"sm_rlgl_time_between_redlights_max|Seconds between red lights: max",
-	"sm_rlgl_damage|Damage per check while moving",
-	"sm_rlgl_warning_time|Warning before a red light (s)",
-	"sm_rlgl_zombies_speed|Zombie speed on red light|0=Unchanged",
-	"sm_rlgl_countdown_folder|Countdown sounds",
-	"sm_rlgl_grace|Seconds to stop once it's red",
-	"sm_rlgl_everyone|Zombies must stop too",
-	"sm_simon_trick|Trick commands (%)",
-	"sm_slapmode_time_interval|Seconds between two slap rounds",
-	"sm_slapmode_randoms_count|Humans slapped each round",
-	"sm_trivia_winners|Players who win|64=Everyone who gets it",
-	"sm_vipmode_timer|Seconds before the VIPs are picked",
-	"sm_vipmode_counter|Seconds before the humans are slain",
-	"sm_vipmode_laser|Laser deaths don't count",
-	"sm_vipmode_max_vips|VIPs each round",
-	"sm_vipmode_replace|New VIPs instead of slaying",
-	"sm_vipmode_hud|Show the VIP names on screen"
+	{ "sm_blindmode_time_interval", "FunModes_Label_blindmode_time_interval" },
+	{ "sm_blindmode_percentage", "FunModes_Label_blindmode_percentage" },
+	{ "sm_blindmode_max_distance", "FunModes_Label_blindmode_max_distance" },
+	{ "sm_blindmode_blind_time", "FunModes_Label_blindmode_blind_time" },
+	{ "sm_boss_delay", "FunModes_Label_boss_delay" },
+	{ "sm_buddy_bleed", "FunModes_Label_buddy_bleed" },
+	{ "sm_buddy_max_distance", "FunModes_Label_buddy_max_distance" },
+	{ "sm_chaosweapons_timer_interval", "FunModes_Label_chaosweapons_timer_interval" },
+	{ "sm_chaosweapons_countdown", "FunModes_Label_chaosweapons_countdown" },
+	{ "sm_crazyshop_damage", "FunModes_Label_crazyshop_damage" },
+	{ "sm_crazyshop_credits", "FunModes_Label_crazyshop_credits" },
+	{ "sm_crazyshop_savecredits", "FunModes_Label_crazyshop_savecredits" },
+	{ "sm_crazyshop_disable_shop", "FunModes_Label_crazyshop_disable_shop" },
+	{ "sm_damagegame_time_interval", "FunModes_Label_damagegame_time_interval" },
+	{ "sm_damagegame_damage", "FunModes_Label_damagegame_damage" },
+	{ "sm_damagegame_mode", "FunModes_Label_damagegame_mode" },
+	{ "sm_doublejump_boost", "FunModes_Label_doublejump_boost" },
+	{ "sm_doublejump_humans", "FunModes_Label_doublejump_humans" },
+	{ "sm_doublejump_zombies", "FunModes_Label_doublejump_zombies" },
+	{ "sm_roulette_norepeat", "FunModes_Label_roulette_norepeat" },
+	{ "sm_roulette_shuffle_min", "FunModes_Label_roulette_shuffle_min" },
+	{ "sm_roulette_shuffle_max", "FunModes_Label_roulette_shuffle_max" },
+	{ "sm_fog_announce", "FunModes_Label_fog_announce" },
+	{ "sm_fog_interval", "FunModes_Label_fog_interval" },
+	{ "sm_fog_preset", "FunModes_Label_fog_preset" },
+	{ "sm_cold_huddle", "FunModes_Label_cold_huddle" },
+	{ "sm_gungame_pistols_damage", "FunModes_Label_gungame_pistols_damage" },
+	{ "sm_gungame_shotguns_damage", "FunModes_Label_gungame_shotguns_damage" },
+	{ "sm_gungame_smgs_damage", "FunModes_Label_gungame_smgs_damage" },
+	{ "sm_gungame_rifles_damage", "FunModes_Label_gungame_rifles_damage" },
+	{ "sm_gungame_m249_damage", "FunModes_Label_gungame_m249_damage" },
+	{ "sm_gungame_hegrenades_reward", "FunModes_Label_gungame_hegrenades_reward" },
+	{ "sm_gungame_speed_reward", "FunModes_Label_gungame_speed_reward" },
+	{ "sm_gungame_scale", "FunModes_Label_gungame_scale" },
+	{ "sm_gungame_hud", "FunModes_Label_gungame_hud" },
+	{ "sm_beacon_timer", "FunModes_Label_beacon_timer" },
+	{ "sm_beacon_alert_timer", "FunModes_Label_beacon_alert_timer" },
+	{ "sm_beacon_damage", "FunModes_Label_beacon_damage" },
+	{ "sm_beacon_heal", "FunModes_Label_beacon_heal" },
+	{ "sm_healbeacon_randoms", "FunModes_Label_healbeacon_randoms" },
+	{ "sm_healbeacon_distance", "FunModes_Label_healbeacon_distance" },
+	{ "sm_healbeacon_on_lost", "FunModes_Label_healbeacon_on_lost" },
+	{ "sm_hero_delay", "FunModes_Label_hero_delay" },
+	{ "sm_hotseat_humans_only", "FunModes_Label_hotseat_humans_only" },
+	{ "sm_ic_mode", "FunModes_Label_ic_mode" },
+	{ "sm_ic_every", "FunModes_Label_ic_every" },
+	{ "sm_ic_last", "FunModes_Label_ic_last" },
+	{ "sm_ic_who", "FunModes_Label_ic_who" },
+	{ "sm_leech_worst_count", "FunModes_Label_leech_worst_count" },
+	{ "sm_mathgame_easy_time", "FunModes_Label_mathgame_easy_time" },
+	{ "sm_mathgame_medium_time", "FunModes_Label_mathgame_medium_time" },
+	{ "sm_mathgame_hard_time", "FunModes_Label_mathgame_hard_time" },
+	{ "sm_mathgame_easy_damage", "FunModes_Label_mathgame_easy_damage" },
+	{ "sm_mathgame_medium_damage", "FunModes_Label_mathgame_medium_damage" },
+	{ "sm_mathgame_hard_damage", "FunModes_Label_mathgame_hard_damage" },
+	{ "sm_mathgame_time_delay", "FunModes_Label_mathgame_time_delay" },
+	{ "sm_mathgame_reward", "FunModes_Label_mathgame_reward" },
+	{ "sm_pullgame_timer_interval", "FunModes_Label_pullgame_timer_interval" },
+	{ "sm_pullgame_speed", "FunModes_Label_pullgame_speed" },
+	{ "sm_pullgame_pull_time", "FunModes_Label_pullgame_pull_time" },
+	{ "sm_pullgame_humans_count", "FunModes_Label_pullgame_humans_count" },
+	{ "sm_pullgame_zombies_count", "FunModes_Label_pullgame_zombies_count" },
+	{ "sm_rw_lock", "FunModes_Label_rw_lock" },
+	{ "sm_realityshift_timer_interval", "FunModes_Label_realityshift_timer_interval" },
+	{ "sm_realityshift_mode", "FunModes_Label_realityshift_mode" },
+	{ "sm_realityshift_pairs", "FunModes_Label_realityshift_pairs" },
+	{ "sm_realityshift_warn", "FunModes_Label_realityshift_warn" },
+	{ "sm_rlgl_time_between_damage", "FunModes_Label_rlgl_time_between_damage" },
+	{ "sm_rlgl_freeze_time", "FunModes_Label_rlgl_freeze_time" },
+	{ "sm_rlgl_time_between_redlights_min", "FunModes_Label_rlgl_time_between_redlights_min" },
+	{ "sm_rlgl_time_between_redlights_max", "FunModes_Label_rlgl_time_between_redlights_max" },
+	{ "sm_rlgl_damage", "FunModes_Label_rlgl_damage" },
+	{ "sm_rlgl_warning_time", "FunModes_Label_rlgl_warning_time" },
+	{ "sm_rlgl_zombies_speed", "FunModes_Label_rlgl_zombies_speed" },
+	{ "sm_rlgl_countdown_folder", "FunModes_Label_rlgl_countdown_folder" },
+	{ "sm_rlgl_grace", "FunModes_Label_rlgl_grace" },
+	{ "sm_rlgl_everyone", "FunModes_Label_rlgl_everyone" },
+	{ "sm_simon_trick", "FunModes_Label_simon_trick" },
+	{ "sm_slapmode_time_interval", "FunModes_Label_slapmode_time_interval" },
+	{ "sm_slapmode_randoms_count", "FunModes_Label_slapmode_randoms_count" },
+	{ "sm_trivia_winners", "FunModes_Label_trivia_winners" },
+	{ "sm_vipmode_timer", "FunModes_Label_vipmode_timer" },
+	{ "sm_vipmode_counter", "FunModes_Label_vipmode_counter" },
+	{ "sm_vipmode_laser", "FunModes_Label_vipmode_laser" },
+	{ "sm_vipmode_max_vips", "FunModes_Label_vipmode_max_vips" },
+	{ "sm_vipmode_replace", "FunModes_Label_vipmode_replace" },
+	{ "sm_vipmode_hud", "FunModes_Label_vipmode_hud" }
 };
 
-/* The short label of a setting (and the names of its values), false when it has none */
-bool FunModes_FindCvarLabel(const char[] cvarName, char[] label, int labelLen, char[] valueNames, int valuesLen)
+/* The names (phrases) of the setting values that stand for choices, as { cvar, value, phrase } */
+static const char g_sCvarValueNames[][][] =
 {
-	char key[sizeof(FM_ConVar::name)];
+	{ "sm_buddy_max_distance", "0", "FunModes_Value_Off" },
+	{ "sm_damagegame_mode", "0", "FunModes_Value_WorstDefenders" },
+	{ "sm_damagegame_mode", "1", "FunModes_Value_NotDefending" },
+	{ "sm_damagegame_mode", "2", "FunModes_Value_Both" },
+	{ "sm_roulette_shuffle_min", "0", "FunModes_Value_OffOnceARound" },
+	{ "sm_roulette_shuffle_max", "0", "FunModes_Value_Off" },
+	{ "sm_healbeacon_on_lost", "0", "FunModes_Value_BeaconGone" },
+	{ "sm_healbeacon_on_lost", "1", "FunModes_Value_RandomHumanGetsIt" },
+	{ "sm_healbeacon_on_lost", "2", "FunModes_Value_AllHumansSlain" },
+	{ "sm_ic_mode", "0", "FunModes_Value_EveryoneAllTime" },
+	{ "sm_ic_mode", "1", "FunModes_Value_RandomBursts" },
+	{ "sm_ic_who", "0", "FunModes_Value_AllHumans" },
+	{ "sm_ic_who", "1", "FunModes_Value_HalfHumans" },
+	{ "sm_ic_who", "2", "FunModes_Value_OneRandomHuman" },
+	{ "sm_ic_who", "3", "FunModes_Value_Everyone" },
+	{ "sm_mathgame_reward", "0", "FunModes_Value_Nothing" },
+	{ "sm_mathgame_reward", "1", "FunModes_Value_HP25" },
+	{ "sm_mathgame_reward", "2", "FunModes_Value_HP50" },
+	{ "sm_mathgame_reward", "3", "FunModes_Value_HEGrenade" },
+	{ "sm_realityshift_mode", "0", "FunModes_Value_Random" },
+	{ "sm_realityshift_mode", "1", "FunModes_Value_FixedPairs" },
+	{ "sm_realityshift_pairs", "0", "FunModes_Value_Everyone" },
+	{ "sm_realityshift_warn", "0", "FunModes_Value_None" },
+	{ "sm_rlgl_zombies_speed", "0", "FunModes_Value_Unchanged" },
+	{ "sm_trivia_winners", "64", "FunModes_Value_EveryoneWhoGetsIt" }
+};
+
+/* The index of the setting's short label in g_sCvarLabels, -1 when it has none */
+int FunModes_FindCvarLabel(const char[] cvarName)
+{
 	for (int i = 0; i < sizeof(g_sCvarLabels); i++)
 	{
-		int pos = SplitString(g_sCvarLabels[i], "|", key, sizeof(key));
-		if (pos == -1 || strcmp(key, cvarName, false) != 0)
-			continue;
-
-		int pos2 = SplitString(g_sCvarLabels[i][pos], "|", label, labelLen);
-		if (pos2 == -1)
-		{
-			strcopy(label, labelLen, g_sCvarLabels[i][pos]);
-			valueNames[0] = '\0';
-		}
-		else
-			strcopy(valueNames, valuesLen, g_sCvarLabels[i][pos + pos2]);
-
-		return true;
+		if (strcmp(g_sCvarLabels[i][0], cvarName, false) == 0)
+			return i;
 	}
 
-	return false;
+	return -1;
 }
 
-/* Puts the name of the setting's current value in value, when valueNames has one for it */
-void FunModes_NameValue(FM_ConVar cvar, const char[] valueNames, char[] value, int maxlen)
+/* Puts the name of the setting's current value in value, when g_sCvarValueNames has one for it */
+void FunModes_NameValue(int client, FM_ConVar cvar, char[] value, int maxlen)
 {
-	char pairs[8][48];
-	int count = ExplodeString(valueNames, ";", pairs, sizeof(pairs), sizeof(pairs[]));
-	for (int i = 0; i < count; i++)
+	for (int i = 0; i < sizeof(g_sCvarValueNames); i++)
 	{
-		int eq = FindCharInString(pairs[i], '=');
-		if (eq <= 0)
+		if (strcmp(g_sCvarValueNames[i][0], cvar.name, false) != 0)
 			continue;
-
-		pairs[i][eq] = '\0';
 
 		bool match;
 		if (cvar.type == CONVAR_FLOAT)
-			match = StringToFloat(pairs[i]) == FUNMODES_CVAR_GET_VALUE(cvar, Float);
+			match = StringToFloat(g_sCvarValueNames[i][1]) == FUNMODES_CVAR_GET_VALUE(cvar, Float);
 		else
-			match = StringToInt(pairs[i]) == FUNMODES_CVAR_GET_VALUE(cvar, Int);
+			match = StringToInt(g_sCvarValueNames[i][1]) == FUNMODES_CVAR_GET_VALUE(cvar, Int);
 
 		if (match)
 		{
-			strcopy(value, maxlen, pairs[i][eq + 1]);
+			FormatEx(value, maxlen, "%T", g_sCvarValueNames[i][2], client);
 			return;
 		}
 	}
 }
 
 /* A setting as a menu line: its description (without the part in brackets) and its value */
-void FunModes_CvarLine(FM_ConVar cvar, bool isEnable, char[] line, int maxlen)
+void FunModes_CvarLine(int client, FM_ConVar cvar, bool isEnable, char[] line, int maxlen)
 {
-	char value[32];
+	char value[128];
 	switch (cvar.type)
 	{
 		case CONVAR_BOOL:
-			strcopy(value, sizeof(value), FUNMODES_CVAR_GET_VALUE(cvar, Bool) ? "ON" : "OFF");
+			FormatEx(value, sizeof(value), "%T", FUNMODES_CVAR_GET_VALUE(cvar, Bool) ? "FunModes_ValueOn" : "FunModes_ValueOff", client);
 
 		case CONVAR_FLOAT:
 		{
@@ -739,20 +752,19 @@ void FunModes_CvarLine(FM_ConVar cvar, bool isEnable, char[] line, int maxlen)
 
 	if (isEnable)
 	{
-		FormatEx(line, maxlen, "Allowed on this server: %s", value);
+		FormatEx(line, maxlen, "%T", "FunModes_AllowedOnServer", client, value);
 		return;
 	}
 
-	char desc[sizeof(FM_ConVar::description)], valueNames[128];
-	if (FunModes_FindCvarLabel(cvar.name, desc, sizeof(desc), valueNames, sizeof(valueNames)))
+	int label = FunModes_FindCvarLabel(cvar.name);
+	if (label != -1)
 	{
-		if (valueNames[0])
-			FunModes_NameValue(cvar, valueNames, value, sizeof(value));
-
-		FormatEx(line, maxlen, "%s: %s", desc, value);
+		FunModes_NameValue(client, cvar, value, sizeof(value));
+		FormatEx(line, maxlen, "%T: %s", g_sCvarLabels[label][1], client, value);
 		return;
 	}
 
+	char desc[sizeof(FM_ConVar::description)];
 	strcopy(desc, sizeof(desc), cvar.description);
 
 	int cut = StrContains(desc, " (");
@@ -792,14 +804,14 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 	bool enabled = FUNMODES_CVAR_GET_VALUE(cvar, Bool);
 
 	bool isOn = g_ModesInfo[modeIndex].isOn;
-	menu.SetTitle("%s - %s\n ", name, isOn ? "ON" : "OFF");
+	menu.SetTitle("%T\n ", isOn ? "FunModes_ModeTitleOn" : "FunModes_ModeTitleOff", client, name);
 
-	char info[12], line[96];
+	char info[12], line[256];
 	FormatEx(info, sizeof(info), "t%d", modeIndex);
 	if (enabled)
-		FormatEx(line, sizeof(line), "Turn %s %s", name, isOn ? "OFF" : "ON");
+		FormatEx(line, sizeof(line), "%T", isOn ? "FunModes_TurnOff" : "FunModes_TurnOn", client, name);
 	else
-		FormatEx(line, sizeof(line), "Turn %s ON (not allowed, see below)", name);
+		FormatEx(line, sizeof(line), "%T", "FunModes_TurnOnNotAllowed", client, name);
 
 	menu.AddItem(info, line, enabled ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
@@ -816,7 +828,7 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 			if (isEnable != (pass == 1))
 				continue;
 
-			FunModes_CvarLine(cvar, isEnable, line, sizeof(line));
+			FunModes_CvarLine(client, cvar, isEnable, line, sizeof(line));
 			FormatEx(info, sizeof(info), "c%d:%d", modeIndex, i);
 
 			// Text settings (fog preset, sound folder) have no steps to go through
@@ -826,7 +838,8 @@ void DisplayModeInfo(int client, int modeIndex, int firstItem = 0)
 	}
 
 	FormatEx(info, sizeof(info), "s%d", modeIndex);
-	menu.AddItem(info, "More options...");
+	FormatEx(line, sizeof(line), "%T", "FunModes_MoreOptions", client);
+	menu.AddItem(info, line);
 
 	menu.ExitBackButton = true;
 	menu.DisplayAt(client, firstItem, MENU_TIME_FOREVER);
@@ -863,7 +876,7 @@ void FunModes_StepCvar(int client, int modeIndex, int cvarIndex)
 	// Just to avoid some random sourcemod bug...
 	strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue, sizeof(FM_ConVar::currentValue), value);
 
-	CPrintToChat(client, "{gold}[FunModes]{lightgreen} You have changed {olive}%s {lightgreen}value to {olive}%s.", cvar.name, value);
+	CPrintToChat(client, "{gold}[FunModes]{lightgreen} %t", "FunModes_CvarChanged", cvar.name, value);
 }
 
 int Menu_DisplayConVars(Menu menu, MenuAction action, int param1, int param2)
@@ -929,7 +942,7 @@ void ShowCvarsInfo(int client, ModeInfo info)
 
 	Menu menu = new Menu(Menu_CvarsInfo);
 
-	menu.SetTitle("%s - ConVars List", info.name);
+	menu.SetTitle("%T", "FunModes_CvarsListTitle", client, info.name);
 
 	for (int i = 0; i < sizeof(ModeInfo::cvars); i++)
 	{
@@ -1044,7 +1057,7 @@ int Menu_ShowCvarInfo(Menu menu, MenuAction action, int param1, int param2)
 			// Just to avoid some random sourcemod bug...
 			strcopy(g_ModesInfo[modeIndex].cvars[cvarIndex].currentValue, sizeof(FM_ConVar::currentValue), dataEx[2]);
 
-			CPrintToChat(param1, "{gold}[FunModes]{lightgreen} You have changed {olive}%s {lightgreen}value to {olive}%s.", cvar.name, dataEx[2]);
+			CPrintToChat(param1, "{gold}[FunModes]{lightgreen} %t", "FunModes_CvarChanged", cvar.name, dataEx[2]);
 
 			ShowCvarInfo(param1, cvar);
 		}
@@ -1069,7 +1082,7 @@ Action Cmd_FunModesCvars(int client, int args)
 {
 	if (args < 1)
 	{
-		CReplyToCommand(client, "[FunModes] Usage: sm_fmcvar <cvar> <value>");
+		CReplyToCommand(client, "[FunModes] %t", "FunModes_UsageFmCvar");
 		return Plugin_Handled;
 	}
 
@@ -1099,13 +1112,13 @@ Action Cmd_FunModesCvars(int client, int args)
 
 	if (!exists)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Cannot find the specified cvar.");
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FunModes_CvarNotFound");
 		return Plugin_Handled;
 	}
 
 	if (args < 2)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %s value is: {olive}%s", cvar.name, cvar.currentValue);
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FunModes_CvarValue", cvar.name, cvar.currentValue);
 		return Plugin_Handled;
 	}
 
@@ -1117,7 +1130,7 @@ Action Cmd_FunModesCvars(int client, int args)
 	int modeIndex = cvar.modeIndex;
 
 	g_ModesInfo[modeIndex].cvars[cvarIndex] = cvar;
-	CReplyToCommand(client, "{gold}[FunModes]{lightgreen} changed %s value to: {olive}%s", cvar.name, cvar.currentValue);
+	CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FunModes_CvarSet", cvar.name, cvar.currentValue);
 
 	return Plugin_Handled;
 }
@@ -1375,7 +1388,7 @@ Action Cmd_FunModesState(int client, int args)
 		if (client)
 			Cmd_FunModes(client, 0);
 		else
-			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off] | sm_fm list | sm_fm stop");
+			ReplyToCommand(client, "[FunModes] %t", "FunModes_UsageFm");
 
 		return Plugin_Handled;
 	}
@@ -1385,16 +1398,17 @@ Action Cmd_FunModesState(int client, int args)
 
 	if (strcmp(arg, "list", false) == 0)
 	{
-		char line[256];
+		char line[256], onTag[32];
+		FormatEx(onTag, sizeof(onTag), " %T", "FunModes_ListOn", client);
 		for (int i = 0; i < g_iLastModeIndex; i++)
 		{
-			char entry[48];
-			FormatEx(entry, sizeof(entry), "%s%s%s", line[0] ? ", " : "", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+			char entry[64];
+			FormatEx(entry, sizeof(entry), "%s%s%s", line[0] ? ", " : "", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? onTag : "");
 			if (strlen(line) + strlen(entry) > 180)
 			{
 				ReplyToCommand(client, "[FunModes] %s", line);
 				line[0] = '\0';
-				FormatEx(entry, sizeof(entry), "%s%s", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? " [ON]" : "");
+				FormatEx(entry, sizeof(entry), "%s%s", g_ModesInfo[i].name, g_ModesInfo[i].isOn ? onTag : "");
 			}
 
 			StrCat(line, sizeof(line), entry);
@@ -1413,7 +1427,7 @@ Action Cmd_FunModesState(int client, int args)
 	int modeIndex = FunModes_FindMode(arg);
 	if (modeIndex == -1)
 	{
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Unknown mode {olive}%s{lightgreen}, type sm_fm list", arg);
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", "FunModes_UnknownMode", arg);
 		return Plugin_Handled;
 	}
 
@@ -1428,13 +1442,13 @@ Action Cmd_FunModesState(int client, int args)
 			on = false;
 		else
 		{
-			ReplyToCommand(client, "[FunModes] Usage: sm_fm <mode> [on|off]");
+			ReplyToCommand(client, "[FunModes] %t", "FunModes_UsageFmMode");
 			return Plugin_Handled;
 		}
 	}
 
 	if (!FunModes_SetModeState(modeIndex, on, client))
-		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} Couldn't turn {olive}%s {lightgreen}%s.", g_ModesInfo[modeIndex].name, on ? "on" : "off");
+		CReplyToCommand(client, "{gold}[FunModes]{lightgreen} %t", on ? "FunModes_CouldNotTurnOn" : "FunModes_CouldNotTurnOff", g_ModesInfo[modeIndex].name);
 	else
 		LogAction(client, -1, "\"%L\" turned the funmode %s %s", client, g_ModesInfo[modeIndex].name, on ? "on" : "off");
 

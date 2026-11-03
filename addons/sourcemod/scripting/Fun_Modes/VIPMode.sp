@@ -266,9 +266,9 @@ public void OnTick_VIPMode()
 
 		SetHudTextParams(-1.0, HUD_Y_VIP, 1.1, 255, 215, 0, 255, 0, 0.0, 0.0, 0.0);
 		if (g_bIsVIP[i] && IsPlayerAlive(i))
-			ShowModeHud(i, g_hVIP_Hud, "YOU ARE A VIP - STAY ALIVE!");
+			ShowModeHud(i, g_hVIP_Hud, "%T", "VIPMode_HudYou", i);
 		else
-			ShowModeHud(i, g_hVIP_Hud, count > 1 ? "VIPs: %s" : "VIP: %s", names);
+			ShowModeHud(i, g_hVIP_Hud, "%T", count > 1 ? "VIPMode_HudVIPs" : "VIPMode_HudVIP", i, names);
 	}
 }
 
@@ -351,14 +351,14 @@ public Action Cmd_VIPModeToggle(int client, int args)
 {
 	if (!g_bVIP_Enabled)
 	{
-		CReplyToCommand(client, "%s VIPMode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s VIPMode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "VIPMode_Enabled" : "VIPMode_Disabled");
 
 	if (THIS_MODE_INFO.isOn)
 	{
@@ -425,12 +425,12 @@ bool VIP_ToggleChosen(int admin, int target)
 {
 	if (!ChosenListToggle(g_aVIP_Chosen, target))
 	{
-		CPrintToChatAll("%s {olive}%N {lightgreen}is no longer a chosen VIP.", THIS_MODE_INFO.tag, target);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_NoLongerChosen", target);
 		LogAction(admin, target, "\"%L\" removed \"%L\" from the chosen VIPs", admin, target);
 		return false;
 	}
 
-	CPrintToChatAll("%s {olive}%N {lightgreen}is now VIP every round until they leave, and can't be a mother zombie.", THIS_MODE_INFO.tag, target);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_Chosen", target);
 	LogAction(admin, target, "\"%L\" chose \"%L\" as VIP", admin, target);
 
 	// Already in a round: VIP right now
@@ -510,7 +510,7 @@ void VIP_Make(int client)
 		TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE
 	);
 
-	CPrintToChatAll("%s %N is VIP!", THIS_MODE_INFO.tag, client);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_IsVIP", client);
 }
 
 Action VIP_BeaconTimer(Handle timer, int userid)
@@ -584,12 +584,12 @@ public Action Cmd_CheckVIP(int client, int args)
 		if (!g_bIsVIP[i])
 			continue;
 
-		CReplyToCommand(client, "%s VIP: %N", THIS_MODE_INFO.tag, i);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "VIPMode_CheckVIP", i);
 		found = true;
 	}
 
 	if (!found)
-		CReplyToCommand(client, "%s no VIP", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "VIPMode_NoVIP");
 
 	return Plugin_Handled;
 }
@@ -601,14 +601,17 @@ public Action Cmd_VIPModeSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_VIPModeSettings);
 
-	menu.SetTitle("%s - Settings\nChosen VIPs stay VIP every round until they leave,\nand are never picked as mother zombie\n ", THIS_MODE_INFO.name);
-	menu.AddItem("pick", "Choose a VIP...");
+	menu.SetTitle("%T\n%T\n ", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name, "VIPMode_SettingsInfo", client);
 
-	char line[48];
-	FormatEx(line, sizeof(line), "Clear the chosen VIPs (%d)", g_aVIP_Chosen.Length);
+	char line[128];
+	FormatEx(line, sizeof(line), "%T", "VIPMode_MenuChoose", client);
+	menu.AddItem("pick", line);
+
+	FormatEx(line, sizeof(line), "%T", "VIPMode_MenuClearChosen", client, g_aVIP_Chosen.Length);
 	menu.AddItem("clear", line, g_aVIP_Chosen.Length ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
 
-	menu.AddItem("cvars", "Show Cvars");
+	FormatEx(line, sizeof(line), "%T", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", line);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -619,21 +622,25 @@ public Action Cmd_VIPModeSettings(int client, int args)
 void VIP_ChooseMenu(int client)
 {
 	Menu menu = new Menu(Menu_VIPChoose);
-	menu.SetTitle("Choose a VIP\nPick a chosen one again to undo\n ");
+	menu.SetTitle("%T\n ", "VIPMode_ChooseTitle", client);
 
-	char info[12], line[64];
+	char info[12], line[128], chosen[32];
+	FormatEx(chosen, sizeof(chosen), " %T", "FunModes_TagChosen", client);
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i) || IsClientSourceTV(i))
 			continue;
 
 		IntToString(GetClientUserId(i), info, sizeof(info));
-		FormatEx(line, sizeof(line), "%N%s%s", i, VIP_IsChosen(i) ? " [CHOSEN]" : "", g_bIsVIP[i] ? " [VIP]" : "");
+		FormatEx(line, sizeof(line), "%N%s%s", i, VIP_IsChosen(i) ? chosen : "", g_bIsVIP[i] ? " [VIP]" : "");
 		menu.AddItem(info, line);
 	}
 
 	if (!menu.ItemCount)
-		menu.AddItem("", "Nobody on the server", ITEMDRAW_DISABLED);
+	{
+		FormatEx(line, sizeof(line), "%T", "FunModes_NobodyOnServer", client);
+		menu.AddItem("", line, ITEMDRAW_DISABLED);
+	}
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -661,7 +668,7 @@ int Menu_VIPChoose(Menu menu, MenuAction action, int param1, int param2)
 			if (target)
 				VIP_ToggleChosen(param1, target);
 			else
-				CPrintToChat(param1, "%s That player left.", THIS_MODE_INFO.tag);
+				CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "FunModes_PlayerLeft");
 
 			VIP_ChooseMenu(param1);
 		}
@@ -693,7 +700,7 @@ int Menu_VIPModeSettings(Menu menu, MenuAction action, int param1, int param2)
 			else if (strcmp(info, "clear") == 0)
 			{
 				g_aVIP_Chosen.Clear();
-				CPrintToChatAll("%s The chosen VIPs were cleared.", THIS_MODE_INFO.tag);
+				CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "VIPMode_ChosenCleared");
 				LogAction(param1, -1, "\"%L\" cleared the chosen VIPs", param1);
 				Cmd_VIPModeSettings(param1, 0);
 			}

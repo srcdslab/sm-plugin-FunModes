@@ -14,6 +14,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "Lightning"
+#define LIGHTNING_DISPLAY_NAME "Lightning Strikes"
 
 static int g_iLightningIndex = -1;
 
@@ -160,7 +161,7 @@ public void Event_RoundStart_Lightning()
 {
 	g_fLightning_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Lightning Strikes are on: when you see a {olive}red ring {lightgreen}under you, MOVE!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_RoundInfo");
 }
 
 public void OnTick_Lightning()
@@ -198,7 +199,7 @@ void Lightning_Wave()
 		// A ring the size of the blast that shrinks to the centre as the bolt comes
 		DrawRingAt(pos, g_fLightning_Radius, 5.0, LIGHTNING_WARN_TIME, g_iLightning_WarnColor, 6.0);
 		EmitAmbientSound(Beacon_Sound, pos, SOUND_FROM_WORLD, SNDLEVEL_NORMAL, _, _, 70);
-		PrintCenterText(target, "LIGHTNING! MOVE!");
+		PrintCenterText(target, "%t", "Lightning_Center");
 
 		DataPack pack;
 		CreateDataTimer(LIGHTNING_WARN_TIME, Lightning_StrikeTimer, pack, TIMER_FLAG_NO_MAPCHANGE);
@@ -254,7 +255,7 @@ void Lightning_Strike(const float pos[3])
 			continue;
 
 		if (GetClientHealth(i) - g_iLightning_Damage <= 0)
-			CPrintToChatAll("%s {olive}%N {lightgreen}was struck by lightning!", THIS_MODE_INFO.tag, i);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_Struck", i);
 
 		HurtPlayer(i, g_iLightning_Damage);
 	}
@@ -264,7 +265,7 @@ public Action Cmd_LightningToggle(int client, int args)
 {
 	if (!g_bLightning_Enabled)
 	{
-		CReplyToCommand(client, "%s Lightning Strikes is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", LIGHTNING_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -272,9 +273,9 @@ public Action Cmd_LightningToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Lightning_Reset();
 
-	CPrintToChatAll("%s Lightning Strikes is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", LIGHTNING_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When you see a {olive}red ring {lightgreen}under you, MOVE!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Lightning_Info");
 
 	return Plugin_Handled;
 }
@@ -287,10 +288,13 @@ public Action Cmd_LightningSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_LightningSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, LIGHTNING_DISPLAY_NAME);
 
-	menu.AddItem("now", "Lightning now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Lightning_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

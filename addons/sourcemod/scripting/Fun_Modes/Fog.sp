@@ -711,7 +711,11 @@ bool Fog_ApplyPreset(int client, const char[] name, float fade, bool quiet)
 	if (quiet)
 		LogMessage("Map preset \"%s\" applied", name);
 	else
-		Fog_Announce(client, "set the fog preset '%s'", name);
+	{
+		char log[96];
+		FormatEx(log, sizeof(log), "set the fog preset '%s'", name);
+		Fog_Announce(client, log, "Fog_AnnouncePreset", name);
+	}
 	return true;
 }
 
@@ -724,15 +728,28 @@ void Fog_Reply(int client, const char[] fmt, any ...)
 	CReplyToCommand(client, "%s %s", THIS_MODE_INFO.tag, buf);
 }
 
-void Fog_Announce(int client, const char[] fmt, any ...)
+// log: the change in English for the server log, then the phrase of the same change for the chat and its arguments
+void Fog_Announce(int client, const char[] log, any ...)
 {
 	char buf[192];
-	VFormat(buf, sizeof(buf), fmt, 3);
 	if (g_bFog_Announce)
-		CPrintToChatAll("%s {olive}%N {lightgreen}%s", THIS_MODE_INFO.tag, client, buf);
+	{
+		for (int i = 1; i <= MaxClients; i++)
+		{
+			if (!IsClientInGame(i) || IsFakeClient(i))
+				continue;
+			SetGlobalTransTarget(i);
+			VFormat(buf, sizeof(buf), "%t", 3);
+			CPrintToChat(i, "%s {olive}%N {lightgreen}%s", THIS_MODE_INFO.tag, client, buf);
+		}
+	}
 	else
+	{
+		SetGlobalTransTarget(client);
+		VFormat(buf, sizeof(buf), "%t", 3);
 		Fog_Reply(client, "%s", buf);
-	LogAction(client, -1, "\"%L\" %s", client, buf);
+	}
+	LogAction(client, -1, "\"%L\" %s", client, log);
 }
 
 // Player-typed number in [lo, hi]; the whole argument must be a number ("1,5" or "8x" are rejected).
@@ -823,9 +840,12 @@ int Fog_ArgColor(int i, float c[3])
 
 void Fog_ColorUsage(int client, const char[] cmd)
 {
-	Fog_Reply(client, "Usage: !fog %s <r g b | 0-255 for grey | name | #hex> [seconds]", cmd);
-	Fog_Reply(client, "e.g. !fog %s 255 120 0   !fog %s 200   !fog %s red 5   !fog %s #ff8800", cmd, cmd, cmd, cmd);
-	Fog_Reply(client, "Names: white, grey, black, red, darkred, green, darkgreen, blue, darkblue, yellow, orange, purple, pink, cyan, brown, gold");
+	char line[128];
+	FormatEx(line, sizeof(line), "!fog %s <r g b | 0-255 for grey | name | #hex> [seconds]", cmd);
+	Fog_Reply(client, "%T", "Fog_Usage", client, line);
+	FormatEx(line, sizeof(line), "!fog %s 255 120 0   !fog %s 200   !fog %s red 5   !fog %s #ff8800", cmd, cmd, cmd, cmd);
+	Fog_Reply(client, "%T", "Fog_Examples", client, line);
+	Fog_Reply(client, "%T", "Fog_ColorNames", client, "white, grey, black, red, darkred, green, darkgreen, blue, darkblue, yellow, orange, purple, pink, cyan, brown, gold");
 }
 
 void Fog_ColorStr(const float c[3], char[] out, int len)
@@ -846,10 +866,10 @@ void Fog_Help(int client)
 {
 	Fog_Reply(client, "!fog status | on | off | reset");
 	Fog_Reply(client, "!fog start <n> | end <n> | range <start> <end>");
-	Fog_Reply(client, "!fog color <r g b | grey 0-255 | name | #hex> | color2 <same>  (color2 shows only with blend 1)");
+	Fog_Reply(client, "!fog color <r g b | grey 0-255 | name | #hex> | color2 <same>  %T", "Fog_HelpColor2", client);
 	Fog_Reply(client, "!fog density <0-1> | farz <n, -1 = off> | blend <0|1>");
 	Fog_Reply(client, "!fog preset <name> | presets | reload | fade <sec> | sky <on|off>");
-	Fog_Reply(client, "Add seconds at the end of a change to blend it in, e.g. !fog end 800 5");
+	Fog_Reply(client, "%T", "Fog_HelpFade", client);
 }
 
 // One line saying whether the fog is on, shown when someone types just !fog.
@@ -857,24 +877,24 @@ void Fog_StateLine(int client)
 {
 	if (!g_bFog_Active)
 	{
-		Fog_Reply(client, "Fog override: OFF (map's own fog, %d controller(s))", Fog_CountMapCtrls());
+		Fog_Reply(client, "%T", "Fog_StateMap", client, Fog_CountMapCtrls());
 		return;
 	}
 	FogVals v;
 	Fog_CurrentTarget(v);
 	if (!v.enable)
 	{
-		Fog_Reply(client, "Fog override: ON - fog turned OFF");
+		Fog_Reply(client, "%T", "Fog_StateFogOff", client);
 		return;
 	}
-	char preset[80];
+	char preset[128];
 	if (g_sFog_LastPreset[0] != '\0')
-		Format(preset, sizeof(preset), " | preset %s%s", g_sFog_LastPreset, g_bFog_PresetEdited ? " (edited)" : "");
+		Format(preset, sizeof(preset), " | %T", g_bFog_PresetEdited ? "Fog_StatePresetEdited" : "Fog_StatePreset", client, g_sFog_LastPreset);
 	float c[3];
 	char cs[16];
 	c = v.c1;
 	Fog_ColorStr(c, cs, sizeof(cs));
-	Fog_Reply(client, "Fog override: ON - fog ON | %d to %d | colour %s%s",
+	Fog_Reply(client, "%T", "Fog_StateOn", client,
 		RoundToNearest(v.startDist), RoundToNearest(v.endDist), cs, preset);
 }
 
@@ -883,7 +903,7 @@ void Fog_Status(int client)
 	int n = Fog_CountMapCtrls();
 	if (!g_bFog_Active)
 	{
-		Fog_Reply(client, "Map default fog (no override). Map fog controllers: %d", n);
+		Fog_Reply(client, "%T", "Fog_StatusMap", client, n);
 		return;
 	}
 	FogVals v;
@@ -894,10 +914,10 @@ void Fog_Status(int client)
 	Fog_ColorStr(c, c1, sizeof(c1));
 	c = v.c2;
 	Fog_ColorStr(c, c2, sizeof(c2));
-	Fog_Reply(client, "Override %s | start %d end %d | color %s / %s", v.enable ? "ON" : "OFF",
+	Fog_Reply(client, "%T", v.enable ? "Fog_StatusOverrideOn" : "Fog_StatusOverrideOff", client,
 		RoundToNearest(v.startDist), RoundToNearest(v.endDist), c1, c2);
-	Fog_Reply(client, "density %.2f | farz %d | blend %d | fade %.1fs | skybox %s | map controllers %d",
-		v.density, RoundToNearest(v.farz), v.blend ? 1 : 0, Fog_FadeDefault(), Fog_SkyOn() ? "on" : "off", n);
+	Fog_Reply(client, "%T", Fog_SkyOn() ? "Fog_StatusDetailsSkyOn" : "Fog_StatusDetailsSkyOff", client,
+		v.density, RoundToNearest(v.farz), v.blend ? 1 : 0, Fog_FadeDefault(), n);
 }
 
 Action Cmd_FogCommand(int client, int args)
@@ -924,9 +944,9 @@ Action Cmd_FogCommand(int client, int args)
 	if (StrEqual(sub, "reload"))
 	{
 		if (Fog_LoadConfig())
-			Fog_Reply(client, "Fog.cfg reloaded.");
+			Fog_Reply(client, "%T", "Fog_Reloaded", client);
 		else
-			Fog_Reply(client, "Couldn't load the presets: %s", g_sFog_ConfigProblem);
+			Fog_Reply(client, "%T", "Fog_ReloadFailed", client, g_sFog_ConfigProblem);
 
 		return Plugin_Handled;
 	}
@@ -955,32 +975,34 @@ Action Cmd_FogCommand(int client, int args)
 			}
 			g_hFog_Config.Rewind();
 		}
-		if (count == 0)
-			Fog_Reply(client, "Presets: none - %s", g_sFog_ConfigProblem[0] ? g_sFog_ConfigProblem : "Fog.cfg has no \"Presets\" section");
+		if (count == 0 && g_sFog_ConfigProblem[0])
+			Fog_Reply(client, "%T", "Fog_PresetsNone", client, g_sFog_ConfigProblem);
+		else if (count == 0)
+			Fog_Reply(client, "%T", "Fog_PresetsNoSection", client);
 		else
-			Fog_Reply(client, "%s  (%d presets)", names, count);
+			Fog_Reply(client, "%T", "Fog_PresetsList", client, names, count);
 		return Plugin_Handled;
 	}
 	if (StrEqual(sub, "fade"))
 	{
 		float t;
 		if (!Fog_ArgFloat(2, 0.0, 120.0, t))
-			Fog_Reply(client, "Usage: !fog fade <seconds 0-120>");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog fade <seconds 0-120>");
 		else
 		{
 			g_fFog_FadeOverride = t;
-			Fog_Reply(client, "Changes now blend over %.1fs (until map change)", t);
+			Fog_Reply(client, "%T", "Fog_FadeSet", client, t);
 		}
 		return Plugin_Handled;
 	}
 	if (StrEqual(sub, "reset"))
 	{
 		if (!g_bFog_Active)
-			Fog_Reply(client, "The fog is already the map's own.");
+			Fog_Reply(client, "%T", "Fog_AlreadyMap", client);
 		else
 		{
 			Fog_Restore();
-			Fog_Announce(client, "reset the fog to the map default");
+			Fog_Announce(client, "reset the fog to the map default", "Fog_AnnounceReset");
 		}
 		return Plugin_Handled;
 	}
@@ -991,7 +1013,7 @@ Action Cmd_FogCommand(int client, int args)
 		Fog_StringToLower(on);
 		if (!StrEqual(on, "on") && !StrEqual(on, "off"))
 		{
-			Fog_Reply(client, "Usage: !fog sky <on|off>");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog sky <on|off>");
 			return Plugin_Handled;
 		}
 		g_iFog_SkyOverride = StrEqual(on, "on") ? 1 : 0;
@@ -1001,7 +1023,7 @@ Action Cmd_FogCommand(int client, int args)
 				if (IsClientInGame(i) && !IsFakeClient(i))
 					Fog_WriteFog(i, true, g_Fog_OrigSky);
 		}
-		Fog_Reply(client, "Skybox fog override %s (until map change)", on);
+		Fog_Reply(client, "%T", g_iFog_SkyOverride == 1 ? "Fog_SkyOverrideOn" : "Fog_SkyOverrideOff", client);
 		return Plugin_Handled;
 	}
 	if (StrEqual(sub, "preset"))
@@ -1009,15 +1031,15 @@ Action Cmd_FogCommand(int client, int args)
 		char name[64];
 		float fade;
 		if (args < 2)
-			Fog_Reply(client, "Usage: !fog preset <name> [seconds]  (!fog presets lists them)");
+			Fog_Reply(client, "%T", "Fog_UsagePreset", client);
 		else if (!Fog_ArgFade(3, fade))
-			Fog_Reply(client, "Bad fade time (0-120 seconds).");
+			Fog_Reply(client, "%T", "Fog_BadFade", client);
 		else
 		{
 			GetCmdArg(2, name, sizeof(name));
 			Fog_StringToLower(name);
 			if (!Fog_ApplyPreset(client, name, fade, false))
-				Fog_Reply(client, "No preset '%s'. !fog presets lists them.", name);
+				Fog_Reply(client, "%T", "Fog_NoPreset", client, name);
 		}
 		return Plugin_Handled;
 	}
@@ -1026,7 +1048,7 @@ Action Cmd_FogCommand(int client, int args)
 	FogVals to;
 	float fade = Fog_FadeDefault(), v, v2;
 	float c[3];
-	char msg[96], cs[16];
+	char msg[96], phrase[32], a1[16], a2[16];   // msg for the log, phrase and its arguments for the chat
 	bool ok = true;
 
 	if (!g_bFog_Active)
@@ -1037,7 +1059,7 @@ Action Cmd_FogCommand(int client, int args)
 			&& !StrEqual(sub, "color2") && !StrEqual(sub, "colour2") && !StrEqual(sub, "density")
 			&& !StrEqual(sub, "farz") && !StrEqual(sub, "blend"))
 		{
-			Fog_Reply(client, "Unknown command '%s'. Type !fog for help.", sub);
+			Fog_Reply(client, "%T", "Fog_UnknownCommand", client, sub);
 			return Plugin_Handled;
 		}
 		Fog_TakeOver(client);
@@ -1049,12 +1071,14 @@ Action Cmd_FogCommand(int client, int args)
 		to.enable = true;
 		fade = 0.0;
 		strcopy(msg, sizeof(msg), "turned the fog on");
+		strcopy(phrase, sizeof(phrase), "Fog_AnnounceOn");
 	}
 	else if (StrEqual(sub, "off"))
 	{
 		to.enable = false;
 		fade = 0.0;
 		strcopy(msg, sizeof(msg), "turned the fog off");
+		strcopy(phrase, sizeof(phrase), "Fog_AnnounceOff");
 	}
 	else if (StrEqual(sub, "start"))
 	{
@@ -1063,9 +1087,11 @@ Action Cmd_FogCommand(int client, int args)
 			to.startDist = v;
 			to.enable = true;
 			Format(msg, sizeof(msg), "set the fog start to %d", RoundToNearest(v));
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceStart");
+			IntToString(RoundToNearest(v), a1, sizeof(a1));
 		}
 		else
-			Fog_Reply(client, "Usage: !fog start <distance> [seconds]");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog start <distance> [seconds]");
 	}
 	else if (StrEqual(sub, "end"))
 	{
@@ -1074,9 +1100,11 @@ Action Cmd_FogCommand(int client, int args)
 			to.endDist = v;
 			to.enable = true;
 			Format(msg, sizeof(msg), "set the fog end to %d", RoundToNearest(v));
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceEnd");
+			IntToString(RoundToNearest(v), a1, sizeof(a1));
 		}
 		else
-			Fog_Reply(client, "Usage: !fog end <distance> [seconds]");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog end <distance> [seconds]");
 	}
 	else if (StrEqual(sub, "range") || StrEqual(sub, "dist"))
 	{
@@ -1086,9 +1114,12 @@ Action Cmd_FogCommand(int client, int args)
 			to.endDist = v2;
 			to.enable = true;
 			Format(msg, sizeof(msg), "set the fog to %d - %d", RoundToNearest(v), RoundToNearest(v2));
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceRange");
+			IntToString(RoundToNearest(v), a1, sizeof(a1));
+			IntToString(RoundToNearest(v2), a2, sizeof(a2));
 		}
 		else
-			Fog_Reply(client, "Usage: !fog range <start> <end> [seconds]");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog range <start> <end> [seconds]");
 	}
 	else if (StrEqual(sub, "color") || StrEqual(sub, "colour"))
 	{
@@ -1098,8 +1129,9 @@ Action Cmd_FogCommand(int client, int args)
 			to.c1 = c;
 			to.c2 = c;
 			to.enable = true;
-			Fog_ColorStr(c, cs, sizeof(cs));
-			Format(msg, sizeof(msg), "set the fog colour to %s", cs);
+			Fog_ColorStr(c, a1, sizeof(a1));
+			Format(msg, sizeof(msg), "set the fog colour to %s", a1);
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceColor");
 		}
 		else
 			Fog_ColorUsage(client, "color");
@@ -1111,8 +1143,9 @@ Action Cmd_FogCommand(int client, int args)
 		{
 			to.c2 = c;
 			to.enable = true;
-			Fog_ColorStr(c, cs, sizeof(cs));
-			Format(msg, sizeof(msg), "set the secondary fog colour to %s", cs);
+			Fog_ColorStr(c, a1, sizeof(a1));
+			Format(msg, sizeof(msg), "set the secondary fog colour to %s", a1);
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceColor2");
 		}
 		else
 			Fog_ColorUsage(client, "color2");
@@ -1124,9 +1157,11 @@ Action Cmd_FogCommand(int client, int args)
 			to.density = v;
 			to.enable = true;
 			Format(msg, sizeof(msg), "set the fog density to %.2f", v);
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceDensity");
+			FormatEx(a1, sizeof(a1), "%.2f", v);
 		}
 		else
-			Fog_Reply(client, "Usage: !fog density <0-1> [seconds]");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog density <0-1> [seconds]");
 	}
 	else if (StrEqual(sub, "farz"))
 	{
@@ -1135,12 +1170,19 @@ Action Cmd_FogCommand(int client, int args)
 			to.farz = v <= 0.0 ? -1.0 : v;
 			fade = 0.0;
 			if (to.farz < 0.0)
+			{
 				strcopy(msg, sizeof(msg), "turned the far clip off");
+				strcopy(phrase, sizeof(phrase), "Fog_AnnounceFarZOff");
+			}
 			else
+			{
 				Format(msg, sizeof(msg), "set the far clip to %d", RoundToNearest(v));
+				strcopy(phrase, sizeof(phrase), "Fog_AnnounceFarZ");
+				IntToString(RoundToNearest(v), a1, sizeof(a1));
+			}
 		}
 		else
-			Fog_Reply(client, "Usage: !fog farz <distance, -1 = off>");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog farz <distance, -1 = off>");
 	}
 	else if (StrEqual(sub, "blend"))
 	{
@@ -1149,13 +1191,15 @@ Action Cmd_FogCommand(int client, int args)
 			to.blend = v >= 0.5;
 			fade = 0.0;
 			Format(msg, sizeof(msg), "set fog blend %d", to.blend ? 1 : 0);
+			strcopy(phrase, sizeof(phrase), "Fog_AnnounceBlend");
+			IntToString(to.blend ? 1 : 0, a1, sizeof(a1));
 		}
 		else
-			Fog_Reply(client, "Usage: !fog blend <0|1>");
+			Fog_Reply(client, "%T", "Fog_Usage", client, "!fog blend <0|1>");
 	}
 	else
 	{
-		Fog_Reply(client, "Unknown command '%s'. Type !fog for help.", sub);
+		Fog_Reply(client, "%T", "Fog_UnknownCommand", client, sub);
 		return Plugin_Handled;
 	}
 
@@ -1163,12 +1207,12 @@ Action Cmd_FogCommand(int client, int args)
 		return Plugin_Handled;
 	if (to.enable && to.startDist >= to.endDist)
 	{
-		Fog_Reply(client, "The start (%d) must be below the end (%d).", RoundToNearest(to.startDist), RoundToNearest(to.endDist));
+		Fog_Reply(client, "%T", "Fog_StartBelowEnd", client, RoundToNearest(to.startDist), RoundToNearest(to.endDist));
 		return Plugin_Handled;
 	}
 	g_bFog_PresetEdited = true;
 	Fog_SetTarget(to, fade);
-	Fog_Announce(client, "%s", msg);
+	Fog_Announce(client, msg, phrase, a1, a2);
 	return Plugin_Handled;
 }
 
@@ -1197,34 +1241,40 @@ void Fog_RestoreSkies()
 void Fog_Menu(int client)
 {
 	Menu menu = new Menu(Menu_FogHandler);
-	char title[192], line[64];
+	char title[256], line[128];
 	if (!g_bFog_Active)
-		strcopy(title, sizeof(title), "Fog - the map's own fog");
+		FormatEx(title, sizeof(title), "%T", "Fog_MenuMap", client);
 	else
 	{
 		FogVals v;
 		Fog_CurrentTarget(v);
 		if (!v.enable)
-			strcopy(title, sizeof(title), "Fog - turned OFF");
+			FormatEx(title, sizeof(title), "%T", "Fog_MenuOff", client);
 		else
-			Format(title, sizeof(title), "Fog - ON, %d to %d", RoundToNearest(v.startDist), RoundToNearest(v.endDist));
+			Format(title, sizeof(title), "%T", "Fog_MenuOn", client, RoundToNearest(v.startDist), RoundToNearest(v.endDist));
 		if (g_sFog_LastPreset[0] != '\0')
-			Format(title, sizeof(title), "%s\nPreset: %s%s", title, g_sFog_LastPreset, g_bFog_PresetEdited ? " (edited)" : "");
+			Format(title, sizeof(title), "%s\n%T", title, g_bFog_PresetEdited ? "Fog_MenuPresetEdited" : "Fog_MenuPreset", client, g_sFog_LastPreset);
 	}
-	Format(title, sizeof(title), "%s\nFine-tune with !fog in chat\n ", title);
+	Format(title, sizeof(title), "%s\n%T\n ", title, "Fog_MenuFineTune", client);
 	menu.SetTitle(title);
 
 	bool on = Fog_IsOn();
-	menu.AddItem("toggle", on ? "Turn fog OFF" : "Turn fog ON");
-	menu.AddItem("presets", "Presets...");
-	menu.AddItem("thicker", "Thicker (fog closer)", on ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("thinner", "Thinner (fog further)", on ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	Format(line, sizeof(line), "Fade time: %.0fs", Fog_FadeDefault());
+	FormatEx(line, sizeof(line), "%T", on ? "Fog_MenuTurnOff" : "Fog_MenuTurnOn", client);
+	menu.AddItem("toggle", line);
+	FormatEx(line, sizeof(line), "%T", "Fog_MenuPresets", client);
+	menu.AddItem("presets", line);
+	FormatEx(line, sizeof(line), "%T", "Fog_MenuThicker", client);
+	menu.AddItem("thicker", line, on ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(line, sizeof(line), "%T", "Fog_MenuThinner", client);
+	menu.AddItem("thinner", line, on ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	Format(line, sizeof(line), "%T", "Fog_MenuFade", client, Fog_FadeDefault());
 	menu.AddItem("fade", line);
-	Format(line, sizeof(line), "Skybox fog: %s", Fog_SkyOn() ? "ON" : "OFF");
+	Format(line, sizeof(line), "%T", Fog_SkyOn() ? "Fog_MenuSkyOn" : "Fog_MenuSkyOff", client);
 	menu.AddItem("sky", line);
-	menu.AddItem("reset", "Back to the map's own fog", g_bFog_Active ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars");
+	FormatEx(line, sizeof(line), "%T", "Fog_MenuReset", client);
+	menu.AddItem("reset", line, g_bFog_Active ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(line, sizeof(line), "%T", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", line);
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
 }
@@ -1243,8 +1293,10 @@ void Fog_Scale(int client, float k)
 	to.enable = true;
 	g_bFog_PresetEdited = true;
 	Fog_SetTarget(to, Fog_FadeDefault());
-	Fog_Announce(client, "made the fog %s (%d to %d)", k < 1.0 ? "thicker" : "thinner",
+	char log[64];
+	FormatEx(log, sizeof(log), "made the fog %s (%d to %d)", k < 1.0 ? "thicker" : "thinner",
 		RoundToNearest(to.startDist), RoundToNearest(to.endDist));
+	Fog_Announce(client, log, k < 1.0 ? "Fog_AnnounceThicker" : "Fog_AnnounceThinner", RoundToNearest(to.startDist), RoundToNearest(to.endDist));
 }
 
 int Menu_FogHandler(Menu menu, MenuAction action, int client, int item)
@@ -1272,7 +1324,7 @@ int Menu_FogHandler(Menu menu, MenuAction action, int client, int item)
 				to.Defaults();
 			g_bFog_PresetEdited = true;
 			Fog_SetTarget(to, 0.0);
-			Fog_Announce(client, to.enable ? "turned the fog on" : "turned the fog off");
+			Fog_Announce(client, to.enable ? "turned the fog on" : "turned the fog off", to.enable ? "Fog_AnnounceOn" : "Fog_AnnounceOff");
 		}
 		else if (StrEqual(info, "presets"))
 		{
@@ -1305,7 +1357,7 @@ int Menu_FogHandler(Menu menu, MenuAction action, int client, int item)
 		else if (StrEqual(info, "reset") && g_bFog_Active)
 		{
 			Fog_Restore();
-			Fog_Announce(client, "reset the fog to the map default");
+			Fog_Announce(client, "reset the fog to the map default", "Fog_AnnounceReset");
 		}
 		Fog_Menu(client);
 	}
@@ -1315,8 +1367,8 @@ int Menu_FogHandler(Menu menu, MenuAction action, int client, int item)
 void Fog_PresetMenu(int client, int firstItem)
 {
 	Menu menu = new Menu(Menu_FogPresets);
-	menu.SetTitle("Fog presets\n(blends in over the fade time)\n ");
-	char name[32], line[48];
+	menu.SetTitle("%T\n%T\n ", "Fog_PresetMenuTitle", client, "Fog_PresetMenuFade", client);
+	char name[32], line[96];
 	if (Fog_HaveConfig())
 	{
 		g_hFog_Config.Rewind();
@@ -1326,7 +1378,7 @@ void Fog_PresetMenu(int client, int firstItem)
 			{
 				g_hFog_Config.GetSectionName(name, sizeof(name));
 				if (g_bFog_Active && StrEqual(name, g_sFog_LastPreset, false) && !g_bFog_PresetEdited)
-					Format(line, sizeof(line), "%s  (current)", name);
+					Format(line, sizeof(line), "%T", "Fog_PresetCurrent", client, name);
 				else
 					strcopy(line, sizeof(line), name);
 				menu.AddItem(name, line);
@@ -1336,7 +1388,10 @@ void Fog_PresetMenu(int client, int firstItem)
 		g_hFog_Config.Rewind();
 	}
 	if (menu.ItemCount == 0)
-		menu.AddItem("", "No presets - check configs/FunModes/Fog.cfg", ITEMDRAW_DISABLED);
+	{
+		FormatEx(line, sizeof(line), "%T", "Fog_PresetMenuNone", client);
+		menu.AddItem("", line, ITEMDRAW_DISABLED);
+	}
 	menu.ExitBackButton = true;
 	menu.DisplayAt(client, firstItem, MENU_TIME_FOREVER);
 }
@@ -1352,7 +1407,7 @@ int Menu_FogPresets(Menu menu, MenuAction action, int client, int item)
 		char name[32];
 		menu.GetItem(item, name, sizeof(name));
 		if (!Fog_ApplyPreset(client, name, Fog_FadeDefault(), false))
-			CPrintToChat(client, "%s Preset '%s' is gone - was the config changed?", THIS_MODE_INFO.tag, name);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "Fog_PresetGone", name);
 		Fog_PresetMenu(client, GetMenuSelectionPosition());   // stay on the same page
 	}
 	return 0;
@@ -1627,7 +1682,7 @@ void Fog_SetDistance(int client, int args, bool start)
 	float distance;
 	if (args < 1 || !Fog_ArgFloat(1, -50000.0, 100000.0, distance))
 	{
-		CReplyToCommand(client, "%s Usage: %s <distance>", THIS_MODE_INFO.tag, start ? "sm_fog_start" : "sm_fog_end");
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "Fog_Usage", start ? "sm_fog_start <distance>" : "sm_fog_end <distance>");
 		return;
 	}
 
@@ -1643,20 +1698,24 @@ void Fog_SetDistance(int client, int args, bool start)
 	to.enable = true;
 	if (to.startDist >= to.endDist)
 	{
-		CReplyToCommand(client, "%s The start (%d) must be below the end (%d).", THIS_MODE_INFO.tag, RoundToNearest(to.startDist), RoundToNearest(to.endDist));
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "Fog_StartBelowEnd", RoundToNearest(to.startDist), RoundToNearest(to.endDist));
 		return;
 	}
 
 	g_bFog_PresetEdited = true;
 	Fog_SetTarget(to, Fog_FadeDefault());
-	Fog_Announce(client, "set the fog %s to %d", start ? "start" : "end", RoundToNearest(distance));
+
+	char log[64], value[16];
+	IntToString(RoundToNearest(distance), value, sizeof(value));
+	FormatEx(log, sizeof(log), "set the fog %s to %s", start ? "start" : "end", value);
+	Fog_Announce(client, log, start ? "Fog_AnnounceStart" : "Fog_AnnounceEnd", value);
 }
 
 public Action Cmd_FogToggle(int client, int args)
 {
 	if (!g_bFog_Enabled)
 	{
-		CReplyToCommand(client, "%s Fog is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -1665,7 +1724,7 @@ public Action Cmd_FogToggle(int client, int args)
 	if (g_bFog_Active)
 	{
 		Fog_Restore();
-		CPrintToChatAll("%s Fog is now {olive}Off{lightgreen}, the map has its own fog back!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Fog_NowOff");
 		return Plugin_Handled;
 	}
 
@@ -1687,7 +1746,7 @@ public Action Cmd_FogToggle(int client, int args)
 		Fog_SetTarget(to, Fog_FadeDefault());
 	}
 
-	CPrintToChatAll("%s Fog is now {olive}On{lightgreen}!", THIS_MODE_INFO.tag);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FunModes_ModeNowOn", THIS_MODE_INFO.name);
 	return Plugin_Handled;
 }
 

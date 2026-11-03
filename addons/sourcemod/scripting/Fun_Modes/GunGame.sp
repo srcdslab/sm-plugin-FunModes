@@ -321,8 +321,8 @@ void GunGame_StartHumans()
         GunGame_StartHuman(i);
     }
 
-    CPrintToChatAll("%s Your weapon will be upgraded when you reach the required damage for each weapon type!", THIS_MODE_INFO.tag);
-    CPrintToChatAll("%s Type {olive}!gungame {lightgreen}if you lost your weapons!", THIS_MODE_INFO.tag);
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "GunGame_Info");
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "GunGame_InfoCommand");
 }
 
 public void Event_RoundEnd_GunGame()
@@ -421,7 +421,7 @@ public void OnBuyCommand_GunGame(int client, const char[] weapon, Action &result
 
     if (!g_GunGameData[client].allowEquip)
     {
-        CPrintToChat(client, "%s You cannot buy/equip weapons during GunGame Escape Mode", THIS_MODE_INFO.tag);
+        CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_NoBuy");
         result = Plugin_Stop;
     }
 }
@@ -462,7 +462,7 @@ public void OnTick_GunGame()
             left = 0;
 
         SetHudTextParams(-1.0, HUD_Y_GUNGAME, 1.1, 192, 128, 255, 255, 0, 0.0, 0.0, 0.0);
-        ShowModeHud(i, g_hGunGame_Hud, "GunGame: %s - %d damage to the next weapon", g_GunGameWeaponsList[weaponType][g_GunGameData[i].level[1]][7], left);
+        ShowModeHud(i, g_hGunGame_Hud, "%T", "GunGame_Hud", i, g_GunGameWeaponsList[weaponType][g_GunGameData[i].level[1]][7], left);
     }
 }
 
@@ -479,7 +479,7 @@ public Action Cmd_GunGameToggle(int client, int args)
 {
     if (!g_bGunGame_Enabled)
     {
-        CReplyToCommand(client, "%s GunGame Mode is currently Disabled", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
         return Plugin_Handled;
     }
 
@@ -491,7 +491,7 @@ public Action Cmd_GunGameToggle(int client, int args)
     if (THIS_MODE_INFO.isOn && randomWeapons != -1 && g_ModesInfo[randomWeapons].isOn)
         FunModes_SetModeState(randomWeapons, false);
 
-    CPrintToChatAll("%s GunGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+    CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
     static bool cvarsValues[2];
 
@@ -559,8 +559,11 @@ public Action Cmd_GunGameSettings(int client, int args)
 
     Menu menu = new Menu(Menu_GunGameSettings);
 
-    menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
-    menu.AddItem(NULL_STRING, "Show Cvars\n");
+    menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
+
+    char buffer[128];
+    FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+    menu.AddItem(NULL_STRING, buffer);
 
     menu.ExitBackButton = true;
     menu.Display(client, MENU_TIME_FOREVER);
@@ -597,20 +600,20 @@ Action Cmd_GunGame(int client, int args)
 
     if (!THIS_MODE_INFO.isOn)
     {
-        CReplyToCommand(client, "%s GunGame is currently Off!", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_Off");
         return Plugin_Handled;
     }
 
     if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
     {
-        CReplyToCommand(client, "%s You have to be an alive human to use this command!", THIS_MODE_INFO.tag);
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_AliveHuman");
         return Plugin_Handled;
     }
 
     float currentTime = GetGameTime();
     if (currentTime < g_GunGameData[client].pickupCooldown)
     {
-        CReplyToCommand(client, "%s Please wait %.0f seconds until you can use this command again.", THIS_MODE_INFO.tag,
+        CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_Wait",
                         g_GunGameData[client].pickupCooldown - currentTime);
         return Plugin_Handled;
     }
@@ -735,10 +738,13 @@ void GunGame_ShowRewardsMenu(int client)
     GunGame_GiveReward(client, REWARD_SPEED);
 
     Menu menu = new Menu(Menu_GunGame_ShowRewards);
-    menu.SetTitle("[GunGame Escape] You have completed a gungame cycle! Choose your reward!\nYou only have 60s to switch your rewards");
+    menu.SetTitle("[GunGame Escape] %T", "GunGame_RewardsTitle", client);
 
-    menu.AddItem("0", "More Speed", g_GunGameData[client].reward == REWARD_SPEED ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
-    menu.AddItem("1", "Smokegrenades (Freeze)", g_GunGameData[client].reward == REWARD_SMOKEGRENADES ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+    char buffer[128];
+    FormatEx(buffer, sizeof(buffer), "%T", "GunGame_RewardSpeed", client);
+    menu.AddItem("0", buffer, g_GunGameData[client].reward == REWARD_SPEED ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+    FormatEx(buffer, sizeof(buffer), "%T", "GunGame_RewardSmokes", client);
+    menu.AddItem("1", buffer, g_GunGameData[client].reward == REWARD_SMOKEGRENADES ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 
     menu.ExitBackButton = true;
     menu.Display(client, 60);
@@ -755,7 +761,7 @@ int Menu_GunGame_ShowRewards(Menu menu, MenuAction action, int param1, int param
         {
             if (!g_GunGameData[param1].completedCycle)
             {
-                CPrintToChat(param1, "%s You cannot pick a reward right now, Sorry :p", THIS_MODE_INFO.tag);
+                CPrintToChat(param1, "%s %t", THIS_MODE_INFO.tag, "GunGame_CannotPick");
                 return 0;
             }
 
@@ -786,7 +792,7 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
             g_GunGameData[client].originalSpeed = GetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue");
             SetEntPropFloat(client, Prop_Data, "m_flLaggedMovementValue", g_GunGameData[client].originalSpeed + 0.3);
 
-            CPrintToChat(client, "%s You have been granted an extra speed for finishing a gungame cycle!", THIS_MODE_INFO.tag);
+            CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_GotSpeed");
 
             delete g_GunGameData[client].rewardTimer;
             g_GunGameData[client].rewardTimer = CreateTimer(g_fGunGame_RewardSpeed, Timer_GunGameReward, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
@@ -812,7 +818,7 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
             int count = g_iGunGame_SmokeGrenadesCount;
             SET_GRENADES_COUNT(client, SMOKEGRENADE, GET_GRENADES_COUNT(client, SMOKEGRENADE) + count);
 
-            CPrintToChat(client, "%s You have been granted {olive}%d extra SMOKEGRENADES {lightgreen}for finishing a gungame cycle!", THIS_MODE_INFO.tag, count);
+            CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_GotSmokes", count);
         }
 
         default:
@@ -834,7 +840,7 @@ Action Timer_GunGameReward(Handle timer, int userid)
 
     g_GunGameData[client].rewardTimer = null;
 
-    CPrintToChat(client, "%s Sorry, your reward has ended!", THIS_MODE_INFO.tag);
+    CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_RewardEnded");
     GunGame_GiveReward(client, REWARD_NONE);
     return Plugin_Stop;
 }

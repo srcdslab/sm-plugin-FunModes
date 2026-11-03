@@ -14,6 +14,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "ToxicGas"
+#define GAS_DISPLAY_NAME "Toxic Gas"
 
 static int g_iToxicGasIndex = -1;
 
@@ -179,7 +180,7 @@ public void Event_RoundStart_ToxicGas()
 {
 	ToxicGas_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Toxic Gas is on: stay out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_RoundInfo");
 }
 
 void ToxicGas_Release()
@@ -201,7 +202,7 @@ void ToxicGas_Release()
 
 	if (made)
 	{
-		CPrintToChatAll("%s Toxic gas is leaking - get out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_Leaking");
 		EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 55);
 	}
 }
@@ -264,7 +265,7 @@ public Action Cmd_ToxicGasToggle(int client, int args)
 {
 	if (!g_bToxicGas_Enabled)
 	{
-		CReplyToCommand(client, "%s Toxic Gas is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", GAS_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -272,9 +273,9 @@ public Action Cmd_ToxicGasToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	ToxicGas_Reset();
 
-	CPrintToChatAll("%s Toxic Gas is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", GAS_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Stay out of the {olive}green clouds{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ToxicGas_Info");
 
 	return Plugin_Handled;
 }
@@ -287,10 +288,13 @@ public Action Cmd_ToxicGasSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ToxicGasSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, GAS_DISPLAY_NAME);
 
-	menu.AddItem("now", "Release gas now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "ToxicGas_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

@@ -146,7 +146,7 @@ public void Event_RoundStart_FloorIsLava()
 {
 	FloorIsLava_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s The floor is lava: once the zombies come, don't stand still for more than {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iLava_After);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FloorIsLava_RoundStart", g_iLava_After);
 }
 
 public void OnCheck_FloorIsLava(bool zombiesNow)
@@ -177,7 +177,7 @@ public void OnCheck_FloorIsLava(bool zombiesNow)
 
 		if (g_iLava_Damage >= 1000)
 		{
-			CPrintToChatAll("%s {olive}%N {lightgreen}stood still too long and melted!", THIS_MODE_INFO.tag, i);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FloorIsLava_Melted", i);
 			ForcePlayerSuicide(i);
 			continue;
 		}
@@ -208,12 +208,12 @@ public void OnTick_FloorIsLava()
 		if (still >= float(g_iLava_After))
 		{
 			SetHudTextParams(-1.0, HUD_Y_LAVA, 1.1, 255, 80, 20, 255, 0, 0.0, 0.0, 0.0);
-			ShowModeHud(i, g_hLava_Hud, "THE FLOOR IS LAVA - MOVE! (-%d HP/s)", g_iLava_Damage >= 1000 ? 999 : g_iLava_Damage);
+			ShowModeHud(i, g_hLava_Hud, "%T", "FloorIsLava_HudMove", i, g_iLava_Damage >= 1000 ? 999 : g_iLava_Damage);
 		}
 		else if (still >= float(g_iLava_After) - 1.5)
 		{
 			SetHudTextParams(-1.0, HUD_Y_LAVA, 1.1, 255, 200, 40, 255, 0, 0.0, 0.0, 0.0);
-			ShowModeHud(i, g_hLava_Hud, "Keep moving...");
+			ShowModeHud(i, g_hLava_Hud, "%T", "FloorIsLava_HudKeepMoving", i);
 		}
 	}
 }
@@ -222,7 +222,7 @@ public Action Cmd_FloorIsLavaToggle(int client, int args)
 {
 	if (!g_bFloorIsLava_Enabled)
 	{
-		CReplyToCommand(client, "%s Floor is Lava is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Floor is Lava");
 		return Plugin_Handled;
 	}
 
@@ -230,9 +230,9 @@ public Action Cmd_FloorIsLavaToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	FloorIsLava_Reset();
 
-	CPrintToChatAll("%s Floor is Lava is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Floor is Lava");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Once the zombies come, {olive}don't stand still{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "FloorIsLava_Info");
 
 	return Plugin_Handled;
 }
@@ -245,9 +245,11 @@ public Action Cmd_FloorIsLavaSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_FloorIsLavaSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

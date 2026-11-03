@@ -186,27 +186,27 @@ public Action Cmd_PullGameToggle(int client, int args)
 {
 	if (!g_bPullGame_Enabled)
 	{
-		CReplyToCommand(client, "%s PullGame Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s PullGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		FunModes_HookEvent(g_bEvent_RoundStart, "round_start", Event_RoundStart);
 		FunModes_HookEvent(g_bEvent_RoundEnd, "round_end", Event_RoundEnd);
 
-		CPrintToChatAll("%s Press (F) {olive} | Flashlight {lightgreen}to use pull, only when you get selected!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "PullGame_HowTo");
 
 		int humansCount = g_iPullGame_RandomsHumans;
 		int zombiesCount = g_iPullGame_RandomsZombies;
 		int interval = RoundToNearest(g_fPullGame_TimerInterval);
 
-		CPrintToChatAll("%s {olive}%d Random Humans {lightgreen}and {olive}%d Random Zombies {lightgreen}will be selected for the pullgame every %d seconds", THIS_MODE_INFO.tag, humansCount, zombiesCount, interval);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "PullGame_Selection", humansCount, zombiesCount, interval);
 
 		// No round restart: turned on after the first infection, the pull rounds start now
 		if (g_bMotherZombie && !g_bRoundEnd)
@@ -228,9 +228,11 @@ public Action Cmd_PullGameSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_PullGameSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	char buffer[64];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -341,8 +343,11 @@ void PullGame_PickTeamRandoms(int[] arr, int len, int min, int max)
 			arr[index] = 0;
 			g_bPullGameHas[random] = true;
 
-			CPrintToChat(random, "%s You have been selected to use pull! Press FlashLight button (F) Now!", THIS_MODE_INFO.tag);
-			SendHudText(random, "[FunModes-PullGame] You have been selected to use pull! Press FlashLight button (F) Now!", _, _, HUD_Y_PULLGAME, g_hPullGame_Hud);
+			CPrintToChat(random, "%s %t", THIS_MODE_INFO.tag, "PullGame_Selected");
+
+			char message[256];
+			FormatEx(message, sizeof(message), "[FunModes-PullGame] %T", "PullGame_Selected", random);
+			SendHudText(random, message, _, _, HUD_Y_PULLGAME, g_hPullGame_Hud);
 		}
 	}
 }
@@ -392,26 +397,26 @@ void Cmd_Pull(int client)
 {
 	if (!g_bPullGameHas[client])
 	{
-		CPrintToChat(client, "%s You cannot use this command unless you were randomly chosen for it!", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_NotChosen");
 		return;
 	}
 
 	if (!IsPlayerAlive(client))
 	{
-		CPrintToChat(client, "%s You have to be alive to use this command.", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_MustBeAlive");
 		return;
 	}
 
 	if (g_iPullClientTarget[client] != -1)
 	{
-		CPrintToChat(client, "%s You cannot use this command more than once while you are activating it.", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_AlreadyPulling");
 		return;
 	}
 
 	int target = GetClientAimTarget(client);
 	if (target == -1)
 	{
-		CPrintToChat(client, "%s You have to aim at a player!", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_AimAtPlayer");
 		return;
 	}
 
@@ -422,13 +427,13 @@ void Cmd_Pull(int client)
 	{
 		if (!isTargetHuman)
 		{
-			CPrintToChat(client, "%s You cannot target a zombie!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_NoZombieTarget");
 			return;
 		}
 
 		if (!g_bPullState[target])
 		{
-			CPrintToChat(client, "%s You cannot pull a human that's not being pulled from the zombies!", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "PullGame_HumanNotPulled");
 			return;
 		}
 	}

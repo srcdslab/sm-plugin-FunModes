@@ -248,14 +248,14 @@ public Action Cmd_MathGameToggle(int client, int args)
 {
 	if (!g_bMathGame_Enabled)
 	{
-		CReplyToCommand(client, "%s MathGame Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s MathGame Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
 	if (THIS_MODE_INFO.isOn)
 	{
@@ -297,8 +297,8 @@ public void OnClientSayCommand_MathGame(int client, const char[] args, Action &r
 
 	if (num == g_iMathGameAnswer[client])
 	{
-		CPrintToChat(client, "%s Congratuations, you have answered the math question, nothing bad will hurt you now!", THIS_MODE_INFO.tag);
-		CPrintToChatAll("%s {olive}%N {lightgreen}turns to be a smart boy and answered their question!", THIS_MODE_INFO.tag, client);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "MathGame_AnsweredSelf");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MathGame_Answered", client);
 		g_bMathGameHasQuestion[client] = false;
 		g_iMathGameAnswer[client] = 0;
 		result = Plugin_Stop;
@@ -315,25 +315,25 @@ void MathGame_Reward(int client)
 	if (g_iMathGame_Reward == MATHGAME_REWARD_HE && ZR_IsClientHuman(client))
 	{
 		GivePlayerItem(client, "weapon_hegrenade");
-		CPrintToChat(client, "%s You got an {olive}HE grenade{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "MathGame_RewardHE");
 		return;
 	}
 
 	// The zombies get health instead of an HE grenade
 	int heal = g_iMathGame_Reward == MATHGAME_REWARD_HP25 ? 25 : 50;
 	SetEntityHealth(client, GetClientHealth(client) + heal);
-	CPrintToChat(client, "%s You got {olive}+%d HP{lightgreen}!", THIS_MODE_INFO.tag, heal);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "MathGame_RewardHP", heal);
 }
 
 void MathGame_Ask()
 {
 	int level = GetRandomInt(0, 2);
 
-	static const char levels[][] = { "Easy", "Medium", "Hard" };
+	static const char levels[][] = { "MathGame_LevelEasy", "MathGame_LevelMedium", "MathGame_LevelHard" };
 
 	int time = RoundToNearest(g_fMathGame_TimerIntervals[level]);
-	CPrintToChatAll("%s Alright gentlemen, Each player will now receive a math question to answer, You have got only {olive}%d seconds", THIS_MODE_INFO.tag, time);
-	CPrintToChatAll("%s Question Level: {olive}%s", THIS_MODE_INFO.tag, levels[level]);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MathGame_Ask", time);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, levels[level]);
 
 	if (g_bMathGame_Same)
 		MathGame_MakeQuestion(level, g_iMathGameSharedNumbers, g_sMathGameSharedOper);
@@ -383,7 +383,7 @@ void MathGame_SendQuestion(int client, int level)
 	g_iMathGameAnswer[client] = answer;
 	FormatEx(g_sMathGameQuestion[client], sizeof(g_sMathGameQuestion[]), "%d %s %d", numbers[0], oper, numbers[1]);
 
-	CPrintToChat(client, "%s What is [ {white}%d {olive}%s {white}%d {lightgreen}]?", THIS_MODE_INFO.tag, numbers[0], oper, numbers[1]);
+	CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "MathGame_Question", numbers[0], oper, numbers[1]);
 }
 
 void MathGame_MakeQuestion(int level, int numbers[2], char oper[2])
@@ -419,7 +419,7 @@ Action MathGame_Timer(Handle timer, int level)
 
 	delete g_hMathGameTimerRepeat;
 
-	CPrintToChatAll("%s Time is Up! Players who failed to answer will now be punished!", THIS_MODE_INFO.tag);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MathGame_TimeUp");
 
 	float damage = g_fMathGame_Damages[level];
 
@@ -435,7 +435,7 @@ Action MathGame_Timer(Handle timer, int level)
 			if (!ZR_IsClientHuman(i))
 				continue;
 
-			CPrintToChatAll("%s {olive}%N {lightgreen}has been damaged for not answering their math question!", THIS_MODE_INFO.tag, i);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "MathGame_Damaged", i);
 			SDKHooks_TakeDamage(i, 0, 0, damage);
 		}
 	}
@@ -460,8 +460,7 @@ Action MathGame_TimerDelay(Handle timer)
 
 Action MathGame_TimerRepeat(Handle timer, int time)
 {
-	char message[128];
-	FormatEx(message, sizeof(message), "[MathGame] Time Left: %ds\n", time - g_iMathGameTime - 2);
+	int left = time - g_iMathGameTime - 2;
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -469,7 +468,7 @@ Action MathGame_TimerRepeat(Handle timer, int time)
 			continue;
 
 		char thisMsg[256];
-		strcopy(thisMsg, sizeof(thisMsg), message);
+		FormatEx(thisMsg, sizeof(thisMsg), "[MathGame] %T\n", "MathGame_HudTimeLeft", i, left);
 
 		if (g_bMathGameHasQuestion[i])
 			FormatEx(thisMsg, sizeof(thisMsg), "%s\n[ %s ]", thisMsg, g_sMathGameQuestion[i]);
@@ -488,9 +487,11 @@ public Action Cmd_MathGameSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_MathGameSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	char buffer[64];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

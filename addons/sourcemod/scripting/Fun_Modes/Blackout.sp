@@ -166,7 +166,7 @@ public void Event_RoundStart_Blackout()
 {
 	g_fBlackout_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Blackouts are on: your screen might go dark at the worst moment...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_RoundStart");
 }
 
 void Blackout_Hit()
@@ -197,16 +197,16 @@ void Blackout_Hit()
 		if (white)
 		{
 			EmitSoundToClient(client, BLACKOUT_FLASH_SOUND);
-			PrintCenterText(client, "FLASHBANGED!");
+			PrintCenterText(client, "%t", "Blackout_CenterFlashbanged");
 		}
 		else
-			PrintCenterText(client, "BLACKOUT!");
+			PrintCenterText(client, "%t", "Blackout_CenterBlackout");
 	}
 
 	if (hits > 0 && hits < count)
-		CPrintToChatAll("%s {olive}%d {lightgreen}player%s lost their sight!", THIS_MODE_INFO.tag, hits, hits == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, hits == 1 ? "Blackout_LostSightOne" : "Blackout_LostSightMany", hits);
 	else if (hits > 0)
-		CPrintToChatAll("%s Everyone lost their sight!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_LostSightAll");
 }
 
 public void OnTick_Blackout()
@@ -219,7 +219,7 @@ public Action Cmd_BlackoutToggle(int client, int args)
 {
 	if (!g_bBlackout_Enabled)
 	{
-		CReplyToCommand(client, "%s Blackout is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -227,9 +227,9 @@ public Action Cmd_BlackoutToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Blackout_Reset();
 
-	CPrintToChatAll("%s Blackout is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Your screen might go dark at the worst moment...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Blackout_Info");
 
 	return Plugin_Handled;
 }
@@ -242,10 +242,13 @@ public Action Cmd_BlackoutSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_BlackoutSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Blackout now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Blackout_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

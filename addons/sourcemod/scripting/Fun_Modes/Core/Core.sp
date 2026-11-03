@@ -274,13 +274,13 @@ enum FM_Category
 
 char g_sCategoryNames[FM_CAT_COUNT][] =
 {
-	"Survival rules",
-	"Weapons",
-	"Hazards & disasters",
-	"Weather & nature",
-	"Chaos & tricks",
-	"Mini-games",
-	"Zombies"
+	"FunModes_CategorySurvival",
+	"FunModes_CategoryWeapons",
+	"FunModes_CategoryHazards",
+	"FunModes_CategoryWeather",
+	"FunModes_CategoryChaos",
+	"FunModes_CategoryGames",
+	"FunModes_CategoryZombies"
 };
 
 /* Modes Section */

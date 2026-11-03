@@ -177,7 +177,7 @@ public void Event_RoundStart_Quicksand()
 {
 	Quicksand_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Quicksand is on: avoid the {olive}brown patches{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_RoundInfo");
 }
 
 bool Quicksand_IsInside(int client)
@@ -214,7 +214,7 @@ void Quicksand_Spawn()
 	}
 
 	if (made)
-		CPrintToChatAll("%s {olive}Quicksand! {lightgreen}Get out of the brown patches!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_Spawned");
 }
 
 public void OnCheck_Quicksand(bool zombiesNow)
@@ -239,7 +239,7 @@ public void OnTick_Quicksand()
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (IsClientInGame(i) && !IsFakeClient(i) && Quicksand_IsInside(i))
-			PrintCenterText(i, "QUICKSAND! Get out!");
+			PrintCenterText(i, "%t", "Quicksand_Center");
 	}
 
 	if (HazardDue(g_fQuicksand_Next, g_iQuicksand_Every))
@@ -250,7 +250,7 @@ public Action Cmd_QuicksandToggle(int client, int args)
 {
 	if (!g_bQuicksand_Enabled)
 	{
-		CReplyToCommand(client, "%s Quicksand is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -258,9 +258,9 @@ public Action Cmd_QuicksandToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Quicksand_Reset();
 
-	CPrintToChatAll("%s Quicksand is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Avoid the {olive}brown patches{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Quicksand_Info");
 
 	return Plugin_Handled;
 }
@@ -273,10 +273,13 @@ public Action Cmd_QuicksandSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_QuicksandSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Quicksand now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Quicksand_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

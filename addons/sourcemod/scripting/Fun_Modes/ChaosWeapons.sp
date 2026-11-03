@@ -166,20 +166,20 @@ public Action Cmd_ChaosWeaponsToggle(int client, int args)
 {
 	if (!g_bChaosWeapons_Enabled)
 	{
-		CReplyToCommand(client, "%s ChaosWeapons Mode is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
 	CHANGE_MODE_INFO(THIS_MODE_INFO, isOn, !THIS_MODE_INFO.isOn, THIS_MODE_INFO.index);
 	THIS_MODE_INFO.byRoulette = false;
 
-	CPrintToChatAll("%s ChaosWeapons Mode is now %s!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		g_hChaosWeaponsTimer = CreateTimer(g_fChaosWeapons_TimerInterval, Timer_ChaosWeapons, _, TIMER_FLAG_NO_MAPCHANGE | TIMER_REPEAT);
 		
-		CPrintToChatAll("%s a Random weapon will get normal knockback and the others will get their knockback nerfed every %.2f seconds!", THIS_MODE_INFO.tag, g_fChaosWeapons_TimerInterval);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "ChaosWeapons_Info", g_fChaosWeapons_TimerInterval);
 
 		SetAllWeaponsKnockback(g_fChaosWeapons_Knockback, _, true);
 
@@ -202,9 +202,11 @@ public Action Cmd_ChaosWeaponsSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_ChaosWeaponsSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
@@ -262,18 +264,14 @@ Action Timer_ChaosWeaponsRepeat(Handle timer)
 		return Plugin_Stop;
 	}
 
-	char msg[128];
-	FormatEx
-	(
-		msg, sizeof(msg), "[ChaosWeapons] The weapon that pushes zombies will change in %d seconds!", 
-		g_iChaosWeapons_Countdown - counter
-	);
+	char msg[256];
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i))
 			continue;
 	
+		FormatEx(msg, sizeof(msg), "[ChaosWeapons] %T", "ChaosWeapons_HudChange", i, g_iChaosWeapons_Countdown - counter);
 		SendHudText(i, msg, _, 1, HUD_Y_CHAOS, g_hChaos_Hud);
 	}
 
@@ -288,18 +286,13 @@ void PickRandomWeapon()
 	SetAllWeaponsKnockback(g_fChaosWeapons_Knockback, index);
 
 	char msg[255];
-	FormatEx(
-		msg, sizeof(msg),
-		"Only the [%s] will push the zombies for the next %.0f seconds\nPress F to buy it!",
-		StrToUpper(g_ChaosWeaponsList[index]),
-		g_fChaosWeapons_TimerInterval
-	);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		if (!IsClientInGame(i))
 			continue;
 	
+		FormatEx(msg, sizeof(msg), "%T", "ChaosWeapons_OnlyWeapon", i, StrToUpper(g_ChaosWeaponsList[index]), g_fChaosWeapons_TimerInterval);
 		SendHudText(i, msg, _, 1, HUD_Y_CHAOS, g_hChaos_Hud);
 		CPrintToChat(i, "%s %s", THIS_MODE_INFO.tag, msg);
 	}
@@ -371,7 +364,7 @@ public void OnPlayerRunCmdPost_ChaosWeapons(int client, int buttons, int impulse
 		int cash = GetEntProp(client, Prop_Send, "m_iAccount");
 		if (cash < price)
 		{
-			CPrintToChat(client, "%s Insufficent fund", THIS_MODE_INFO.tag);
+			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "ChaosWeapons_NoMoney");
 			return;
 		}
 

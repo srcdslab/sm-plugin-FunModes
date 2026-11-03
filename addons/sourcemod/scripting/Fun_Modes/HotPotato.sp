@@ -162,7 +162,7 @@ public void Event_RoundStart_HotPotato()
 {
 	HotPotato_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hot Potato is on: once the zombies come, {olive}don't be the one holding it{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_RoundStart");
 }
 
 public void Event_RoundEnd_HotPotato()
@@ -188,11 +188,11 @@ void HotPotato_Give(int client, int from)
 	SetEntityRenderColor(client, 255, 80, 80, 255);
 
 	if (from)
-		CPrintToChatAll("%s {olive}%N {lightgreen}passed the hot potato to {olive}%N{lightgreen}! (%d s left)", THIS_MODE_INFO.tag, from, client, g_iPotato_Left);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_Passed", from, client, g_iPotato_Left);
 	else
-		CPrintToChatAll("%s {olive}%N {lightgreen}has the hot potato! {olive}%d {lightgreen}seconds - knife another human or press E next to one to pass it.", THIS_MODE_INFO.tag, client, g_iPotato_Left);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_Has", client, g_iPotato_Left);
 
-	PrintCenterText(client, "YOU HAVE THE HOT POTATO! PASS IT ON!");
+	PrintCenterText(client, "%t", "HotPotato_CenterHave");
 }
 
 void HotPotato_TryPass(int holder, int target)
@@ -206,7 +206,7 @@ void HotPotato_TryPass(int holder, int target)
 
 	if (g_iPotato_Prev && GetClientUserId(target) == g_iPotato_Prev && now < g_fPotato_NoBackUntil)
 	{
-		PrintCenterText(holder, "No pass-backs! Find someone else.");
+		PrintCenterText(holder, "%t", "HotPotato_CenterNoPassBack");
 		return;
 	}
 
@@ -268,7 +268,7 @@ public void OnCheck_HotPotato(bool zombiesNow)
 
 		// The holder died, got infected or left before the countdown ran out: it jumps on
 		if (holder)
-			CPrintToChatAll("%s {olive}%N {lightgreen}dropped the hot potato!", THIS_MODE_INFO.tag, holder);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_Dropped", holder);
 
 		HotPotato_Drop();
 		if (zombiesNow)
@@ -309,7 +309,7 @@ void HotPotato_Explode(int holder)
 	}
 
 	EmitAmbientSound(Explode_Sound, pos, holder, SNDLEVEL_RAIDSIREN);
-	CPrintToChatAll("%s {olive}BOOM! %N {lightgreen}was still holding the hot potato!", THIS_MODE_INFO.tag, holder);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_Boom", holder);
 
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -353,9 +353,9 @@ public void OnTick_HotPotato()
 
 		SetHudTextParams(-1.0, HUD_Y_POTATO, 1.1, 255, 60, 60, 255, 0, 0.0, 0.0, 0.0);
 		if (i == holder)
-			ShowModeHud(i, g_hPotato_Hud, "YOU HAVE THE HOT POTATO! %d s - knife a human or press E next to one", g_iPotato_Left);
+			ShowModeHud(i, g_hPotato_Hud, "%T", "HotPotato_HudHolder", i, g_iPotato_Left);
 		else
-			ShowModeHud(i, g_hPotato_Hud, "Hot potato: %N - %d s", holder, g_iPotato_Left);
+			ShowModeHud(i, g_hPotato_Hud, "%T", "HotPotato_HudOther", i, holder, g_iPotato_Left);
 	}
 }
 
@@ -363,7 +363,7 @@ public Action Cmd_HotPotatoToggle(int client, int args)
 {
 	if (!g_bHotPotato_Enabled)
 	{
-		CReplyToCommand(client, "%s Hot Potato is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Hot Potato");
 		return Plugin_Handled;
 	}
 
@@ -371,9 +371,9 @@ public Action Cmd_HotPotatoToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	HotPotato_Reset();
 
-	CPrintToChatAll("%s Hot Potato is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Hot Potato");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Once the zombies come, {olive}don't be the one holding it{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "HotPotato_Info");
 
 	return Plugin_Handled;
 }
@@ -386,9 +386,11 @@ public Action Cmd_HotPotatoSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_HotPotatoSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

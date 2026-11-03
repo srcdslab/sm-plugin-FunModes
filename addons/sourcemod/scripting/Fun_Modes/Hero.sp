@@ -179,7 +179,7 @@ public void Event_RoundStart_Hero()
 	ResetModeMults(THIS_MODE_INDEX);
 
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Hero mode is on: a hero rises when the zombies come - {olive}protect them{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Hero_RoundStart");
 }
 
 public void Event_RoundEnd_Hero()
@@ -205,9 +205,9 @@ void Hero_Make(int client)
 	GetEntityRenderColor(client, r, g, b, a);
 	SetEntityRenderColor(client, 100, 160, 255, a);
 
-	CPrintToChatAll("%s {olive}%N {lightgreen}is the {olive}HERO! {lightgreen}(%d HP, faster)%s", THIS_MODE_INFO.tag, client, g_iHero_Health,
-		g_iHero_Fall == HERO_FALL_SLAY ? " If the hero falls, every human falls!" : (g_iHero_Fall == HERO_FALL_HURT ? " Keep them alive!" : ""));
-	PrintCenterTextAll("%N IS THE HERO!", client);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag,
+		g_iHero_Fall == HERO_FALL_SLAY ? "Hero_ChosenSlay" : (g_iHero_Fall == HERO_FALL_HURT ? "Hero_ChosenHurt" : "Hero_Chosen"), client, g_iHero_Health);
+	PrintCenterTextAll("%t", "Hero_CenterChosen", client);
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 170);
 }
 
@@ -218,13 +218,13 @@ void Hero_Fallen(int hero)
 
 	if (g_iHero_Fall == HERO_FALL_SLAY)
 	{
-		CPrintToChatAll("%s The hero {olive}%N {lightgreen}has fallen! All humans are slain.", THIS_MODE_INFO.tag, hero);
-		PrintCenterTextAll("THE HERO HAS FALLEN!");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Hero_FallenSlay", hero);
+		PrintCenterTextAll("%t", "Hero_CenterFallen");
 		SlayAllHumans();
 		return;
 	}
 
-	CPrintToChatAll("%s The hero {olive}%N {lightgreen}has fallen!%s", THIS_MODE_INFO.tag, hero, g_iHero_Fall == HERO_FALL_HURT ? " Every human loses 25 HP." : "");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iHero_Fall == HERO_FALL_HURT ? "Hero_FallenHurt" : "Hero_Fallen", hero);
 	if (g_iHero_Fall != HERO_FALL_HURT)
 		return;
 
@@ -244,7 +244,7 @@ public void OnCheck_Hero(bool zombiesNow)
 		{
 			g_iHero = 0;
 			ResetModeMults(THIS_MODE_INDEX);
-			CPrintToChatAll("%s The hero left the server.", THIS_MODE_INFO.tag);
+			CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Hero_Left");
 		}
 		else if (!IsHumanAlive(hero))
 		{
@@ -282,9 +282,9 @@ public void OnTick_Hero()
 
 		SetHudTextParams(-1.0, HUD_Y_HERO, 1.1, 100, 160, 255, 255, 0, 0.0, 0.0, 0.0);
 		if (i == hero)
-			ShowModeHud(i, g_hHero_Hud, "YOU ARE THE HERO! (%d HP)", GetClientHealth(hero));
+			ShowModeHud(i, g_hHero_Hud, "%T", "Hero_HudYou", i, GetClientHealth(hero));
 		else
-			ShowModeHud(i, g_hHero_Hud, "HERO: %N (%d HP)", hero, GetClientHealth(hero));
+			ShowModeHud(i, g_hHero_Hud, "%T", "Hero_HudOther", i, hero, GetClientHealth(hero));
 	}
 }
 
@@ -292,7 +292,7 @@ public Action Cmd_HeroToggle(int client, int args)
 {
 	if (!g_bHero_Enabled)
 	{
-		CReplyToCommand(client, "%s Hero is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -300,9 +300,9 @@ public Action Cmd_HeroToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Hero_Reset();
 
-	CPrintToChatAll("%s Hero is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", THIS_MODE_INFO.name);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s A hero rises when the zombies come - {olive}protect them{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Hero_Info");
 
 	return Plugin_Handled;
 }
@@ -315,10 +315,13 @@ public Action Cmd_HeroSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_HeroSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Make a random human the hero now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Hero_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

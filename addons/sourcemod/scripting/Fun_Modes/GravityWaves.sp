@@ -147,7 +147,7 @@ public void Event_RoundStart_GravityWaves()
 {
 	GravityWaves_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Gravity Waves are on: sometimes gravity just... lets go.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "GravityWaves_RoundStart");
 }
 
 void GravityWaves_Start()
@@ -155,8 +155,8 @@ void GravityWaves_Start()
 	g_bGravity_Active = true;
 	g_fGravity_Ends = GetGameTime() + float(g_iGravity_Last);
 
-	CPrintToChatAll("%s {olive}GRAVITY WAVE! {lightgreen}Low gravity for {olive}%d {lightgreen}seconds!", THIS_MODE_INFO.tag, g_iGravity_Last);
-	PrintCenterTextAll("LOW GRAVITY!");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "GravityWaves_Started", g_iGravity_Last);
+	PrintCenterTextAll("%t", "GravityWaves_CenterLow");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 210);
 }
 
@@ -173,7 +173,7 @@ public void OnTick_GravityWaves()
 		if (GetGameTime() >= g_fGravity_Ends)
 		{
 			g_bGravity_Active = false;
-			PrintCenterTextAll("Gravity is back to normal");
+			PrintCenterTextAll("%t", "GravityWaves_CenterNormal");
 		}
 
 		return;
@@ -187,7 +187,7 @@ public Action Cmd_GravityWavesToggle(int client, int args)
 {
 	if (!g_bGravityWaves_Enabled)
 	{
-		CReplyToCommand(client, "%s Gravity Waves is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Gravity Waves");
 		return Plugin_Handled;
 	}
 
@@ -195,9 +195,9 @@ public Action Cmd_GravityWavesToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	GravityWaves_Reset();
 
-	CPrintToChatAll("%s Gravity Waves is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Gravity Waves");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Sometimes gravity just... lets go.", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "GravityWaves_Info");
 
 	return Plugin_Handled;
 }
@@ -210,10 +210,13 @@ public Action Cmd_GravityWavesSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_GravityWavesSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Gravity wave now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bGravity_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "GravityWaves_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bGravity_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

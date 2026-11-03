@@ -140,7 +140,7 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 {
 	if (!g_bDoubleJump_Enabled)
 	{
-		CReplyToCommand(client, "%s DoubleJump disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", THIS_MODE_INFO.name);
 		return Plugin_Handled;
 	}
 
@@ -148,18 +148,19 @@ public Action Cmd_DoubleJumpToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 
 	CPrintToChatAll(
-		"%s DoubleJump is now %s",
+		"%s %t",
 		THIS_MODE_INFO.tag,
-		THIS_MODE_INFO.isOn ? "Enabled" : "Disabled"
+		THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff",
+		THIS_MODE_INFO.name
 	);
 
 	if (THIS_MODE_INFO.isOn)
 	{
 		CPrintToChatAll(
-			"%s Humans: %s | Zombies: %s",
+			"%s %t",
 			THIS_MODE_INFO.tag,
-			g_bDoubleJump_Humans ? "Enabled" : "Disabled",
-			g_bDoubleJump_Zombies ? "Enabled" : "Disabled"
+			g_bDoubleJump_Humans ? (g_bDoubleJump_Zombies ? "DoubleJump_TeamsBoth" : "DoubleJump_TeamsHumans")
+				: (g_bDoubleJump_Zombies ? "DoubleJump_TeamsZombies" : "DoubleJump_TeamsNone")
 		);
 	}
 
@@ -217,9 +218,11 @@ public Action Cmd_DoubleJumpSettings(int client, int args)
 {
 	Menu menu = new Menu(Menu_DoubleJumpSettings);
 
-	menu.SetTitle("%s Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem(NULL_STRING, "Show Cvars");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "FunModes_ShowCvars", client);
+	menu.AddItem(NULL_STRING, buffer);
 
 	menu.ExitBackButton = true;
 

@@ -145,7 +145,7 @@ public void Event_RoundStart_Darkness()
 {
 	g_fDarkness_Next = 0.0;
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Sudden Darkness is on: the lights will go out when you least expect it...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Darkness_RoundStart");
 }
 
 void Darkness_Lights()
@@ -165,7 +165,7 @@ void Darkness_Lights()
 		ScreenTint(i, 0, 0, 0, g_iDarkness_LevelAlpha[level], float(g_iDarkness_Last), 2.0);
 	}
 
-	CPrintToChatAll("%s The lights went out!", THIS_MODE_INFO.tag);
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Darkness_LightsOut");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 35);
 }
 
@@ -179,7 +179,7 @@ public Action Cmd_DarknessToggle(int client, int args)
 {
 	if (!g_bDarkness_Enabled)
 	{
-		CReplyToCommand(client, "%s Sudden Darkness is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", "Sudden Darkness");
 		return Plugin_Handled;
 	}
 
@@ -187,9 +187,9 @@ public Action Cmd_DarknessToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	Darkness_Reset();
 
-	CPrintToChatAll("%s Sudden Darkness is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", "Sudden Darkness");
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s The lights will go out when you least expect it...", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "Darkness_Info");
 
 	return Plugin_Handled;
 }
@@ -202,10 +202,13 @@ public Action Cmd_DarknessSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_DarknessSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, THIS_MODE_INFO.name);
 
-	menu.AddItem("now", "Lights out now", (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "Darkness_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);

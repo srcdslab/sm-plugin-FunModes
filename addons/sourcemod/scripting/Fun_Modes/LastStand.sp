@@ -13,6 +13,7 @@
 
 #undef THIS_MODE_NAME
 #define THIS_MODE_NAME "LastStand"
+#define LASTSTAND_DISPLAY_NAME "Last Stand"
 
 static int g_iLastStandIndex = -1;
 
@@ -137,7 +138,7 @@ public void Event_RoundStart_LastStand()
 {
 	LastStand_Reset();
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s Last Stand is on: when only {olive}%d {lightgreen}human%s remain, they get a power boost!", THIS_MODE_INFO.tag, g_iLastStand_At, g_iLastStand_At == 1 ? "" : "s");
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, g_iLastStand_At == 1 ? "LastStand_RoundInfoOne" : "LastStand_RoundInfo", g_iLastStand_At);
 }
 
 void LastStand_Trigger()
@@ -157,15 +158,17 @@ void LastStand_Trigger()
 			SetEntityHealth(i, GetClientHealth(i) + g_iLastStand_Health);
 	}
 
-	char bonus[64];
-	if (g_iLastStand_Health > 0)
-		FormatEx(bonus, sizeof(bonus), "+%d HP", g_iLastStand_Health);
+	bool health = g_iLastStand_Health > 0, speed = g_fLastStand_Speed > 1.001;
+	if (health && speed)
+		CPrintToChatAll("%s %t %t", THIS_MODE_INFO.tag, count == 1 ? "LastStand_TriggeredOne" : "LastStand_Triggered", count, "LastStand_BonusBoth", g_iLastStand_Health, g_fLastStand_Speed);
+	else if (health)
+		CPrintToChatAll("%s %t %t", THIS_MODE_INFO.tag, count == 1 ? "LastStand_TriggeredOne" : "LastStand_Triggered", count, "LastStand_BonusHealth", g_iLastStand_Health);
+	else if (speed)
+		CPrintToChatAll("%s %t %t", THIS_MODE_INFO.tag, count == 1 ? "LastStand_TriggeredOne" : "LastStand_Triggered", count, "LastStand_BonusSpeed", g_fLastStand_Speed);
+	else
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, count == 1 ? "LastStand_TriggeredOne" : "LastStand_Triggered", count);
 
-	if (g_fLastStand_Speed > 1.001)
-		Format(bonus, sizeof(bonus), "%s%sx%.2f speed", bonus, bonus[0] ? ", " : "", g_fLastStand_Speed);
-
-	CPrintToChatAll("%s Only {olive}%d {lightgreen}human%s left - {olive}LAST STAND!%s%s", THIS_MODE_INFO.tag, count, count == 1 ? "" : "s", bonus[0] ? " " : "", bonus);
-	PrintCenterTextAll("LAST STAND!");
+	PrintCenterTextAll("%t", "LastStand_Center");
 	EmitSoundToAll(Beacon_Sound, _, _, _, _, _, 200);
 }
 
@@ -212,7 +215,7 @@ public Action Cmd_LastStandToggle(int client, int args)
 {
 	if (!g_bLastStand_Enabled)
 	{
-		CReplyToCommand(client, "%s Last Stand is currently Disabled", THIS_MODE_INFO.tag);
+		CReplyToCommand(client, "%s %t", THIS_MODE_INFO.tag, "FunModes_ModeDisabled", LASTSTAND_DISPLAY_NAME);
 		return Plugin_Handled;
 	}
 
@@ -220,9 +223,9 @@ public Action Cmd_LastStandToggle(int client, int args)
 	THIS_MODE_INFO.byRoulette = false;
 	LastStand_Reset();
 
-	CPrintToChatAll("%s Last Stand is now {olive}%s{lightgreen}!", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "On" : "Off");
+	CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, THIS_MODE_INFO.isOn ? "FunModes_ModeNowOn" : "FunModes_ModeNowOff", LASTSTAND_DISPLAY_NAME);
 	if (THIS_MODE_INFO.isOn)
-		CPrintToChatAll("%s When only a few humans remain, they get a {olive}power boost{lightgreen}!", THIS_MODE_INFO.tag);
+		CPrintToChatAll("%s %t", THIS_MODE_INFO.tag, "LastStand_Info");
 
 	return Plugin_Handled;
 }
@@ -235,10 +238,13 @@ public Action Cmd_LastStandSettings(int client, int args)
 
 	Menu menu = new Menu(Menu_LastStandSettings);
 
-	menu.SetTitle("%s - Settings", THIS_MODE_INFO.name);
+	menu.SetTitle("%T", "FunModes_SettingsTitle", client, LASTSTAND_DISPLAY_NAME);
 
-	menu.AddItem("now", "Trigger it now", (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bLastStand_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
-	menu.AddItem("cvars", "Show Cvars\n");
+	char buffer[128];
+	FormatEx(buffer, sizeof(buffer), "%T", "LastStand_MenuNow", client);
+	menu.AddItem("now", buffer, (THIS_MODE_INFO.isOn && g_bRoundLive && !g_bLastStand_Active) ? ITEMDRAW_DEFAULT : ITEMDRAW_DISABLED);
+	FormatEx(buffer, sizeof(buffer), "%T\n", "FunModes_ShowCvars", client);
+	menu.AddItem("cvars", buffer);
 
 	menu.ExitBackButton = true;
 	menu.Display(client, MENU_TIME_FOREVER);
