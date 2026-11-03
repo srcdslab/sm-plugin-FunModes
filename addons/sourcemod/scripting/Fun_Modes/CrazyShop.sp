@@ -188,12 +188,13 @@ int g_iCrazyShopProps;
 
 Database g_hCrazyShop_DB;
 bool g_bCrazyShop_DBConnecting;
+bool g_bCrazyShop_DBMySQL;
 Handle g_hCrazyShop_DBRetryTimer;
 
 /* Macros */
 /***************************************************************/
 #define THIS_MODE_DB					g_hCrazyShop_DB
-#define CRAZYSHOP_DB_NAME				"FM_CrazyShop" // Only SQLITE is supported
+#define CRAZYSHOP_DB_NAME				"FM_CrazyShop" // MYSQL or SQLITE
 #define CRAZYSHOP_DB_DATA_COLUMN		"clients_data"
 #define CRAZYSHOP_DB_ITEMS_DATA_COLUMN	"shop_items_data"
 #define CRAZYSHOP_DB_RETRY_DELAY		30.0
@@ -675,38 +676,65 @@ void CrazyShop_DB_CreateTables()
 	char driver[10];
 	THIS_MODE_DB.Driver.GetIdentifier(driver, sizeof(driver));
 
-	if (strcmp(driver, "sqlite", false) != 0)
+	if (strcmp(driver, "mysql", false) == 0)
+		g_bCrazyShop_DBMySQL = true;
+	else if (strcmp(driver, "sqlite", false) == 0)
+		g_bCrazyShop_DBMySQL = false;
+	else
 	{
 		delete THIS_MODE_DB;
-		LogError("[FM-%s] Only SQLITE is supported", THIS_MODE_INFO.name);
+		LogError("[FM-%s] Unsupported database driver \"%s\", only mysql and sqlite are supported", THIS_MODE_INFO.name, driver);
 		return;
 	}
 
 	Transaction tr = new Transaction();
 
 	char query[1024];
-	THIS_MODE_DB.Format(query, sizeof(query),
-					"CREATE TABLE IF NOT EXISTS `%s` ("
-				... "`client_steamid` INTEGER PRIMARY KEY NOT NULL,"
-				... "`credits` INTEGER NOT NULL)", CRAZYSHOP_DB_DATA_COLUMN);
+	if (g_bCrazyShop_DBMySQL)
+	{
+		// Signed like the SQLite INTEGER columns: the account id is formatted with %d
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"CREATE TABLE IF NOT EXISTS `%s` ("
+					... "`client_steamid` INT NOT NULL,"
+					... "`credits` INT NOT NULL,"
+					... "PRIMARY KEY(`client_steamid`))", CRAZYSHOP_DB_DATA_COLUMN);
 
-	tr.AddQuery(query);
+		tr.AddQuery(query);
 
-	THIS_MODE_DB.Format(query, sizeof(query),
-					"CREATE TABLE IF NOT EXISTS `%s` ("
-				... "`client_steamid` INTEGER NOT NULL,"
-				... "`item` INTEGER NOT NULL,"
-				... "`count` INTEGER NOT NULL,"
-				... "UNIQUE(`client_steamid`, `item`))", CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"CREATE TABLE IF NOT EXISTS `%s` ("
+					... "`client_steamid` INT NOT NULL,"
+					... "`item` INT NOT NULL,"
+					... "`count` INT NOT NULL,"
+					... "PRIMARY KEY(`client_steamid`, `item`))", CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
 
-	tr.AddQuery(query);
+		tr.AddQuery(query);
+	}
+	else
+	{
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"CREATE TABLE IF NOT EXISTS `%s` ("
+					... "`client_steamid` INTEGER PRIMARY KEY NOT NULL,"
+					... "`credits` INTEGER NOT NULL)", CRAZYSHOP_DB_DATA_COLUMN);
+
+		tr.AddQuery(query);
+
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"CREATE TABLE IF NOT EXISTS `%s` ("
+					... "`client_steamid` INTEGER NOT NULL,"
+					... "`item` INTEGER NOT NULL,"
+					... "`count` INTEGER NOT NULL,"
+					... "UNIQUE(`client_steamid`, `item`))", CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+
+		tr.AddQuery(query);
+	}
 
 	THIS_MODE_DB.Execute(tr, DB_CrazyShop_TablesOnSuccess, DB_CrazyShop_TablesOnError, _, DBPrio_High);
 }
 
 void DB_CrazyShop_TablesOnSuccess(Database database, any data, int queries, Handle[] results, any[] queryData)
 {
-	LogMessage("[FM-%s] Successfully created tables (SQLITE)", THIS_MODE_INFO.name);
+	LogMessage("[FM-%s] Successfully created tables (%s)", THIS_MODE_INFO.name, g_bCrazyShop_DBMySQL ? "MYSQL" : "SQLITE");
 
 	// here is where we get players' credits and items:
 	CrazyShop_DB_GetAllData();
@@ -714,7 +742,7 @@ void DB_CrazyShop_TablesOnSuccess(Database database, any data, int queries, Hand
 
 void DB_CrazyShop_TablesOnError(Database database, any data, int queries, const char[] error, int failIndex, any[] queryData)
 {
-	LogError("[FM-%s] Error while creating tables (SQLITE): %s", THIS_MODE_INFO.name, error);
+	LogError("[FM-%s] Error while creating tables (%s): %s", THIS_MODE_INFO.name, g_bCrazyShop_DBMySQL ? "MYSQL" : "SQLITE", error);
 }
 
 void CrazyShop_DB_GetAllData()
@@ -802,9 +830,14 @@ void CrazyShop_DB_SavePlayer(int client)
 	char query[512];
 	if (!PLAYER_IN_DB(client) || PLAYER_CREDITS(client) != PLAYER_CREDITS_OG(client))
 	{
-		THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `credits`) VALUES (%d, %d) "
-											    ... "ON CONFLICT(`client_steamid`) DO UPDATE SET `credits`=excluded.credits",
-											    	CRAZYSHOP_DB_DATA_COLUMN, steamID, PLAYER_CREDITS(client));
+		if (g_bCrazyShop_DBMySQL)
+			THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `credits`) VALUES (%d, %d) "
+												    ... "ON DUPLICATE KEY UPDATE `credits`=VALUES(`credits`)",
+												    	CRAZYSHOP_DB_DATA_COLUMN, steamID, PLAYER_CREDITS(client));
+		else
+			THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `credits`) VALUES (%d, %d) "
+												    ... "ON CONFLICT(`client_steamid`) DO UPDATE SET `credits`=excluded.credits",
+												    	CRAZYSHOP_DB_DATA_COLUMN, steamID, PLAYER_CREDITS(client));
 
 		tr.AddQuery(query);
 		queries++;
@@ -818,10 +851,16 @@ void CrazyShop_DB_SavePlayer(int client)
 		// A missing row loads as a count of 0
 		if (PLAYER_ITEM_COUNT(client, i) > 0)
 		{
-			THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `item`, `count`) VALUES "
-													... "(%d, %d, %d) ON CONFLICT(`client_steamid`, `item`) DO UPDATE SET "
-													... "`count` = excluded.count",
-												    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID, i, PLAYER_ITEM_COUNT(client, i));
+			if (g_bCrazyShop_DBMySQL)
+				THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `item`, `count`) VALUES "
+														... "(%d, %d, %d) ON DUPLICATE KEY UPDATE "
+														... "`count`=VALUES(`count`)",
+													    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID, i, PLAYER_ITEM_COUNT(client, i));
+			else
+				THIS_MODE_DB.Format(query, sizeof(query), 	"INSERT INTO `%s` (`client_steamid`, `item`, `count`) VALUES "
+														... "(%d, %d, %d) ON CONFLICT(`client_steamid`, `item`) DO UPDATE SET "
+														... "`count` = excluded.count",
+													    	CRAZYSHOP_DB_ITEMS_DATA_COLUMN, steamID, i, PLAYER_ITEM_COUNT(client, i));
 		}
 		else
 		{
