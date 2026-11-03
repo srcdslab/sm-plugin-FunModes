@@ -349,7 +349,7 @@ Action Timer_ApplyBlind(Handle timer, int ref)
 		return Plugin_Stop;
 	
 	int owner = GetEntPropEnt(entity, Prop_Data, "m_hOwnerEntity");
-	if (!owner)
+	if (owner < 1 || owner > MaxClients)
 		return Plugin_Stop;
 	
 	if (!IsPlayerAlive(owner) || !ZR_IsClientZombie(owner))

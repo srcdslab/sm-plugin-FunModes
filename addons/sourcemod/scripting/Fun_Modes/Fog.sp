@@ -1256,7 +1256,7 @@ void Fog_Menu(int client)
 			Format(title, sizeof(title), "%s\n%T", title, g_bFog_PresetEdited ? "Fog_MenuPresetEdited" : "Fog_MenuPreset", client, g_sFog_LastPreset);
 	}
 	Format(title, sizeof(title), "%s\n%T\n ", title, "Fog_MenuFineTune", client);
-	menu.SetTitle(title);
+	menu.SetTitle("%s", title);
 
 	bool on = Fog_IsOn();
 	FormatEx(line, sizeof(line), "%T", on ? "Fog_MenuTurnOff" : "Fog_MenuTurnOn", client);

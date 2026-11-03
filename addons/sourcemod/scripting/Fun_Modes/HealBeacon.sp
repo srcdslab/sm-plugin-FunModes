@@ -938,7 +938,7 @@ Action Cmd_HealBeaconDistance(int client, int args)
 
     g_BeaconPlayersData[target].distance = distance;
     CReplyToCommand(client, "%s %T", THIS_MODE_INFO.tag, "HealBeacon_DistanceChange", client, target, distance);
-    LogAction(client, target, "[FunModes-HealBeacon] \"%L\" changed Beacon Distance of \"%L\" to \"%d\"", client, target, distance);
+    LogAction(client, target, "[FunModes-HealBeacon] \"%L\" changed Beacon Distance of \"%L\" to \"%.2f\"", client, target, distance);
     return Plugin_Handled;
 }
 
