@@ -260,7 +260,7 @@ A bunch of powerful items that can be bought by earing credits by shooting the z
 - sm_crazyshop_enable - "Enable/Disable CrazyShop Mode (This differs from turning it on/off)"
 
 ### Database
-With `sm_crazyshop_savecredits 1`, credits and items are saved through the `FM_CrazyShop` entry of `addons/sourcemod/configs/databases.cfg`. MySQL (or MariaDB) and SQLite are both supported, the tables are created on their own. The table names (`clients_data`, `shop_items_data`) are generic: give the mode its own database.
+With `sm_crazyshop_savecredits 1`, credits and items are saved through the `FM_CrazyShop` entry of `addons/sourcemod/configs/databases.cfg`. MySQL (or MariaDB) and SQLite are both supported, the tables are created on their own. The tables are `fm_crazyshop_credits` and `fm_crazyshop_items`; the old `clients_data` and `shop_items_data` tables of an existing database are renamed on connect.
 
 ```
 "FM_CrazyShop"
