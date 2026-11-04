@@ -259,6 +259,29 @@ A bunch of powerful items that can be bought by earing credits by shooting the z
 - sm_crazyshop_disable_shop - "Enable/Disable the !crazyshop command"
 - sm_crazyshop_enable - "Enable/Disable CrazyShop Mode (This differs from turning it on/off)"
 
+### Database
+With `sm_crazyshop_savecredits 1`, credits and items are saved through the `FM_CrazyShop` entry of `addons/sourcemod/configs/databases.cfg`. MySQL (or MariaDB) and SQLite are both supported, the tables are created on their own. The table names (`clients_data`, `shop_items_data`) are generic: give the mode its own database.
+
+```
+"FM_CrazyShop"
+{
+	"driver"	"sqlite"
+	"database"	"fm_crazyshop"
+}
+```
+
+```
+"FM_CrazyShop"
+{
+	"driver"	"mysql"
+	"host"		"127.0.0.1"
+	"database"	"fm_crazyshop"
+	"user"		"user"
+	"pass"		"password"
+	"port"		"3306"
+}
+```
+
 ## RealityShift
 Each human will swap their position with another every x seconds (after a countdown). Players carrying a map item are never moved
 
