@@ -195,8 +195,10 @@ Handle g_hCrazyShop_DBRetryTimer;
 /***************************************************************/
 #define THIS_MODE_DB					g_hCrazyShop_DB
 #define CRAZYSHOP_DB_NAME				"FM_CrazyShop" // MYSQL or SQLITE
-#define CRAZYSHOP_DB_DATA_COLUMN		"clients_data"
-#define CRAZYSHOP_DB_ITEMS_DATA_COLUMN	"shop_items_data"
+#define CRAZYSHOP_DB_DATA_COLUMN		"fm_crazyshop_credits"
+#define CRAZYSHOP_DB_ITEMS_DATA_COLUMN	"fm_crazyshop_items"
+#define CRAZYSHOP_DB_OLD_DATA_COLUMN		"clients_data" // Before 3.2.1, renamed on connect
+#define CRAZYSHOP_DB_OLD_ITEMS_DATA_COLUMN	"shop_items_data" // Before 3.2.1, renamed on connect
 #define CRAZYSHOP_DB_RETRY_DELAY		30.0
 /***************************************************************/
 #define PLAYER_CREDITS(%1) 			g_CrazyShopPlayerData[%1].credits
@@ -687,9 +689,56 @@ void CrazyShop_DB_CreateTables()
 		return;
 	}
 
+	// The tables had generic names before, also used by other plugins (SelfMute has a `clients_data` table):
+	// look for old tables that have a CrazyShop column and can be renamed
+	char query[1024];
+	if (g_bCrazyShop_DBMySQL)
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '%s' AND column_name = 'credits') "
+					... "AND NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '%s'), "
+					... "EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '%s' AND column_name = 'count') "
+					... "AND NOT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '%s')",
+						CRAZYSHOP_DB_OLD_DATA_COLUMN, CRAZYSHOP_DB_DATA_COLUMN, CRAZYSHOP_DB_OLD_ITEMS_DATA_COLUMN, CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+	else
+		THIS_MODE_DB.Format(query, sizeof(query),
+						"SELECT EXISTS(SELECT 1 FROM `sqlite_master` WHERE `type` = 'table' AND `name` = '%s' AND `sql` LIKE '%%`credits`%%') "
+					... "AND NOT EXISTS(SELECT 1 FROM `sqlite_master` WHERE `type` = 'table' AND `name` = '%s'), "
+					... "EXISTS(SELECT 1 FROM `sqlite_master` WHERE `type` = 'table' AND `name` = '%s' AND `sql` LIKE '%%`count`%%') "
+					... "AND NOT EXISTS(SELECT 1 FROM `sqlite_master` WHERE `type` = 'table' AND `name` = '%s')",
+						CRAZYSHOP_DB_OLD_DATA_COLUMN, CRAZYSHOP_DB_DATA_COLUMN, CRAZYSHOP_DB_OLD_ITEMS_DATA_COLUMN, CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+
+	THIS_MODE_DB.Query(DB_CrazyShop_OnCheckOldTables, query, _, DBPrio_High);
+}
+
+void DB_CrazyShop_OnCheckOldTables(Database db, DBResultSet results, const char[] error, any data)
+{
+	if (THIS_MODE_DB == null)
+		return;
+
+	// Creating the new tables now would leave the old data behind for good
+	if (results == null || !results.FetchRow())
+	{
+		LogError("[FM-%s] Error while looking for the old tables (%s): %s", THIS_MODE_INFO.name, g_bCrazyShop_DBMySQL ? "MYSQL" : "SQLITE", error);
+		return;
+	}
+
 	Transaction tr = new Transaction();
 
 	char query[1024];
+	if (results.FetchInt(0))
+	{
+		LogMessage("[FM-%s] Renaming table `%s` to `%s`", THIS_MODE_INFO.name, CRAZYSHOP_DB_OLD_DATA_COLUMN, CRAZYSHOP_DB_DATA_COLUMN);
+		THIS_MODE_DB.Format(query, sizeof(query), "ALTER TABLE `%s` RENAME TO `%s`", CRAZYSHOP_DB_OLD_DATA_COLUMN, CRAZYSHOP_DB_DATA_COLUMN);
+		tr.AddQuery(query);
+	}
+
+	if (results.FetchInt(1))
+	{
+		LogMessage("[FM-%s] Renaming table `%s` to `%s`", THIS_MODE_INFO.name, CRAZYSHOP_DB_OLD_ITEMS_DATA_COLUMN, CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+		THIS_MODE_DB.Format(query, sizeof(query), "ALTER TABLE `%s` RENAME TO `%s`", CRAZYSHOP_DB_OLD_ITEMS_DATA_COLUMN, CRAZYSHOP_DB_ITEMS_DATA_COLUMN);
+		tr.AddQuery(query);
+	}
+
 	if (g_bCrazyShop_DBMySQL)
 	{
 		// Signed like the SQLite INTEGER columns: the account id is formatted with %d
