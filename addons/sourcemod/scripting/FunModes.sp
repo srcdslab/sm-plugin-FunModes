@@ -27,7 +27,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly, Hobbitten",
 	description = "bunch of fun modes for ze mode",
-	version = "3.2.1",
+	version = "3.2.2",
 	url = "https://nide.gg"
 }
 
@@ -260,7 +260,12 @@ public void OnLibraryRemoved(const char[] name)
 
 public void OnPlayerRunCmdPost(int client, int buttons, int impulse)
 {
-	DECLARE_FM_FORWARD_PARAM3(OnPlayerRunCmdPost, client, buttons, impulse)
+	// Runs for every player command: only call the modes that are on, like OnPlayerRunCmd
+	for (int i = 0; i < g_iLastModeIndex; i++)
+	{
+		if (g_ModesInfo[i].isOn)
+			g_ModesInfo[i].forwards.Call_OnPlayerRunCmdPost(client, buttons, impulse);
+	}
 }
 
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
