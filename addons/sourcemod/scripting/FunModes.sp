@@ -27,7 +27,7 @@ public Plugin myinfo =
 	name = "FunModes",
 	author = "Dolly, Hobbitten",
 	description = "bunch of fun modes for ze mode",
-	version = "3.2.3",
+	version = "3.2.4",
 	url = "https://nide.gg"
 }
 
@@ -241,15 +241,22 @@ void FunModes_HookEvent(bool &modeBool, const char[] name, EventHook callback)
 	}
 }
 
+/* DynamicChannels is loaded and its native can be called. Checked when the libraries change, not for every hud text */
+void FunModes_UpdateDynamicChannels()
+{
+	g_bPlugin_DynamicChannels = LibraryExists("DynamicChannels")
+		&& GetFeatureStatus(FeatureType_Native, "GetDynamicChannel") == FeatureStatus_Available;
+}
+
 public void OnAllPluginsLoaded()
 {
-	g_bPlugin_DynamicChannels = LibraryExists("DynamicChannels");
+	FunModes_UpdateDynamicChannels();
 }
 
 public void OnLibraryAdded(const char[] name)
 {
 	if (strcmp(name, "DynamicChannels", false) == 0)
-		g_bPlugin_DynamicChannels = true;
+		FunModes_UpdateDynamicChannels();
 }
 
 public void OnLibraryRemoved(const char[] name)
@@ -258,23 +265,22 @@ public void OnLibraryRemoved(const char[] name)
 		g_bPlugin_DynamicChannels = false;
 }
 
-public void OnPlayerRunCmdPost(int client, int buttons, int impulse)
-{
-	// Runs for every player command: only call the modes that are on, like OnPlayerRunCmd
-	for (int i = 0; i < g_iLastModeIndex; i++)
-	{
-		if (g_ModesInfo[i].isOn)
-			g_ModesInfo[i].forwards.Call_OnPlayerRunCmdPost(client, buttons, impulse);
-	}
-}
-
+/* Runs for every player command (players x tickrate times a second): only the few modes that use it are looked at,
+   and there is no OnPlayerRunCmdPost, a second callback as costly as this one for the flashlight key alone */
 public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
 	bool changed = false;
-	for (int i = 0; i < g_iLastModeIndex; i++)
+	for (int i = 0; i < g_iFwdModesCount[FWDI_OnPlayerRunCmd]; i++)
 	{
-		if (g_ModesInfo[i].isOn)
-			g_ModesInfo[i].forwards.Call_OnPlayerRunCmd(client, buttons, vel, changed);
+		int mode = g_iFwdModes[FWDI_OnPlayerRunCmd][i];
+		if (g_ModesInfo[mode].isOn)
+			g_ModesInfo[mode].forwards.Call_OnPlayerRunCmd(client, buttons, vel, changed);
+	}
+
+	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
+	if (impulse == 100)
+	{
+		DECLARE_FM_FORWARD_ON_PARAM1(OnFlashlight, client)
 	}
 
 	return changed ? Plugin_Changed : Plugin_Continue;
@@ -284,10 +290,11 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 public Action CS_OnBuyCommand(int client, const char[] weapon)
 {
 	Action result = Plugin_Continue;
-	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
+	for (int i = 0; i < g_iFwdModesCount[FWDI_OnBuyCommand] && result == Plugin_Continue; i++)
 	{
-		if (g_ModesInfo[i].isOn)
-			g_ModesInfo[i].forwards.Call_OnBuyCommand(client, weapon, result);
+		int mode = g_iFwdModes[FWDI_OnBuyCommand][i];
+		if (g_ModesInfo[mode].isOn)
+			g_ModesInfo[mode].forwards.Call_OnBuyCommand(client, weapon, result);
 	}
 
 	return result;
@@ -297,10 +304,11 @@ public Action CS_OnBuyCommand(int client, const char[] weapon)
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
 {
 	Action result = Plugin_Continue;
-	for (int i = 0; i < g_iLastModeIndex && result == Plugin_Continue; i++)
+	for (int i = 0; i < g_iFwdModesCount[FWDI_OnClientSayCommand] && result == Plugin_Continue; i++)
 	{
-		if (g_ModesInfo[i].isOn)
-			g_ModesInfo[i].forwards.Call_OnClientSayCommand(client, sArgs, result);
+		int mode = g_iFwdModes[FWDI_OnClientSayCommand][i];
+		if (g_ModesInfo[mode].isOn)
+			g_ModesInfo[mode].forwards.Call_OnClientSayCommand(client, sArgs, result);
 	}
 
 	return result;
@@ -1143,18 +1151,14 @@ Action Cmd_FunModesCvars(int client, int args)
 /* y = the mode's row, sync = the mode's own text slot (else the shared one, which the other modes overwrite) */
 stock void SendHudText(int client, const char[] message, bool isFar = false, int color = -1, float y = 0.1, Handle sync = null)
 {
-	static bool dynamicAvailable;
 	int hudChannel = -1;
-
-	if (!dynamicAvailable)
-		dynamicAvailable = g_bPlugin_DynamicChannels && GetFeatureStatus(FeatureType_Native, "GetDynamicChannel") == FeatureStatus_Available;
 
 	int channel = g_cvHUDChannel.IntValue;
 	if (channel < 0 || channel > 5)
 		channel = 4;
 
 #if defined _DynamicChannels_included_
-	if (dynamicAvailable)
+	if (g_bPlugin_DynamicChannels)
 		hudChannel = GetDynamicChannel(channel);
 #endif
 
@@ -1185,7 +1189,7 @@ stock void SendHudText(int client, const char[] message, bool isFar = false, int
 		return;
 	}
 
-	if (dynamicAvailable)
+	if (g_bPlugin_DynamicChannels)
 	{
 		ShowHudText(client, hudChannel, "%s", message);
 		return;

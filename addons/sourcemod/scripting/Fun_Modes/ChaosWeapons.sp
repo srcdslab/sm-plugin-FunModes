@@ -332,13 +332,9 @@ void SetAllWeaponsKnockback(float kb = 0.0, int index = -1, bool firstTime = fal
 	}
 }
 
-public void OnPlayerRunCmdPost_ChaosWeapons(int client, int buttons, int impulse)
+/* The flashlight key buys the current chaos weapon */
+public void OnFlashlight_ChaosWeapons(int client)
 {
-	#pragma unused buttons
-
-	if (!THIS_MODE_INFO.isOn)
-		return;
-
 	if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
 		return;
 
@@ -348,40 +344,36 @@ public void OnPlayerRunCmdPost_ChaosWeapons(int client, int buttons, int impulse
 	if (currentTime <= playersTime[client])
 		return;
 
-	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
-	if (impulse == 100)
-	{	
-		playersTime[client] = currentTime + 2.0;
+	playersTime[client] = currentTime + 2.0;
 
-		char curWeapon[sizeof(g_sChaosWeaponCurrent)];
-		strcopy(curWeapon, sizeof(curWeapon), g_sChaosWeaponCurrent);
+	char curWeapon[sizeof(g_sChaosWeaponCurrent)];
+	strcopy(curWeapon, sizeof(curWeapon), g_sChaosWeaponCurrent);
 
-		int weapon = 0; 
+	int weapon = 0; 
 
-		ReplaceString(curWeapon, sizeof(curWeapon), "weapon_", "");
-		int price = ZR_GetWeaponZMarketPrice(curWeapon);
+	ReplaceString(curWeapon, sizeof(curWeapon), "weapon_", "");
+	int price = ZR_GetWeaponZMarketPrice(curWeapon);
 
-		int cash = GetEntProp(client, Prop_Send, "m_iAccount");
-		if (cash < price)
-		{
-			CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "ChaosWeapons_NoMoney");
-			return;
-		}
-
-		weapon = GetPlayerWeaponSlot(client, CS_SLOT_PRIMARY);
-		if (IsValidEntity(weapon))
-		{
-			SDKHooks_DropWeapon(client, weapon);
-			RemoveEntity(weapon);
-		}
-
-		weapon = GivePlayerItem(client, g_sChaosWeaponCurrent);
-		if (!IsValidEntity(weapon))
-			return;
-
-		if (g_hSwitchSDKCall != null)
-			SDKCall(g_hSwitchSDKCall, client, weapon, 0);
-
-		SetEntProp(client, Prop_Send, "m_iAccount", cash - price);
+	int cash = GetEntProp(client, Prop_Send, "m_iAccount");
+	if (cash < price)
+	{
+		CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "ChaosWeapons_NoMoney");
+		return;
 	}
+
+	weapon = GetPlayerWeaponSlot(client, CS_SLOT_PRIMARY);
+	if (IsValidEntity(weapon))
+	{
+		SDKHooks_DropWeapon(client, weapon);
+		RemoveEntity(weapon);
+	}
+
+	weapon = GivePlayerItem(client, g_sChaosWeaponCurrent);
+	if (!IsValidEntity(weapon))
+		return;
+
+	if (g_hSwitchSDKCall != null)
+		SDKCall(g_hSwitchSDKCall, client, weapon, 0);
+
+	SetEntProp(client, Prop_Send, "m_iAccount", cash - price);
 }
