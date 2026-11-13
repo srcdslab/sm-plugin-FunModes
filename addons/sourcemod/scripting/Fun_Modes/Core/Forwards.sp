@@ -7,28 +7,56 @@
 
 #pragma semicolon 1
 
-/* Forwards Flags */
-#define FWD_InitCvarsValues          (1 << 0)
-#define FWD_OnPluginEnd              (1 << 1)
-#define FWD_OnMapStart               (1 << 2)
-#define FWD_OnMapEnd                 (1 << 3)
-#define FWD_OnClientPutInServer      (1 << 4)
-#define FWD_OnClientDisconnect       (1 << 5)
-#define FWD_ZR_OnClientInfected      (1 << 6)
-#define FWD_Event_RoundStart         (1 << 7)
-#define FWD_Event_RoundEnd           (1 << 8)
-#define FWD_Event_PlayerSpawn        (1 << 9)
-#define FWD_Event_PlayerTeam         (1 << 10)
-#define FWD_Event_PlayerDeath        (1 << 11)
-#define FWD_OnTakeDamagePost         (1 << 12)
-#define FWD_OnTakeDamage             (1 << 13)
-#define FWD_OnWeaponEquip            (1 << 14)
-#define FWD_OnPlayerRunCmdPost       (1 << 15)
-#define FWD_OnTick                   (1 << 16)
-#define FWD_OnCheck                  (1 << 17)
-#define FWD_OnPlayerRunCmd           (1 << 18)
-#define FWD_OnClientSayCommand       (1 << 19)
-#define FWD_OnBuyCommand             (1 << 20)
+/* Forwards Indexes and Flags */
+#define FWDI_InitCvarsValues         0
+#define FWDI_OnPluginEnd             1
+#define FWDI_OnMapStart              2
+#define FWDI_OnMapEnd                3
+#define FWDI_OnClientPutInServer     4
+#define FWDI_OnClientDisconnect      5
+#define FWDI_ZR_OnClientInfected     6
+#define FWDI_Event_RoundStart        7
+#define FWDI_Event_RoundEnd          8
+#define FWDI_Event_PlayerSpawn       9
+#define FWDI_Event_PlayerTeam        10
+#define FWDI_Event_PlayerDeath       11
+#define FWDI_OnTakeDamagePost        12
+#define FWDI_OnTakeDamage            13
+#define FWDI_OnWeaponEquip           14
+#define FWDI_OnFlashlight            15
+#define FWDI_OnTick                  16
+#define FWDI_OnCheck                 17
+#define FWDI_OnPlayerRunCmd          18
+#define FWDI_OnClientSayCommand      19
+#define FWDI_OnBuyCommand            20
+#define FWD_COUNT                    21
+
+#define FWD_InitCvarsValues          (1 << FWDI_InitCvarsValues)
+#define FWD_OnPluginEnd              (1 << FWDI_OnPluginEnd)
+#define FWD_OnMapStart               (1 << FWDI_OnMapStart)
+#define FWD_OnMapEnd                 (1 << FWDI_OnMapEnd)
+#define FWD_OnClientPutInServer      (1 << FWDI_OnClientPutInServer)
+#define FWD_OnClientDisconnect       (1 << FWDI_OnClientDisconnect)
+#define FWD_ZR_OnClientInfected      (1 << FWDI_ZR_OnClientInfected)
+#define FWD_Event_RoundStart         (1 << FWDI_Event_RoundStart)
+#define FWD_Event_RoundEnd           (1 << FWDI_Event_RoundEnd)
+#define FWD_Event_PlayerSpawn        (1 << FWDI_Event_PlayerSpawn)
+#define FWD_Event_PlayerTeam         (1 << FWDI_Event_PlayerTeam)
+#define FWD_Event_PlayerDeath        (1 << FWDI_Event_PlayerDeath)
+#define FWD_OnTakeDamagePost         (1 << FWDI_OnTakeDamagePost)
+#define FWD_OnTakeDamage             (1 << FWDI_OnTakeDamage)
+#define FWD_OnWeaponEquip            (1 << FWDI_OnWeaponEquip)
+#define FWD_OnFlashlight             (1 << FWDI_OnFlashlight)
+#define FWD_OnTick                   (1 << FWDI_OnTick)
+#define FWD_OnCheck                  (1 << FWDI_OnCheck)
+#define FWD_OnPlayerRunCmd           (1 << FWDI_OnPlayerRunCmd)
+#define FWD_OnClientSayCommand       (1 << FWDI_OnClientSayCommand)
+#define FWD_OnBuyCommand             (1 << FWDI_OnBuyCommand)
+
+/* The modes that define each forward, in the order they were registered: the forwards only loop over them,
+   not over every mode (most modes define a handful of forwards, and some forwards run for every player command) */
+int g_iFwdModes[FWD_COUNT][MAX_MODES_NUM];
+int g_iFwdModesCount[FWD_COUNT];
 
 /* 
 * Checks whether a given forward can be executed for the current mode the compiler is reading.
@@ -36,7 +64,7 @@
 * @param %1		The forward name.
 */
 #define CHECK_FORWARD_FLAG(%1) \
-		if (this.flags != 0 && !(this.flags & FWD_%1)) return;
+		if (!(this.flags & FWD_%1)) return;
 
 /* 
 * Executes a specific forward with no params for the current FM_Forwards enum struct.
@@ -103,45 +131,57 @@
 		Call_Finish();
 
 /*
-* Declares a specific forward with no params to prepare all modes forwards execution.
+* Calls a forward with no params on every mode that defines it.
 *
 * @param %1		The forward name.
 */
 #define DECLARE_FM_FORWARD_PARAM0(%1) \
-		for (int i = 0; i < g_iLastModeIndex; i++) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
 		{ \
-			g_ModesInfo[i].forwards.Call_%1(); \
+			g_ModesInfo[g_iFwdModes[FWDI_%1][fwd_i]].forwards.Call_%1(); \
 		}
 
 /*
-* Declares a specific forward with one param to prepare all modes forwards execution.
+* Calls a forward with one param on every mode that defines it.
 *
 * @param %1		The forward name.
 * @param %2		The first param.
 */
 #define DECLARE_FM_FORWARD_PARAM1(%1,%2) \
-		for (int i = 0; i < g_iLastModeIndex; i++) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
 		{ \
-			g_ModesInfo[i].forwards.Call_%1(%2); \
+			g_ModesInfo[g_iFwdModes[FWDI_%1][fwd_i]].forwards.Call_%1(%2); \
 		}
 
 /*
-* Declares a specific forward with no params, only for the modes that are currently on.
+* Calls a forward with no params on the modes that define it and are on.
 *
 * @param %1		The forward name.
 */
-#define DECLARE_FM_FORWARD_ON_PARAM0(%1) 		for (int i = 0; i < g_iLastModeIndex; i++) 		{ 			if (g_ModesInfo[i].isOn) 				g_ModesInfo[i].forwards.Call_%1(); 		}
+#define DECLARE_FM_FORWARD_ON_PARAM0(%1) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
+		{ \
+			int fwd_m = g_iFwdModes[FWDI_%1][fwd_i]; \
+			if (g_ModesInfo[fwd_m].isOn) \
+				g_ModesInfo[fwd_m].forwards.Call_%1(); \
+		}
 
 /*
-* Declares a specific forward with one param, only for the modes that are currently on.
+* Calls a forward with one param on the modes that define it and are on.
 *
 * @param %1		The forward name.
 * @param %2		The first param.
 */
-#define DECLARE_FM_FORWARD_ON_PARAM1(%1,%2) 		for (int i = 0; i < g_iLastModeIndex; i++) 		{ 			if (g_ModesInfo[i].isOn) 				g_ModesInfo[i].forwards.Call_%1(%2); 		}
+#define DECLARE_FM_FORWARD_ON_PARAM1(%1,%2) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
+		{ \
+			int fwd_m = g_iFwdModes[FWDI_%1][fwd_i]; \
+			if (g_ModesInfo[fwd_m].isOn) \
+				g_ModesInfo[fwd_m].forwards.Call_%1(%2); \
+		}
 
 /*
-* Declares a specific forward with three params to prepare all modes forwards execution.
+* Calls a forward with three params on every mode that defines it.
 *
 * @param %1		The forward name.
 * @param %2		The first param.
@@ -149,13 +189,13 @@
 * @param %4		The third param.
 */
 #define DECLARE_FM_FORWARD_PARAM3(%1,%2,%3,%4) \
-		for (int i = 0; i < g_iLastModeIndex; i++) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
 		{ \
-			g_ModesInfo[i].forwards.Call_%1(%2,%3,%4); \
+			g_ModesInfo[g_iFwdModes[FWDI_%1][fwd_i]].forwards.Call_%1(%2,%3,%4); \
 		}
 
 /*
-* Declares a specific forward with four params to prepare all modes forwards execution.
+* Calls a forward with four params on every mode that defines it.
 *
 * @param %1		The forward name.
 * @param %2		The first param.
@@ -164,13 +204,13 @@
 * @param %5		The fourth param.
 */
 #define DECLARE_FM_FORWARD_PARAM4(%1,%2,%3,%4,%5) \
-		for (int i = 0; i < g_iLastModeIndex; i++) \
+		for (int fwd_i = 0; fwd_i < g_iFwdModesCount[FWDI_%1]; fwd_i++) \
 		{ \
-			g_ModesInfo[i].forwards.Call_%1(%2,%3,%4,%5); \
+			g_ModesInfo[g_iFwdModes[FWDI_%1][fwd_i]].forwards.Call_%1(%2,%3,%4,%5); \
 		}
 
 /*
-* Validates whether a mode can execute this specific forward.
+* Validates whether a mode can execute this specific forward, and adds the mode to the forward's list.
 * Only expanded inside FunModes_ValidateForwards (Core.sp), which provides modeIndex and modeName.
 *
 * @param %1		The forward name.
@@ -181,6 +221,7 @@
 		if (g_ModesInfo[modeIndex].forwards.fn_%1 != INVALID_FUNCTION) \
 		{ \
 			g_ModesInfo[modeIndex].forwards.flags |= FWD_%1; \
+			g_iFwdModes[FWDI_%1][g_iFwdModesCount[FWDI_%1]++] = modeIndex; \
 		}
 
 /*
@@ -205,7 +246,12 @@
 		VALIDATE_FM_ONE_FORWARD(OnTakeDamagePost, "OnTakeDamagePost") \
 		VALIDATE_FM_ONE_FORWARD(OnTakeDamage, "OnTakeDamage") \
 		VALIDATE_FM_ONE_FORWARD(OnWeaponEquip, "OnWeaponEquip") \
-		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmdPost, "OnPlayerRunCmdPost") 		VALIDATE_FM_ONE_FORWARD(OnTick, "OnTick") 		VALIDATE_FM_ONE_FORWARD(OnCheck, "OnCheck") 		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmd, "OnPlayerRunCmd") 		VALIDATE_FM_ONE_FORWARD(OnClientSayCommand, "OnClientSayCommand") 		VALIDATE_FM_ONE_FORWARD(OnBuyCommand, "OnBuyCommand")
+		VALIDATE_FM_ONE_FORWARD(OnFlashlight, "OnFlashlight") \
+		VALIDATE_FM_ONE_FORWARD(OnTick, "OnTick") \
+		VALIDATE_FM_ONE_FORWARD(OnCheck, "OnCheck") \
+		VALIDATE_FM_ONE_FORWARD(OnPlayerRunCmd, "OnPlayerRunCmd") \
+		VALIDATE_FM_ONE_FORWARD(OnClientSayCommand, "OnClientSayCommand") \
+		VALIDATE_FM_ONE_FORWARD(OnBuyCommand, "OnBuyCommand")
 
 enum struct FM_Forwards
 {
@@ -302,10 +348,11 @@ enum struct FM_Forwards
 		CALL_FUNCTION_PARAM3(OnWeaponEquip, client, Cell, weapon, Cell, result, CellRef)
 	}
 
-	Function fn_OnPlayerRunCmdPost;
-	void Call_OnPlayerRunCmdPost(int client, int buttons, int impulse)
+	/* The player pressed the flashlight key (impulse 100), only called while the mode is on */
+	Function fn_OnFlashlight;
+	void Call_OnFlashlight(int client)
 	{
-		CALL_FUNCTION_PARAM3(OnPlayerRunCmdPost, client, Cell, buttons, Cell, impulse, Cell)
+		CALL_FUNCTION_PARAM1(OnFlashlight, client, Cell)
 	}
 
 	/* Called every second while the mode is on */

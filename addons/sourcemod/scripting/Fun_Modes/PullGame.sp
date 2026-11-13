@@ -376,21 +376,15 @@ int PullGame_GetRandomFromArray(int[] arr, int len, int &client)
 	return index;
 }
 
-public void OnPlayerRunCmdPost_PullGame(int client, int buttons, int impulse)
+/* The flashlight key pulls the player in sight */
+public void OnFlashlight_PullGame(int client)
 {
-	#pragma unused buttons
-	if (!THIS_MODE_INFO.isOn)
-		return;
-
 	float time = GetGameTime();
 	if (g_fPullLastUseTime[client] > time)
 		return;
 
-	if (impulse == 100)
-	{
-		Cmd_Pull(client);
-		g_fPullLastUseTime[client] = GetGameTime() + 2.0;
-	}
+	Cmd_Pull(client);
+	g_fPullLastUseTime[client] = time + 2.0;
 }
 
 void Cmd_Pull(int client)
