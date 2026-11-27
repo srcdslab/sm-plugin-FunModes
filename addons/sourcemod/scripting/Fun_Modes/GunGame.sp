@@ -744,7 +744,8 @@ void GunGame_ShowRewardsMenu(int client)
     FormatEx(buffer, sizeof(buffer), "%T", "GunGame_RewardSpeed", client);
     menu.AddItem("0", buffer, g_GunGameData[client].reward == REWARD_SPEED ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
     FormatEx(buffer, sizeof(buffer), "%T", "GunGame_RewardSmokes", client);
-    menu.AddItem("1", buffer, g_GunGameData[client].reward == REWARD_SMOKEGRENADES ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
+    // No smokegrenades to give (the cvar is 0): picking them would only take the speed away
+    menu.AddItem("1", buffer, (g_GunGameData[client].reward == REWARD_SMOKEGRENADES || g_iGunGame_SmokeGrenadesCount <= 0) ? ITEMDRAW_DISABLED : ITEMDRAW_DEFAULT);
 
     menu.ExitBackButton = true;
     menu.Display(client, 60);
@@ -809,14 +810,21 @@ void GunGame_GiveReward(int client, GunGame_Reward reward)
             if (!IsPlayerAlive(client) || !ZR_IsClientHuman(client))
                 return;
 
-			if (!HasPlayerItem(client, "weapon_smokegrenade"))
-			{
-            	int wp = GivePlayerItem(client, "weapon_smokegrenade");
-            	EquipPlayerWeapon(client, wp);
+            int count = g_iGunGame_SmokeGrenadesCount;
+            if (count <= 0)
+                return;
+
+            // GivePlayerItem already gives one smokegrenade: count it, or the player gets one too many
+            int have = 0;
+            if (HasPlayerItem(client, "weapon_smokegrenade"))
+                have = GET_GRENADES_COUNT(client, SMOKEGRENADE);
+            else
+            {
+                int wp = GivePlayerItem(client, "weapon_smokegrenade");
+                EquipPlayerWeapon(client, wp);
             }
 
-            int count = g_iGunGame_SmokeGrenadesCount;
-            SET_GRENADES_COUNT(client, SMOKEGRENADE, GET_GRENADES_COUNT(client, SMOKEGRENADE) + count);
+            SET_GRENADES_COUNT(client, SMOKEGRENADE, have + count);
 
             CPrintToChat(client, "%s %t", THIS_MODE_INFO.tag, "GunGame_GotSmokes", count);
         }
