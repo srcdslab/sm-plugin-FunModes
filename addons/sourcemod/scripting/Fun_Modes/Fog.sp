@@ -112,6 +112,7 @@ FogVals g_Fog_To;
 float g_fFog_T0;
 float g_fFog_T1;
 float g_fFog_NextLerpApply;
+bool g_bFog_FrameQueued;        // Fog_LerpFrame is queued: it runs every frame while a fade runs, not all the time like OnGameFrame
 
 ArrayList g_aFog_OrigRefs;       // map controllers as they were before the takeover (entity refs) ...
 ArrayList g_aFog_OrigVals;       // ... and their values, same order
@@ -215,10 +216,14 @@ Action Fog_EnforceTimer(Handle timer)
 	return Plugin_Continue;
 }
 
-public void OnGameFrame()
+void Fog_LerpFrame(any data)
 {
 	if (!g_bFog_Lerping || !g_bFog_Active)
+	{
+		g_bFog_FrameQueued = false;
 		return;
+	}
+	RequestFrame(Fog_LerpFrame);
 	float now = GetEngineTime();
 	if (now < g_fFog_NextLerpApply)
 		return;
@@ -608,6 +613,11 @@ void Fog_SetTarget(FogVals to, float fade)
 		g_fFog_T1 = g_fFog_T0 + fade;
 		g_fFog_NextLerpApply = 0.0;
 		g_bFog_Lerping = true;
+		if (!g_bFog_FrameQueued)
+		{
+			g_bFog_FrameQueued = true;
+			RequestFrame(Fog_LerpFrame);
+		}
 		g_Fog_Cur.enable = to.enable;
 		g_Fog_Cur.blend = to.blend;
 		g_Fog_Cur.farz = to.farz;

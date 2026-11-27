@@ -593,13 +593,9 @@ void CrazyShop_CheckIgnite(int userid)
 	}
 }
 
-public void OnPlayerRunCmdPost_CrazyShop(int client, int buttons, int impulse)
+/* The flashlight key opens the shop */
+public void OnFlashlight_CrazyShop(int client)
 {
-	#pragma unused buttons
-
-	if (!THIS_MODE_INFO.isOn)
-		return;
-
 	if (!IsPlayerAlive(client))
 		return;
 
@@ -607,12 +603,8 @@ public void OnPlayerRunCmdPost_CrazyShop(int client, int buttons, int impulse)
 	if (currentTime <= PLAYER_TEMP_VAR(client, lastUse))
 		return;
 
-	// https://github.com/ValveSoftware/source-sdk-2013/blob/7191ecc418e28974de8be3a863eebb16b974a7ef/src/game/server/player.cpp#L6073
-	if (impulse == 100)
-	{
-		PLAYER_TEMP_VAR(client, lastUse) = currentTime + 2.0;
-		CrazyShop_OpenAvailableItems(client);
-	}
+	PLAYER_TEMP_VAR(client, lastUse) = currentTime + 2.0;
+	CrazyShop_OpenAvailableItems(client);
 }
 
 /* TODO: Handle this in FunModes.sp */

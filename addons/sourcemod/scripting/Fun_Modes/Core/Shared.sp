@@ -28,6 +28,11 @@ Handle g_hTickTimer = null;
 float g_fSpeedMult[MAXPLAYERS + 1][MAX_MODES_NUM];
 float g_fGravityMult[MAXPLAYERS + 1][MAX_MODES_NUM];
 
+/* How many modes hold a multiplier other than 1.0 on the player: with none, the player is skipped without reading
+   their speed or gravity (Physics_Apply runs for every player 5 times a second) */
+int g_iSpeedMults[MAXPLAYERS + 1];
+int g_iGravityMults[MAXPLAYERS + 1];
+
 bool g_bSpeedTouched[MAXPLAYERS + 1];
 float g_fSpeedBase[MAXPLAYERS + 1];
 float g_fSpeedSet[MAXPLAYERS + 1];
@@ -120,11 +125,19 @@ void FunModes_RunCheck()
 	if (g_bCheckRunning)
 		return;
 
+	// Nothing to check: only look for the first zombies (g_bZombiesSeen), not for every check
+	bool anyOn = false;
+	for (int i = 0; i < g_iFwdModesCount[FWDI_OnCheck] && !anyOn; i++)
+		anyOn = g_ModesInfo[g_iFwdModes[FWDI_OnCheck][i]].isOn;
+
+	if (!anyOn && (g_bZombiesSeen || !g_bRoundLive))
+		return;
+
 	g_bCheckRunning = true;
 
 	bool zombiesNow = ZombiesAlive();
 
-	if (g_bRoundLive)
+	if (g_bRoundLive && anyOn)
 	{
 		DECLARE_FM_FORWARD_ON_PARAM1(OnCheck, zombiesNow)
 	}
@@ -580,11 +593,13 @@ stock void ExplodeAt(const float pos[3], float radius, int damage, float knock, 
 
 stock void SetSpeedMult(int client, int modeIndex, float mult)
 {
+	g_iSpeedMults[client] += Physics_MultCountDelta(g_fSpeedMult[client][modeIndex], mult);
 	g_fSpeedMult[client][modeIndex] = mult;
 }
 
 stock void SetGravityMult(int client, int modeIndex, float mult)
 {
+	g_iGravityMults[client] += Physics_MultCountDelta(g_fGravityMult[client][modeIndex], mult);
 	g_fGravityMult[client][modeIndex] = mult;
 }
 
@@ -593,14 +608,21 @@ stock void ResetModeMults(int modeIndex)
 {
 	for (int i = 0; i <= MaxClients; i++)
 	{
-		g_fSpeedMult[i][modeIndex] = 1.0;
-		g_fGravityMult[i][modeIndex] = 1.0;
+		SetSpeedMult(i, modeIndex, 1.0);
+		SetGravityMult(i, modeIndex, 1.0);
 	}
 }
 
 bool Physics_Near(float a, float b)
 {
 	return FloatAbs(a - b) < 0.001;
+}
+
+/* +1 when a multiplier leaves 1.0, -1 when it comes back to it */
+int Physics_MultCountDelta(float oldMult, float newMult)
+{
+	bool wasSet = !Physics_Near(oldMult, 1.0), isSet = !Physics_Near(newMult, 1.0);
+	return wasSet == isSet ? 0 : (isSet ? 1 : -1);
 }
 
 void Physics_ApplySpeed(int client, float mult)
@@ -683,6 +705,11 @@ void Physics_Apply()
 			continue;
 		}
 
+		// No mode changes this player's speed or gravity, and none did before: nothing to read or write
+		bool speedSet = g_iSpeedMults[i] > 0, gravitySet = g_iGravityMults[i] > 0;
+		if (!speedSet && !gravitySet && !g_bSpeedTouched[i] && !g_bGravityTouched[i])
+			continue;
+
 		float speed = 1.0, gravity = 1.0;
 		if (IsPlayerAlive(i))
 		{
@@ -693,8 +720,11 @@ void Physics_Apply()
 			}
 		}
 
-		Physics_ApplySpeed(i, speed);
-		Physics_ApplyGravity(i, gravity);
+		if (speedSet || g_bSpeedTouched[i])
+			Physics_ApplySpeed(i, speed);
+
+		if (gravitySet || g_bGravityTouched[i])
+			Physics_ApplyGravity(i, gravity);
 	}
 }
 
@@ -718,7 +748,7 @@ stock void ShowModeHud(int client, Handle sync, const char[] format, any ...)
 	VFormat(text, sizeof(text), format, 4);
 
 #if defined _DynamicChannels_included_
-	if (g_bPlugin_DynamicChannels && GetFeatureStatus(FeatureType_Native, "GetDynamicChannel") == FeatureStatus_Available)
+	if (g_bPlugin_DynamicChannels)
 	{
 		int slot;
 		for (int i = 0; i < g_iHudSlotsCount; i++)
